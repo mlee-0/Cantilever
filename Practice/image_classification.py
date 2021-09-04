@@ -46,8 +46,8 @@ fashion_mnist = tf.keras.datasets.fashion_mnist
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
 # Preprocess images by scaling them to [0, 1].
-train_images /= 255
-test_images /= 255
+train_images = train_images / 255
+test_images = test_images / 255
 
 # Show some images and their corresponding labels to verify the images have the correct format.
 # plt.figure()
@@ -86,25 +86,25 @@ probability_model = tf.keras.Sequential([model, tf.keras.layers.Softmax()])
 predictions = probability_model.predict(test_images)
 
 # Show prediction results.
-num_rows = 5
-num_cols = 3
-num_images = num_rows*num_cols
-plt.figure(figsize=(2*2*num_cols, 2*num_rows))
-for i in range(num_images):
-    plt.subplot(num_rows, 2*num_cols, 2*i+1)
-    plot_image(i, predictions[i], test_labels, test_images)
-    plt.subplot(num_rows, 2*num_cols, 2*i+2)
-    plot_value_array(i, predictions[i], test_labels)
-plt.tight_layout()
-plt.show()
+# num_rows = 5
+# num_cols = 3
+# num_images = num_rows*num_cols
+# plt.figure(figsize=(2*2*num_cols, 2*num_rows))
+# for i in range(num_images):
+#     plt.subplot(num_rows, 2*num_cols, 2*i+1)
+#     plot_image(i, predictions[i], test_labels, test_images)
+#     plt.subplot(num_rows, 2*num_cols, 2*i+2)
+#     plot_value_array(i, predictions[i], test_labels)
+# plt.tight_layout()
+# plt.show()
 
 # Use the model on a new image.
-image = Image.open('test.jpg')
-correct_label = 1  # Number between 0, 9
-image = image.resize(image, (28, 28))
-image = np.expand_dims(image, 0)
+image = Image.open('Practice/test.png')
+correct_label = 0  # Number between 0, 9
+image = image.resize((28, 28))
+image = image.convert('L')  # Convert to grayscale
+image = np.expand_dims(image, 0)  # Change size to (1, size, size)
 predictions_single = probability_model.predict(image)
 plot_value_array(correct_label, predictions_single[0], test_labels)
 _ = plt.xticks(range(10), class_names, rotation=45)
 plt.show()
-# print(f'Predicted a {class_names[np.argmax(predictions_single[0])]}')
