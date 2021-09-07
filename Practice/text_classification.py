@@ -13,22 +13,21 @@ from tensorflow.keras import losses
 from tensorflow.keras import preprocessing
 from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
 
+# Download movie review data.
+url = 'https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz'
+dataset = tf.keras.utils.get_file('aclImdb_v1', url, untar=True, cache_dir='.', cache_subdir='')
+dataset_dir = os.path.join(os.path.dirname(dataset), 'aclImdb')
+train_dir = os.path.join(dataset_dir, 'train')
 
-if False:
-    # Download movie review data. Do not run this after the data has already been downloaded.
-    url = 'https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz'
-    dataset = tf.keras.utils.get_file('aclImdb_v1', url, untar=True, cache_dir='.', cache_subdir='')
-    dataset_dir = os.path.join(os.path.dirname(dataset), 'aclImdb')
-    train_dir = os.path.join(dataset_dir, 'train')
+# Remove a folder.
+remove_dir = os.path.join(train_dir, 'unsup')
+shutil.rmtree(remove_dir)
 
-    # Open a single sample file.
-    sample_file = os.path.join(train_dir, 'pos/1181_9.txt')
-    with open(sample_file) as f:
-        print(f.read())
-
-    # Remove a folder.
-    remove_dir = os.path.join(train_dir, 'unsup')
-    shutil.rmtree(remove_dir)
+# # Download Stack Overflow data.
+# url = 'http://storage.googleapis.com/download.tensorflow.org/data/stack_overflow_16k.tar.gz'
+# dataset = tf.keras.utils.get_file('stack_overflow_16k', url, untar=True, cache_dir='.', cache_subdir='')
+# dataset_dir = os.path.join(os.path.dirname(dataset), 'stack_overflow')
+# train_dir = os.path.join(dataset_dir, 'train')
 
 # Gather datasets.
 batch_size = 32
@@ -77,12 +76,12 @@ def vectorize_text(text, label):
     text = tf.expand_dims(text, -1)
     return vectorize_layer(text), label
 
-# Show a sample data from the test dataset.
-text_batch, label_batch = next(iter(raw_train_dataset))
-first_text, first_label = text_batch[0], label_batch[0]
-print('Review', first_text)
-print('Label', raw_train_dataset.class_names[first_label])
-print('Vectorized review', vectorize_text(first_text, first_label))
+# # Show a sample data from the test dataset.
+# text_batch, label_batch = next(iter(raw_train_dataset))
+# first_text, first_label = text_batch[0], label_batch[0]
+# print('Review', first_text)
+# print('Label', raw_train_dataset.class_names[first_label])
+# print('Vectorized review', vectorize_text(first_text, first_label))
 
 # Vectorize the datasets.
 train_dataset = raw_train_dataset.map(vectorize_text)
@@ -102,15 +101,20 @@ model = tf.keras.Sequential([
     layers.Dropout(0.2),
     layers.GlobalAveragePooling1D(),
     layers.Dropout(0.2),
-    layers.Dense(1),
+    layers.Dense(1),  # layers.Dense(4),
 ])
 model.summary()
 
-model.compile(
+model.compile(  # Movie review dataset
     loss=losses.BinaryCrossentropy(from_logits=True),
     optimizer='adam',
     metrics=tf.metrics.BinaryAccuracy(threshold=0.0),
 )
+# model.compile(  # Stack Overflow dataset
+#     loss=losses.SparseCategoricalCrossentropy(),
+#     optimizer='adam',
+#     metrics=['accuracy'],
+# )
 
 # Train the model.
 epochs = 10
@@ -127,8 +131,8 @@ print(f'Accuracy: {accuracy*100}%')
 
 # Plot how the training metrics changed over time.
 history_dict = history.history
-accuracy = history_dict['binary_accuracy']
-validation_accuracy = history_dict['val_binary_accuracy']
+accuracy = history_dict['accuracy']
+validation_accuracy = history_dict['val_accuracy']
 loss = history_dict['loss']
 validation_loss = history_dict['val_loss']
 
@@ -157,7 +161,7 @@ model_export = tf.keras.Sequential([
     layers.Activation('sigmoid')
 ])
 model_export.compile(
-    lsos=losses.BinaryCrossentropy(from_logits=True),
+    loss=losses.BinaryCrossentropy(from_logits=True),
     optimizer='adam',
     metrics=['accuracy']
 )
@@ -181,4 +185,5 @@ data = [
     I went here because I was out of town and craving Chipotle and this was close to my hotel. It is not as good as Chipotle but it did satisfy my craving. This place is also cheaper than Chipotle. My burrito was already closed before I saw that I could put cilantro on there. Darn. Solid 3 stars.
     ''',  # Mixed
 ]  # https://www.yelp.com/biz/moes-southwest-grill-atlanta-19
-model_export.predict(data)
+prediction = model_export.predict(data)
+print(prediction)
