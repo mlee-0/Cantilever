@@ -13,22 +13,21 @@ from tensorflow.keras import losses
 from tensorflow.keras import preprocessing
 from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
 
+# Download movie review data.
+url = 'https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz'
+dataset = tf.keras.utils.get_file('aclImdb_v1', url, untar=True, cache_dir='.', cache_subdir='')
+dataset_dir = os.path.join(os.path.dirname(dataset), 'aclImdb')
+train_dir = os.path.join(dataset_dir, 'train')
 
-if False:
-    # Download movie review data. Do not run this after the data has already been downloaded.
-    url = 'https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz'
-    dataset = tf.keras.utils.get_file('aclImdb_v1', url, untar=True, cache_dir='.', cache_subdir='')
-    dataset_dir = os.path.join(os.path.dirname(dataset), 'aclImdb')
-    train_dir = os.path.join(dataset_dir, 'train')
+# Remove a folder.
+remove_dir = os.path.join(train_dir, 'unsup')
+shutil.rmtree(remove_dir)
 
-    # Open a single sample file.
-    sample_file = os.path.join(train_dir, 'pos/1181_9.txt')
-    with open(sample_file) as f:
-        print(f.read())
-
-    # Remove a folder.
-    remove_dir = os.path.join(train_dir, 'unsup')
-    shutil.rmtree(remove_dir)
+# # Download Stack Overflow data.
+# url = 'http://storage.googleapis.com/download.tensorflow.org/data/stack_overflow_16k.tar.gz'
+# dataset = tf.keras.utils.get_file('stack_overflow_16k', url, untar=True, cache_dir='.', cache_subdir='')
+# dataset_dir = os.path.join(os.path.dirname(dataset), 'stack_overflow')
+# train_dir = os.path.join(dataset_dir, 'train')
 
 # Gather datasets.
 batch_size = 32
@@ -102,15 +101,20 @@ model = tf.keras.Sequential([
     layers.Dropout(0.2),
     layers.GlobalAveragePooling1D(),
     layers.Dropout(0.2),
-    layers.Dense(1),
+    layers.Dense(1),  # layers.Dense(4),
 ])
 model.summary()
 
-model.compile(
+model.compile(  # Movie review dataset
     loss=losses.BinaryCrossentropy(from_logits=True),
     optimizer='adam',
     metrics=tf.metrics.BinaryAccuracy(threshold=0.0),
 )
+# model.compile(  # Stack Overflow dataset
+#     loss=losses.SparseCategoricalCrossentropy(),
+#     optimizer='adam',
+#     metrics=['accuracy'],
+# )
 
 # Train the model.
 epochs = 10
@@ -127,8 +131,8 @@ print(f'Accuracy: {accuracy*100}%')
 
 # Plot how the training metrics changed over time.
 history_dict = history.history
-accuracy = history_dict['binary_accuracy']
-validation_accuracy = history_dict['val_binary_accuracy']
+accuracy = history_dict['accuracy']
+validation_accuracy = history_dict['val_accuracy']
 loss = history_dict['loss']
 validation_loss = history_dict['val_loss']
 
