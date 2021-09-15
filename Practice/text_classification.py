@@ -77,12 +77,12 @@ def vectorize_text(text, label):
     text = tf.expand_dims(text, -1)
     return vectorize_layer(text), label
 
-# Show a sample data from the test dataset.
-text_batch, label_batch = next(iter(raw_train_dataset))
-first_text, first_label = text_batch[0], label_batch[0]
-print('Review', first_text)
-print('Label', raw_train_dataset.class_names[first_label])
-print('Vectorized review', vectorize_text(first_text, first_label))
+# # Show a sample data from the test dataset.
+# text_batch, label_batch = next(iter(raw_train_dataset))
+# first_text, first_label = text_batch[0], label_batch[0]
+# print('Review', first_text)
+# print('Label', raw_train_dataset.class_names[first_label])
+# print('Vectorized review', vectorize_text(first_text, first_label))
 
 # Vectorize the datasets.
 train_dataset = raw_train_dataset.map(vectorize_text)
@@ -157,7 +157,7 @@ model_export = tf.keras.Sequential([
     layers.Activation('sigmoid')
 ])
 model_export.compile(
-    lsos=losses.BinaryCrossentropy(from_logits=True),
+    loss=losses.BinaryCrossentropy(from_logits=True),
     optimizer='adam',
     metrics=['accuracy']
 )
@@ -181,4 +181,5 @@ data = [
     I went here because I was out of town and craving Chipotle and this was close to my hotel. It is not as good as Chipotle but it did satisfy my craving. This place is also cheaper than Chipotle. My burrito was already closed before I saw that I could put cilantro on there. Darn. Solid 3 stars.
     ''',  # Mixed
 ]  # https://www.yelp.com/biz/moes-southwest-grill-atlanta-19
-model_export.predict(data)
+prediction = model_export.predict(data)
+print(prediction)
