@@ -1,3 +1,6 @@
+# https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html?highlight=cifar10
+
+
 import os
 
 import matplotlib.pyplot as plt
@@ -103,6 +106,22 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 print(f'Accuracy of the network on the 10000 test images: {100 * correct / total}%')
+
+# Find how well the model performed on each class.
+correct_predictions = {classname: 0 for classname in classes}
+total_predictions = {classname: 0 for classname in classes}
+
+with torch.no_grad():
+    for images, labels in test_dataloader:
+        outputs = network(images)
+        _, predictions = torch.max(outputs, 1)
+        for label, prediction in zip(labels, predictions):
+            if label == prediction:
+                correct_predictions[classes[label]] += 1
+            total_predictions[classes[label]] += 1
+for classname, correct_count in correct_predictions.items():
+    accuracy = 100 * correct_count / total_predictions[classname]
+    print(f'Accuracy for class {classname}: {accuracy}%.')
 
 # class NeuralNetwork(nn.Module):
 #     def __init__(self):
