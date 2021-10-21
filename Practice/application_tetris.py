@@ -52,27 +52,41 @@ class TetrisDataset(Dataset):
     # Number of holes.
     holes = np.sum(np.logical_not(array_copy[self.INDICES_ROWS[:array_copy.shape[0],:] > (array_copy.shape[0]-heights)]))
 
-    # # Normalize outputs.
-    # line_count /= ROW_COUNT
-    # roughness /= ROW_COUNT * (COLUMN_COUNT - 1)
-    # holes /= (ROW_COUNT - 1) * COLUMN_COUNT
+    # Normalize outputs.
+    line_count /= ROW_COUNT
+    roughness /= ROW_COUNT * (COLUMN_COUNT - 1)
+    holes /= (ROW_COUNT - 1) * COLUMN_COUNT
     # # Format array and labels to have 3 dimensions for use in CNN.
     # array = np.expand_dims(array, 0)
-    # labels = torch.Tensor([line_count])  #torch.Tensor([line_count, roughness, holes])
+    labels = torch.Tensor([[line_count, roughness, holes]])  #torch.Tensor([line_count, roughness, holes])
     # # labels = np.expand_dims(labels, 0)
 
-    return array, holes  #labels
+    return array, labels
 
 class Network(nn.Module):
   def __init__(self):
     super().__init__()
     self.flatten = nn.Flatten()
-    self.model = nn.Sequential(
+    self.model_1 = nn.Sequential(
         nn.Linear(ROW_COUNT * COLUMN_COUNT, 512),
         nn.ReLU(),
         nn.Linear(512, 512),
         nn.ReLU(),
-        nn.Linear(512, (ROW_COUNT - 1) * COLUMN_COUNT + 1)
+        nn.Linear(512, 1)
+    )
+    self.model_2 = nn.Sequential(
+        nn.Linear(ROW_COUNT * COLUMN_COUNT, 512),
+        nn.ReLU(),
+        nn.Linear(512, 512),
+        nn.ReLU(),
+        nn.Linear(512, 1)
+    )
+    self.model_3 = nn.Sequential(
+        nn.Linear(ROW_COUNT * COLUMN_COUNT, 512),
+        nn.ReLU(),
+        nn.Linear(512, 512),
+        nn.ReLU(),
+        nn.Linear(512, 1)
     )
     # self.cnn = nn.Sequential(
     #     nn.Conv2d(in_channels=1, out_channels=4, kernel_size=3, stride=1, padding=1),
@@ -90,35 +104,43 @@ class Network(nn.Module):
   
   def forward(self, x):
     x = self.flatten(x)
-    x = self.model(x)
+    output_1 = self.model_1(x)
+    output_2 = self.model_2(x)
+    output_3 = self.model_3(x)
     # x = self.cnn(x)
     # x = x.view(x.size(0), -1)
     # x = self.linear(x)
     # # x *= ROW_COUNT * (COLUMN_COUNT - 1)
     # # x = x.round()
-    return x
+    return output_1, output_2, output_3
 
-
-# Train the model.
 learning_rate = 0.1
 batch_size = 32
-epochs = 10
 
 dataset = TetrisDataset()
 train_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 model = Network().to(device)
 
-loss_function = nn.CrossEntropyLoss()  #nn.MSELoss()
+loss_function = nn.MSELoss()  #nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
+
+# Train the model.
+epochs = 5
 
 def train(dataloader, model, loss_function, optimizer):
   size = len(dataloader.dataset)
   for batch, (data, label) in enumerate(dataloader):
+    data = data.to(device)
+    label = label.to(device)
     # Input the data into the model to return an output.
-    prediction = model(data.float())
+    line_count, roughness, holes = model(data.float())
     # Calculate the loss by comparing to the true value.
-    loss = loss_function(prediction, label.long())  #loss_function(prediction, label.float())
+    loss_line_count = loss_function(line_count, label[:,:,0].float())  #loss_function(prediction, label.long())
+    loss_roughness = loss_function(roughness, label[:,:,1].float())  #loss_function(prediction, label.long())
+    loss_holes = loss_function(holes, label[:,:,2].float())  #loss_function(prediction, label.long())
+    loss = loss_line_count + loss_roughness + loss_holes
 
     # Reset gradients of model parameters.
     optimizer.zero_grad()
@@ -138,9 +160,13 @@ def test(dataloader, model, loss_function):
 
   with torch.no_grad():
     for data, label in dataloader:
-      prediction = model(data.float())
-      test_loss += loss_function(prediction, label.long()).item()
-      accuracy += (prediction.argmax(1) == label).type(torch.float).sum().item()  #(prediction.argmax(0) == label).type(torch.float).sum().item()
+      data = data.to(device)
+      label = label.to(device)
+      line_count, roughness, holes = model(data.float())
+      test_loss += loss_function(line_count, label[:,:,0].float())  #loss_function(prediction, label.long()).item()
+      test_loss += loss_function(roughness, label[:,:,1].float())  #loss_function(prediction, label.long()).item()
+      test_loss += loss_function(holes, label[:,:,2].float())  #loss_function(prediction, label.long()).item()
+      # accuracy += (prediction.argmax(1) == label).type(torch.float).sum().item()  #(prediction.argmax(0) == label).type(torch.float).sum().item()
 
   test_loss /= batch_count
   accuracy /= size
@@ -169,11 +195,22 @@ plt.grid(axis='y')
 plt.show()
 
 
-# for i in range(1):
-#   data, label = next(iter(test_dataloader))
-#   prediction = model(data.float())
-#   print(torch.round(prediction * torch.Tensor([ROW_COUNT, ROW_COUNT * (COLUMN_COUNT - 1), (ROW_COUNT - 1) * COLUMN_COUNT])))
-#   print(label * torch.Tensor([ROW_COUNT, ROW_COUNT * (COLUMN_COUNT - 1), (ROW_COUNT - 1) * COLUMN_COUNT]))
-#   print(prediction.shape)
+import time
+for i in range(1):
+  data, label = next(iter(test_dataloader))
+  data = data.to(device)
+  label = label.to(device)
+  t1 = time.time()
+  line_count, roughness, holes = model(data.float())
+  t2 = time.time()
+  print((t2-t1) * 1000)
+  # print(prediction.size(), label.size())
+  print(line_count.flatten(), label[0].flatten())
+  print(roughness.flatten(), label[1].flatten())
+  print(holes.flatten(), label[2].flatten())
+  # print(label)
+  # print(torch.round(prediction * torch.Tensor([ROW_COUNT, ROW_COUNT * (COLUMN_COUNT - 1), (ROW_COUNT - 1) * COLUMN_COUNT])))
+  # print(label * torch.Tensor([ROW_COUNT, ROW_COUNT * (COLUMN_COUNT - 1), (ROW_COUNT - 1) * COLUMN_COUNT]))
+  # print(prediction.shape)
 
-torch.save(model.state_dict(), 'holes_weights.pth')
+torch.save(model.state_dict(), 'weights.pth')
