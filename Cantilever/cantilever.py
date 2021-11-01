@@ -1,12 +1,12 @@
 '''
-Train a CNN that predicts the stress contour in a fixed-size cantilever beam with a point load at the end that varies in magnitude and direction.
+Train a CNN that predicts the stress contour in a fixed-size cantilever beam with a constant-magnitude point load at the end that varies in direction.
 
 Properties of the cantilever beam:
     - Dimensions: 1 m (length), 0.25 m (height), 0.25 m (depth).
     - Material: structural steel.
     - Elastic modulus: 200 GPa.
 
-The input images are black-and-white binary images with a single white pixel representing the load magnitude and load angle. The vertical position of the white pixel represents the magnitude (N), and the horizontal position represents the angle (degrees). Angle values increase clockwise, and an angle of 0 degrees points directly right, while an angle of 90 degrees points directly up. The output images are stress contours produced by the load. 
+The input images are black-and-white binary images with a white line representing the direction of the load. Angle values follow the standard coordinate system and increase counterclockwise. An angle of 0 degrees points directly right, while an angle of 90 degrees points directly up. The output images are stress contours produced by the load. 
 '''
 
 
@@ -30,17 +30,14 @@ print(f'Using {device} device.')
 
 # Dataset size.
 NUMBER_SAMPLES = 20
+# Load magnitude.
+LOAD = 50000
 # Minimum and maximum values of parameters to be varied.
-LOAD_RANGE = (1e4, 1e5)
-ANGLE_RANGE = (0, 360)
+ANGLE_RANGE = (0, 90)
 # Increments used to generate samples within the above ranges.
-LOAD_STEP = 500
-ANGLE_STEP = 5
-# Number of possible points within the ranges using the specified increments. The maximum value is excluded from the range.
-INPUT_SIZE = (
-    round((LOAD_RANGE[1] - LOAD_RANGE[0]) / LOAD_STEP),
-    round((ANGLE_RANGE[1] - ANGLE_RANGE[0]) / ANGLE_STEP),
-    )
+ANGLE_STEP = 3
+# Size of input images.
+INPUT_SIZE = (100, 100)
 # Size to which output images are resized to account for different output image sizes.
 OUTPUT_SIZE = (100, 25)
 
@@ -52,7 +49,7 @@ FOLDER_OUTPUTS = os.path.join(FOLDER_ROOT, 'Outputs')
 FILENAME_TEXT = 'cantilever_samples.txt'
 
 # Training hyperparameters.
-BATCH_SIZE = 5
+BATCH_SIZE = 1
 LEARNING_RATE = 0.1
 EPOCHS = 30
 
@@ -60,45 +57,54 @@ EPOCHS = 30
 # Return randomly generated sample values for load magnitudes and angles and write them to a text file.
 def generate_samples():
     # Generate equally spaced values within the corresponding range, using the specified increments.
-    load_samples = np.arange(LOAD_RANGE[0], LOAD_RANGE[1], LOAD_STEP)
     angle_samples = np.arange(ANGLE_RANGE[0], ANGLE_RANGE[1], ANGLE_STEP)
     # Randomize the ordering of the samples.
-    random.shuffle(load_samples)
     random.shuffle(angle_samples)
     # Keep only the first N samples.
-    load_samples, angle_samples = load_samples[:NUMBER_SAMPLES], angle_samples[:NUMBER_SAMPLES]
+    angle_samples = angle_samples[:NUMBER_SAMPLES]
+    
+    # Determine the x and y components of the load for easier entry in ANSYS.
+    load_samples = []
+    for angle in angle_samples:
+        angle *= (np.pi / 180)
+        load_samples.append((
+            np.cos(angle) * LOAD,
+            np.sin(angle) * LOAD,
+            ))
     # Write samples to text file.
-    text = [f'Load: {load},  Angle: {angle}\n' for load, angle in zip(load_samples, angle_samples)]
+    text = [f'X load: {load[0]:.2f},  Y load: {load[1]:.2f},  Angle: {angle}\n' for load, angle in zip(load_samples, angle_samples)]
     with open(os.path.join(FOLDER_ROOT, FILENAME_TEXT), 'w') as file:
         file.writelines(text)
-    return load_samples, angle_samples
+    return angle_samples
 
 # Return the sample values found in the text file previously generated.
 def read_samples():
-    load_samples = []
     angle_samples = []
     filename = os.path.join(FOLDER_ROOT, FILENAME_TEXT)
     if os.path.exists(filename):
         with open(filename, 'r') as file:
             for string in file.readlines():
-                load, angle = [int(float(string.split(':')[1])) for string in string.split(',')]
-                load_samples.append(load)
+                *_, angle = [int(float(string.split(':')[1])) for string in string.split(',')]
                 angle_samples.append(angle)
-    return load_samples, angle_samples
+    return angle_samples
 
 # Create images for each pair of sample values provided.
-def generate_input_images(load_samples, angle_samples):
+def generate_input_images(angle_samples):
     filenames = []
-    for load, angle in zip(load_samples, angle_samples):
-        load, angle = int(load), int(angle)
-        # Create a black image and add one white pixel.
-        image = np.zeros((INPUT_SIZE[0], INPUT_SIZE[1]))
-        image[
-            int(round((load - LOAD_RANGE[0]) / LOAD_STEP)),
-            int(round((angle - ANGLE_RANGE[0]) / ANGLE_STEP))
-            ] = 255
+    for angle in angle_samples:
+        angle = int(angle)
+        # Create a black image and add a white line of pixels representing the load direction.
+        image = np.zeros(INPUT_SIZE)
+        r = np.arange(INPUT_SIZE[0])
+        x = r * np.cos(angle * np.pi/180) + INPUT_SIZE[1]/2
+        y = r * np.sin(angle * np.pi/180) + INPUT_SIZE[0]/2
+        x = x.astype(int)
+        y = y.astype(int)
+        valid_indices = (x >= 0) * (x < INPUT_SIZE[0]) * (y >= 0) * (y < INPUT_SIZE[1])
+        image[y[valid_indices], x[valid_indices]] = 255
+        image = np.flipud(image)
         # Write image files.
-        filename = os.path.join(FOLDER_INPUTS, f'cantilever_{load}_{angle}.png')
+        filename = os.path.join(FOLDER_INPUTS, f'input_{angle}.png')
         with Image.fromarray(image.astype(np.uint8), 'L').convert('1') as file:
             file.save(filename)
             filenames.append(filename)
@@ -106,9 +112,13 @@ def generate_input_images(load_samples, angle_samples):
 
 # Crop the stress contour region of the output images.
 def crop_output_images():
+    # LEFT, TOP = 209, 108
+    # SIZE = (616, 155)
     filenames = glob.glob(os.path.join(FOLDER_OUTPUTS, '*.png'))
     for filename in filenames:
         with Image.open(filename) as image:
+            # if image.size[0] > SIZE[0] and image.size[1] > SIZE[1]:
+            #     image = image.crop((LEFT, TOP, LEFT+SIZE[0]-1, TOP+SIZE[1]-1))
             image_copy = image.convert('L')
             area = ImageOps.invert(image_copy).getbbox()
             image = image.crop(area)
@@ -123,36 +133,7 @@ def rgb_to_hue(array):
         for j in range(array.shape[1]):
             hsv = colorsys.rgb_to_hsv(array[i, j, 0], array[i, j, 1], array[i, j, 2])
             hue_array[i, j] = hsv[0]
-    # array = array / 255
-    # max_channels = [np.max(array[:, :, i]) for i in range(3)]
-    # min_channels = [np.min(array[:, :, i]) for i in range(3)]
-    # max_all = max(max_channels)
-    # min_all = min(min_channels)
-    # if max_all == max_channels[0]:
-    #     hue_array = (array[:, :, 1] - array[:, :, 2]) / (max_all - min_all)
-    # elif max_all == max_channels[1]:
-    #     hue_array = 2.0 + (array[:, :, 2] - array[:, :, 0]) / (max_all - min_all)
-    # elif max_all == max_channels[2]:
-    #     hue_array = 4.0 + (array[:, :, 0] - array[:, :, 1]) / (max_all - min_all)
-    # else:
-    #     raise Exception('Hues could not be calculated.')
-    # hue_array *= 60
-    # if np.any(hue_array < 0):
-    #     hue_array += 360
-    # hue_array /= 360
     return hue_array
-
-# Try to read sample values from the text file if it already exists. If not, generate the samples.
-load_samples, angle_samples = read_samples()
-if not load_samples or not angle_samples:
-    load_samples, angle_samples = generate_samples()
-# generate_input_images(load_samples, angle_samples)
-# Determine the x and y components of the load for easier entry in ANSYS.
-for load, angle in zip(load_samples, angle_samples):
-    angle *= (np.pi / 180)
-    print(f'Load {int(load)} has components: x = {np.cos(angle) * load :.2f}, y = {np.sin(angle) * load :.2f}')
-# Crop output images.
-crop_output_images()
 
 class CantileverDataset(Dataset):
     def __init__(self, folder_inputs, folder_outputs):
@@ -188,7 +169,7 @@ class StressContourNetwork(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
             )
         self.linear = nn.Sequential(
-            nn.Linear(in_features=2752, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
+            nn.Linear(in_features=2116, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
         )
     
     def forward(self, x):
@@ -233,6 +214,15 @@ def test(dataloader, model, loss_function):
     print(f"Test Error: \n Accuracy: {(100*accuracy):>0.1f}%, Avg loss: {test_loss:>8f} \n")
     return accuracy*100, test_loss
 
+
+# Try to read sample values from the text file if it already exists. If not, generate the samples.
+angle_samples = read_samples()
+if not angle_samples:
+    angle_samples = generate_samples()
+generate_input_images(angle_samples)
+# Crop output images.
+crop_output_images()
+
 # Set up the data and model.
 dataset = CantileverDataset(FOLDER_INPUTS, FOLDER_OUTPUTS)
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -259,8 +249,9 @@ plt.grid(axis='y')
 plt.show()
 
 # Test the model on new data not part of the dataset.
-test_filenames = generate_input_images([50000]*4, [45, 135, 225, 315])
-for filename in test_filenames:
+test_angles = [1, 7, 13, 43, 82]
+test_filenames = generate_input_images(test_angles)
+for filename, angle in zip(test_filenames, test_angles):
     input = np.expand_dims(np.asarray(Image.open(filename), np.uint8), (0, 1))
     os.remove(filename)
     input = torch.tensor(input)
@@ -274,8 +265,7 @@ for filename in test_filenames:
             rgb = colorsys.hsv_to_rgb(output[i, j, 0], output[i, j, 1], output[i, j, 2])
             for k in range(3):
                 output[i, j, k] = rgb[k] * 255
-    # Display the generated output image.
+    # Save the generated output image.
     output = output.transpose((1, 0, 2)).astype(np.uint8)
-    plt.figure()
-    plt.imshow(output)
-    plt.show()
+    with Image.fromarray(output) as image:
+        image.save(os.path.join(FOLDER_ROOT, f'test_{angle}.png'))

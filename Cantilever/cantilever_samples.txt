@@ -1,20 +1,20 @@
-Load: 81500.0,  Angle: 155
-Load: 40500.0,  Angle: 90
-Load: 11000.0,  Angle: 85
-Load: 42500.0,  Angle: 305
-Load: 47500.0,  Angle: 260
-Load: 59000.0,  Angle: 295
-Load: 99500.0,  Angle: 70
-Load: 41500.0,  Angle: 170
-Load: 15500.0,  Angle: 345
-Load: 67500.0,  Angle: 130
-Load: 91000.0,  Angle: 10
-Load: 31000.0,  Angle: 140
-Load: 28000.0,  Angle: 335
-Load: 30000.0,  Angle: 220
-Load: 38000.0,  Angle: 315
-Load: 12500.0,  Angle: 355
-Load: 69000.0,  Angle: 190
-Load: 97500.0,  Angle: 265
-Load: 57500.0,  Angle: 5
-Load: 65500.0,  Angle: 115
+X load: 7821.72,  Y load: 49384.42,  Angle: 81
+X load: 17918.40,  Y load: 46679.02,  Angle: 69
+X load: 5226.42,  Y load: 49726.09,  Angle: 84
+X load: 29389.26,  Y load: 40450.85,  Angle: 54
+X load: 31466.02,  Y load: 38857.30,  Angle: 51
+X load: 10395.58,  Y load: 48907.38,  Angle: 78
+X load: 37157.24,  Y load: 33456.53,  Angle: 42
+X load: 47552.83,  Y load: 15450.85,  Angle: 18
+X load: 2616.80,  Y load: 49931.48,  Angle: 87
+X load: 41933.53,  Y load: 27231.95,  Angle: 33
+X load: 50000.00,  Y load: 0.00,  Angle: 0
+X load: 49726.09,  Y load: 5226.42,  Angle: 6
+X load: 48296.29,  Y load: 12940.95,  Angle: 15
+X load: 15450.85,  Y load: 47552.83,  Angle: 72
+X load: 33456.53,  Y load: 37157.24,  Angle: 48
+X load: 40450.85,  Y load: 29389.26,  Angle: 36
+X load: 48907.38,  Y load: 10395.58,  Angle: 12
+X load: 43301.27,  Y load: 25000.00,  Angle: 30
+X load: 27231.95,  Y load: 41933.53,  Angle: 57
+X load: 44550.33,  Y load: 22699.52,  Angle: 27
