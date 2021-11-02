@@ -6,7 +6,7 @@ Properties of the cantilever beam:
     - Material: structural steel.
     - Elastic modulus: 200 GPa.
 
-The input images are black-and-white binary images with a white line representing the direction of the load. Angle values follow the standard coordinate system and increase counterclockwise. An angle of 0 degrees points directly right, while an angle of 90 degrees points directly up. The output images are stress contours produced by the load. 
+The input images are black-and-white binary images with a white line oriented at the specific angle. Angle values follow the standard coordinate system and increase counterclockwise. An angle of 0 degrees points directly right, and an angle of 90 degrees points directly up. The output images are stress contours in the cantilever.
 '''
 
 
@@ -21,7 +21,6 @@ from PIL import Image, ImageOps
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-# import torchvision
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -135,6 +134,15 @@ def rgb_to_hue(array):
             hue_array[i, j] = hsv[0]
     return hue_array
 
+# Convert a 3-channel HSV array into a 3-channel RGB array.
+def hsv_to_rgb(array):
+    for i in range(array.shape[0]):
+        for j in range(array.shape[1]):
+            rgb = colorsys.hsv_to_rgb(array[i, j, 0], array[i, j, 1], array[i, j, 2])
+            for k in range(3):
+                array[i, j, k] = rgb[k] * 255
+    return array
+
 class CantileverDataset(Dataset):
     def __init__(self, folder_inputs, folder_outputs):
         self.folder_inputs = folder_inputs
@@ -196,11 +204,11 @@ def train(dataloader, model, loss_function, optimizer):
 
         if batch % (BATCH_SIZE * 10) == 0:
             loss, current = loss.item(), batch * len(data)
-            print(f'Loss: {loss:>7f}  [{current:>5d}/{size:>5d}]')
+            print(f'Loss: {loss:>7f}  (batch {batch * len(data)})')
 
 def test(dataloader, model, loss_function):
     batch_count = len(dataloader)
-    test_loss, accuracy = 0, 0
+    test_loss = 0
 
     with torch.no_grad():
         for data, label in dataloader:
@@ -210,9 +218,8 @@ def test(dataloader, model, loss_function):
             test_loss += loss_function(output, label.float())
 
     test_loss /= batch_count
-    accuracy /= size
-    print(f"Test Error: \n Accuracy: {(100*accuracy):>0.1f}%, Avg loss: {test_loss:>8f} \n")
-    return accuracy*100, test_loss
+    print(f'Average loss: {test_loss:>8f}')
+    return test_loss
 
 
 # Try to read sample values from the text file if it already exists. If not, generate the samples.
@@ -232,12 +239,11 @@ loss_function = nn.MSELoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
 # Train the model and record the accuracy and loss.
-accuracy_values, test_loss_values = [], []
+test_loss_values = []
 for t in range(EPOCHS):
   print(f'Epoch {t+1}\n------------------------')
   train(dataloader, model, loss_function, optimizer)
-  accuracy, test_loss = test(dataloader, model, loss_function)
-  accuracy_values.append(accuracy)
+  test_loss = test(dataloader, model, loss_function)
   test_loss_values.append(test_loss)
 
 # Plot the loss history.
@@ -252,19 +258,15 @@ plt.show()
 test_angles = [1, 7, 13, 43, 82]
 test_filenames = generate_input_images(test_angles)
 for filename, angle in zip(test_filenames, test_angles):
-    input = np.expand_dims(np.asarray(Image.open(filename), np.uint8), (0, 1))
+    input_array = torch.tensor(
+        np.expand_dims(np.asarray(Image.open(filename), np.uint8), (0, 1))
+        )
     os.remove(filename)
-    input = torch.tensor(input)
-    output = model(input).detach().numpy()[0, :]
+    output = model(input_array).detach().numpy()[0, :]
     output = output.reshape(OUTPUT_SIZE, order='F')
     # Convert the output to an RGB array.
     output = np.dstack((output, np.ones(OUTPUT_SIZE, float), 2/3 * np.ones(OUTPUT_SIZE, float)))
-    for i in range(output.shape[0]):
-        for j in range(output.shape[1]):
-            # print(output[i, j, 0], output[i, j, 1], output[i, j, 2])
-            rgb = colorsys.hsv_to_rgb(output[i, j, 0], output[i, j, 1], output[i, j, 2])
-            for k in range(3):
-                output[i, j, k] = rgb[k] * 255
+    output = hsv_to_rgb(output)
     # Save the generated output image.
     output = output.transpose((1, 0, 2)).astype(np.uint8)
     with Image.fromarray(output) as image:
