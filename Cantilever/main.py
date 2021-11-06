@@ -45,8 +45,14 @@ LEARNING_RATE = 0.1
 EPOCHS = 30
 
 
-# Create images for the sample values provided.
+# Create images for the sample values provided inside the specified folder.
 def generate_input_images(angle_samples, folder_inputs):
+    # Remove existing input images in the folder.
+    filenames = glob.glob(os.path.join(folder_inputs, '*.png'))
+    for filename in filenames:
+        os.remove(filename)
+    print(f'Deleted {len(filenames)} existing images in {folder_inputs}.')
+
     filenames = []
     for angle in angle_samples:
         angle = int(angle)
@@ -94,7 +100,7 @@ class CantileverDataset(Dataset):
         self.folder_outputs = folder_outputs
         # Get all input image filenames in the inputs folder.
         self.filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
-        self.filename_suffixes = [filename.split('.')[0].split('_')[1:] for filename in self.filenames]
+        self.filename_suffixes = [filename.split('.')[-2].split('_')[1:] for filename in self.filenames]
 
     def __len__(self):
         return len(self.filenames)
