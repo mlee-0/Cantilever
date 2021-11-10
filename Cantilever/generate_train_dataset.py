@@ -1,4 +1,5 @@
 import colorsys
+from dataclasses import dataclass
 import glob
 import os
 import random
@@ -6,54 +7,97 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageOps
-import torch
-from torch import nn
-from torch.utils.data import Dataset, DataLoader
 
 from main import generate_input_images, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, OUTPUT_SIZE
 
 
+# A dataclass that stores settings for each parameter.
+@dataclass
+class Parameter:
+    # The minimum and maximum values between which samples are generated.
+    range: tuple
+    # Number of decimal places to which sample values are rounded.
+    precision: int
+    # Name of the parameter.
+    name: str
+    # Units for the parameter.
+    units: str = ''
+    # Generated sample values.
+    samples: list = None
+
 # Dataset size.
 NUMBER_SAMPLES = 100
-# Minimum and maximum values of parameters to be varied.
-LOAD_RANGE = (0, 100000)
-ANGLE_RANGE = (0, 360)
-LENGTH_RANGE = (0.1, 4)
-HEIGHT_RANGE = (0.1, 1)
-# The two angle values at which there should be peaks in the bimodal probability distribution used to generate angle values.
+assert NUMBER_SAMPLES % 4 == 0, 'Sample size must be divisible by 4 for angles to be generated properly.'
+# Define the settings for each parameter.
+load = Parameter(range=(10000, 100000), precision=0, name='Load', units='N')
+angle = Parameter(range=(0, 360), precision=2, name='Angle', units='Degrees')
+length = Parameter(range=(0.1, 4), precision=3, name='Length', units='m')
+height = Parameter(range=(0.1, 1), precision=3, name='Height', units='m')
+# Store all parameters.
+parameters = (load, angle, length, height)
+# The two angle values at which there should be peaks in the probability distribution used to generate angle values.
 ANGLE_PEAKS = (0, 180)
-# Standard deviation for probability distribution used to generate angle values.
-ANGLE_STD = 45
 
-# Name of text file to contain samples.
-FILENAME_TEXT = 'cantilever_samples.txt'
+# Names of text files to be generated.
+FILENAME_SAMPLES = 'cantilever_samples.txt'
+FILENAME_ANSYS = 'ansys.txt'
 
-# Return randomly generated sample values.
+# Generate and return sample values for each parameter.
 def generate_samples():
-    load_samples = np.random.uniform(LOAD_RANGE[0], LOAD_RANGE[1], NUMBER_SAMPLES)
-    angle_samples = np.array([
-        random.choice([
-            np.random.normal(loc=ANGLE_PEAKS[0], scale=ANGLE_STD),
-            np.random.normal(loc=ANGLE_PEAKS[1], scale=ANGLE_STD),
-            ]) for _ in range(NUMBER_SAMPLES)
-            ])
-    length_samples = np.random.uniform(LENGTH_RANGE[0], LENGTH_RANGE[1], NUMBER_SAMPLES)
-    height_samples = np.random.uniform(HEIGHT_RANGE[0], HEIGHT_RANGE[1], NUMBER_SAMPLES)
-    # Fix out-of-bounds angle samples.
-    angle_samples = np.mod(angle_samples, ANGLE_RANGE[1])
+    # Helper function for generating unevenly spaced samples within a defined range. Setting "increasing" to True makes spacings increase as values increase.
+    generate_logspace_samples = lambda low, high, increasing: (((
+        np.logspace(
+            0, 1, round(NUMBER_SAMPLES/4)+1
+            ) - 1) / 9) * (1 if increasing else -1) + (0 if increasing else 1)
+        ) * (high - low) + low
+    # Generate samples.
+    load_samples = np.linspace(load.range[0], load.range[1], NUMBER_SAMPLES)
+    angle_samples = np.concatenate((
+        generate_logspace_samples(angle.range[0], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, increasing=True)[:-1],
+        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, ANGLE_PEAKS[1], increasing=False)[1:],
+        generate_logspace_samples(ANGLE_PEAKS[1], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], increasing=True)[:-1],
+        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], angle.range[1], increasing=False)[1:],
+        ))
+    length_samples = np.linspace(length.range[0], length.range[1], NUMBER_SAMPLES)
+    height_samples = np.linspace(height.range[0], height.range[1], NUMBER_SAMPLES)
+    # Randomize ordering of samples.
+    np.random.shuffle(load_samples)
+    np.random.shuffle(angle_samples)
+    np.random.shuffle(length_samples)
+    np.random.shuffle(height_samples)
     # Round all samples to a fixed number of decimal places.
-    load_samples = np.round(load_samples, 2)
-    angle_samples = np.round(angle_samples, 2)
-    length_samples = np.round(length_samples, 2)
-    height_samples = np.round(height_samples, 2)
-
-    # # Plot angle samples.
-    # plt.figure()
-    # plt.hist(angle_samples, bins=round(ANGLE_RANGE[1]-ANGLE_RANGE[0])*2, color='#0095ff')
-    # plt.xlabel('Angle (degrees)')
-    # plt.xticks(range(ANGLE_RANGE[0], ANGLE_RANGE[1]+1, round(ANGLE_RANGE[1]/4)))
-    # plt.title('Histogram of Angle Samples')
-    # plt.show()
+    load_samples = np.round(load_samples, load.precision)
+    angle_samples = np.round(angle_samples, angle.precision)
+    length_samples = np.round(length_samples, length.precision)
+    height_samples = np.round(height_samples, height.precision)
+    # # Store samples.
+    # load.samples = load_samples
+    # angle.samples = angle_samples
+    # length.samples = length_samples
+    # height.samples = height_samples
+    
+    # Plot histograms for generated samples.
+    plt.figure()
+    plt.hist(
+        angle_samples,
+        bins=round(angle.range[1]-angle.range[0]),
+        rwidth=0.75,
+        color='#0095ff',
+        )
+    plt.xticks(np.linspace(angle.range[0], angle.range[1], 5))
+    plt.title(angle.name)
+    # for i, samples in enumerate([load_samples, angle_samples, length_samples, height_samples]):
+    #     is_angle = i == 1
+    #     plt.subplot(1, len(parameters), i+1)
+    #     plt.hist(
+    #         samples,
+    #         bins=round(parameters[i].range[1]-parameters[i].range[0]) if is_angle else 50,
+    #         rwidth=0.75,
+    #         color='#0095ff' if not is_angle else '#ff4040',
+    #         )
+    #     plt.xticks(np.linspace(parameters[i].range[0], parameters[i].range[1], 5 if is_angle else 2))
+    #     plt.title(parameters[i].name)
+    plt.show()
     return load_samples, angle_samples, length_samples, height_samples
 
 # Write the specified sample values to a text file.
@@ -69,17 +113,21 @@ def write_samples(samples):
             ))
     # Write samples to text file.
     text = [
-        f'Load: {load:>10},  X load: {load_x:>10},  Y load: {load_y:>10},  Angle: {angle:>10},  Length: {length:>5},  Height: {height:>5}\n'
+        f'Load: {load:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  Angle: {angle:>10},  Length: {length:>5},  Height: {height:>5}\n'
         for load, (load_x, load_y), angle, length, height in zip(load_samples, load_components, angle_samples, length_samples, height_samples)
         ]
-    with open(os.path.join(FOLDER_ROOT, FILENAME_TEXT), 'w') as file:
+    with open(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES), 'w') as file:
         file.writelines(text)
-    print(f'Wrote samples in {FILENAME_TEXT}.')
+    print(f'Wrote samples in {FILENAME_SAMPLES}.')
+
+# Write a text file containing ANSYS commands used to perform FEA and generate stress contour images.
+def write_ansys_script(samples):
+    pass
 
 # Return the sample values found in the text file previously generated.
 def read_samples():
     angle_samples = []
-    filename = os.path.join(FOLDER_ROOT, FILENAME_TEXT)
+    filename = os.path.join(FOLDER_ROOT, FILENAME_SAMPLES)
     try:
         with open(filename, 'r') as file:
             for string in file.readlines():
