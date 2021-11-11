@@ -11,7 +11,7 @@ from main import load, angle, length, height, ANGLE_PEAKS, generate_input_images
 
 
 # Dataset size.
-NUMBER_SAMPLES = 20
+NUMBER_SAMPLES = 100
 assert NUMBER_SAMPLES % 4 == 0, 'Sample size must be divisible by 4 for angles to be generated properly.'
 
 # Names of text files to be generated.
