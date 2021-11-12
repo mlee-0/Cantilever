@@ -53,8 +53,8 @@ height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
 ANGLE_PEAKS = (0, 180)
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_SIZE = (50, 100, 2)
-assert (INPUT_SIZE[0] / INPUT_SIZE[1]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
+INPUT_SIZE = (100, 50, 2)
+assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
 # Size of output images produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_SIZE = INPUT_SIZE[:2]
 
@@ -81,14 +81,14 @@ def generate_input_images(samples, folder_inputs):
 
     filenames = []
     for load_sample, angle_sample, length_sample, height_sample in zip(*samples):
-        image = np.zeros(INPUT_SIZE)
+        image = np.zeros((INPUT_SIZE[1], INPUT_SIZE[0], INPUT_SIZE[2]))
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
-        r = np.arange(INPUT_SIZE[0])
-        x = r * np.cos(angle_sample * np.pi/180) + INPUT_SIZE[1]/2
-        y = r * np.sin(angle_sample * np.pi/180) + INPUT_SIZE[0]/2
+        r = np.arange(max(INPUT_SIZE))
+        x = r * np.cos(angle_sample * np.pi/180) + INPUT_SIZE[0]/2
+        y = r * np.sin(angle_sample * np.pi/180) + INPUT_SIZE[1]/2
         x = x.astype(int)
         y = y.astype(int)
-        inside_image = (x >= 0) * (x < INPUT_SIZE[1]) * (y >= 0) * (y < INPUT_SIZE[0])
+        inside_image = (x >= 0) * (x < INPUT_SIZE[0]) * (y >= 0) * (y < INPUT_SIZE[1])
         image[y[inside_image], x[inside_image], 0] = 255 * (load_sample / load.high)
         image[:, :, 0] = np.flipud(image[:, :, 0])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
