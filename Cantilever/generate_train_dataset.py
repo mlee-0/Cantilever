@@ -66,16 +66,17 @@ def generate_samples(show_histogram=False):
 def write_samples(samples):
     # Determine the x and y components of the load.
     load_components = []
+    NUMBER_ELEMENTS = 10  # Defined in ANSYS
     for load_sample, angle_sample in zip(*samples[0:2]):
         angle_sample *= (np.pi / 180)
         load_components.append((
-            np.cos(angle_sample) * load_sample,
-            np.sin(angle_sample) * load_sample,
+            np.cos(angle_sample) * load_sample / NUMBER_ELEMENTS,
+            np.sin(angle_sample) * load_sample / NUMBER_ELEMENTS,
             ))
     # Write samples to text file.
     text = [
-        f'Load: {load:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  Angle: {angle:>10},  Length: {length:>5},  Height: {height:>5}\n'
-        for load, angle, length, height, (load_x, load_y) in zip(*samples, load_components)
+        f'Load: {load_sample:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  X load (edge): {load_x/2:>10.2f},  Y load (edge): {load_y/2:>10.2f},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
+        for load_sample, angle_sample, length_sample, height_sample, (load_x, load_y) in zip(*samples, load_components)
         ]
     with open(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES), 'w') as file:
         file.writelines(text)
