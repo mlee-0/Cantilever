@@ -1,100 +1,100 @@
-Load:    57273.0,  X load:    -876.20,  Y load:   -5659.88,  X load (edge):    -438.10,  Y load (edge):   -2829.94,  Angle:      261.2,  Length: 2.465,  Height: 1.111
-Load:    11818.0,  X load:     180.80,  Y load:   -1167.89,  X load (edge):      90.40,  Y load (edge):    -583.94,  Angle:      278.8,  Length:  3.98,  Height: 1.313
-Load:    58182.0,  X load:   -5048.33,  Y load:   -2892.38,  X load (edge):   -2524.16,  Y load (edge):   -1446.19,  Angle:     209.81,  Length: 3.657,  Height: 1.909
-Load:    70000.0,  X load:    6873.94,  Y load:    1322.47,  X load (edge):    3436.97,  Y load (edge):     661.23,  Angle:      10.89,  Length: 3.939,  Height: 1.202
-Load:    99091.0,  X load:    9730.65,  Y load:   -1872.07,  X load (edge):    4865.33,  Y load (edge):    -936.03,  Angle:     349.11,  Length: 2.121,  Height: 1.374
-Load:    16364.0,  X load:   -1595.04,  Y load:    -365.60,  X load (edge):    -797.52,  Y load (edge):    -182.80,  Angle:     192.91,  Length:  3.96,  Height: 1.586
-Load:    43636.0,  X load:    1784.57,  Y load:    3982.00,  X load (edge):     892.29,  Y load (edge):    1991.00,  Angle:      65.86,  Length: 2.747,  Height: 1.465
-Load:    81818.0,  X load:    4912.52,  Y load:    6542.86,  X load (edge):    2456.26,  Y load (edge):    3271.43,  Angle:       53.1,  Length: 3.455,  Height: 1.556
-Load:    91818.0,  X load:   -7643.28,  Y load:    5087.80,  X load (edge):   -3821.64,  Y load (edge):    2543.90,  Angle:     146.35,  Length: 2.424,  Height: 1.737
-Load:    54545.0,  X load:    5119.01,  Y load:   -1883.43,  X load (edge):    2559.51,  Y load (edge):    -941.71,  Angle:      339.8,  Length: 3.838,  Height: 1.354
-Load:    66364.0,  X load:   -5948.93,  Y load:   -2941.44,  X load (edge):   -2974.46,  Y load (edge):   -1470.72,  Angle:     206.31,  Length: 2.444,  Height: 1.727
-Load:    63636.0,  X load:    5024.14,  Y load:   -3905.56,  X load (edge):    2512.07,  Y load (edge):   -1952.78,  Angle:     322.14,  Length:  3.01,  Height: 1.606
-Load:    85455.0,  X load:       0.00,  Y load:    8545.50,  X load (edge):       0.00,  Y load (edge):    4272.75,  Angle:       90.0,  Length: 2.808,  Height: 1.919
-Load:    44545.0,  X load:    4453.87,  Y load:      74.63,  X load (edge):    2226.94,  Y load (edge):      37.32,  Angle:       0.96,  Length: 3.051,  Height: 1.303
-Load:    65455.0,  X load:    3353.54,  Y load:   -5621.15,  X load (edge):    1676.77,  Y load (edge):   -2810.58,  Angle:     300.82,  Length: 2.182,  Height: 1.495
-Load:    18182.0,  X load:    1795.57,  Y load:     286.00,  X load (edge):     897.78,  Y load (edge):     143.00,  Angle:       9.05,  Length: 2.707,  Height: 1.545
-Load:    78182.0,  X load:   -7818.20,  Y load:       0.00,  X load (edge):   -3909.10,  Y load (edge):       0.00,  Angle:      180.0,  Length: 2.626,  Height: 1.141
-Load:    45455.0,  X load:   -4180.74,  Y load:    1784.10,  X load (edge):   -2090.37,  Y load (edge):     892.05,  Angle:     156.89,  Length: 3.677,  Height: 1.414
-Load:    40000.0,  X load:    4000.00,  Y load:       0.00,  X load (edge):    2000.00,  Y load (edge):       0.00,  Angle:        0.0,  Length: 2.081,  Height: 1.152
-Load:    64545.0,  X load:   -6338.27,  Y load:    1219.41,  X load (edge):   -3169.13,  Y load (edge):     609.71,  Angle:     169.11,  Length: 2.343,  Height: 1.505
-Load:    10000.0,  X load:    -994.79,  Y load:    -101.92,  X load (edge):    -497.40,  Y load (edge):     -50.96,  Angle:     185.85,  Length: 3.232,  Height: 1.455
-Load:    59091.0,  X load:    5434.91,  Y load:   -2319.31,  X load (edge):    2717.46,  Y load (edge):   -1159.65,  Angle:     336.89,  Length: 3.253,  Height: 1.646
-Load:    62727.0,  X load:    1815.11,  Y load:   -6004.34,  X load (edge):     907.55,  Y load (edge):   -3002.17,  Angle:     286.82,  Length: 2.909,  Height: 1.424
-Load:    22727.0,  X load:   -2253.87,  Y load:     291.93,  X load (edge):   -1126.94,  Y load (edge):     145.96,  Angle:     172.62,  Length:  2.97,  Height: 1.525
-Load:    32727.0,  X load:   -1338.43,  Y load:   -2986.50,  X load (edge):    -669.21,  Y load (edge):   -1493.25,  Angle:     245.86,  Length: 3.576,  Height: 1.444
-Load:    38182.0,  X load:    2815.97,  Y load:    2578.56,  X load (edge):    1407.99,  Y load (edge):    1289.28,  Angle:      42.48,  Length:   4.0,  Height: 1.182
-Load:    72727.0,  X load:      -0.00,  Y load:   -7272.70,  X load (edge):      -0.00,  Y load (edge):   -3636.35,  Angle:      270.0,  Length: 3.859,  Height: 1.222
-Load:    15455.0,  X load:    1341.00,  Y load:     768.31,  X load (edge):     670.50,  Y load (edge):     384.15,  Angle:      29.81,  Length: 3.596,  Height: 1.253
-Load:    35455.0,  X load:    2951.41,  Y load:    1964.63,  X load (edge):    1475.70,  Y load (edge):     982.31,  Angle:      33.65,  Length: 2.242,  Height: 1.818
-Load:    90000.0,  X load:    8067.68,  Y load:    3989.05,  X load (edge):    4033.84,  Y load (edge):    1994.52,  Angle:      26.31,  Length: 3.434,  Height: 1.061
-Load:    69091.0,  X load:    6734.45,  Y load:    1543.63,  X load (edge):    3367.23,  Y load (edge):     771.82,  Angle:      12.91,  Length: 3.131,  Height: 1.384
-Load:    70909.0,  X load:    6845.42,  Y load:    1849.60,  X load (edge):    3422.71,  Y load (edge):     924.80,  Angle:      15.12,  Length: 3.879,  Height:  1.96
-Load:    53636.0,  X load:    5177.92,  Y load:   -1399.05,  X load (edge):    2588.96,  Y load (edge):    -699.52,  Angle:     344.88,  Length: 2.869,  Height:  1.02
-Load:    47273.0,  X load:   -3732.26,  Y load:    2901.31,  X load (edge):   -1866.13,  Y load (edge):    1450.65,  Angle:     142.14,  Length: 2.545,  Height: 1.939
-Load:    12727.0,  X load:    -859.17,  Y load:     938.93,  X load (edge):    -429.58,  Y load (edge):     469.47,  Angle:     132.46,  Length: 3.556,  Height: 1.747
-Load:    60909.0,  X load:    2490.98,  Y load:   -5558.24,  X load (edge):    1245.49,  Y load (edge):   -2779.12,  Angle:     294.14,  Length: 3.899,  Height: 1.283
-Load:    61818.0,  X load:    6163.16,  Y load:     479.64,  X load (edge):    3081.58,  Y load (edge):     239.82,  Angle:       4.45,  Length: 2.788,  Height: 1.263
-Load:    95455.0,  X load:   -8958.39,  Y load:   -3296.04,  X load (edge):   -4479.19,  Y load (edge):   -1648.02,  Angle:      200.2,  Length: 2.141,  Height: 1.828
-Load:    94545.0,  X load:    9376.18,  Y load:    1214.43,  X load (edge):    4688.09,  Y load (edge):     607.21,  Angle:       7.38,  Length: 3.111,  Height:   1.0
-Load:    26364.0,  X load:   -1078.20,  Y load:    2405.84,  X load (edge):    -539.10,  Y load (edge):    1202.92,  Angle:     114.14,  Length: 3.758,  Height: 1.323
-Load:    82727.0,  X load:    7608.84,  Y load:    3247.02,  X load (edge):    3804.42,  Y load (edge):    1623.51,  Angle:      23.11,  Length: 2.162,  Height: 1.687
-Load:    10909.0,  X load:     908.11,  Y load:    -604.49,  X load (edge):     454.05,  Y load (edge):    -302.24,  Angle:     326.35,  Length: 2.101,  Height: 1.616
-Load:    31818.0,  X load:    3176.90,  Y load:     176.50,  X load (edge):    1588.45,  Y load (edge):      88.25,  Angle:       3.18,  Length: 2.768,  Height: 1.293
-Load:    24545.0,  X load:    2340.38,  Y load:     739.72,  X load (edge):    1170.19,  Y load (edge):     369.86,  Angle:      17.54,  Length: 2.525,  Height: 1.131
-Load:    77273.0,  X load:   -7663.29,  Y load:    -992.57,  X load (edge):   -3831.64,  Y load (edge):    -496.28,  Angle:     187.38,  Length: 3.697,  Height: 1.485
-Load:    87273.0,  X load:   -8713.86,  Y load:     484.13,  X load (edge):   -4356.93,  Y load (edge):     242.06,  Angle:     176.82,  Length: 3.091,  Height: 1.848
-Load:    14545.0,  X load:   -1454.30,  Y load:     -24.37,  X load (edge):    -727.15,  Y load (edge):     -12.18,  Angle:     180.96,  Length: 3.798,  Height: 1.768
-Load:    51818.0,  X load:    5117.29,  Y load:    -815.08,  X load (edge):    2558.65,  Y load (edge):    -407.54,  Angle:     350.95,  Length: 2.889,  Height: 1.677
-Load:    23636.0,  X load:   -2281.78,  Y load:     616.52,  X load (edge):   -1140.89,  Y load (edge):     308.26,  Angle:     164.88,  Length: 2.667,  Height: 1.394
-Load:    29091.0,  X load:   -2607.74,  Y load:    1289.39,  X load (edge):   -1303.87,  Y load (edge):     644.70,  Angle:     153.69,  Length: 2.687,  Height: 1.717
-Load:    80909.0,  X load:    1237.79,  Y load:    7995.66,  X load (edge):     618.90,  Y load (edge):    3997.83,  Angle:       81.2,  Length:  3.03,  Height: 1.232
-Load:    20000.0,  X load:    -305.97,  Y load:    1976.46,  X load (edge):    -152.99,  Y load (edge):     988.23,  Angle:       98.8,  Length: 2.586,  Height: 1.758
-Load:    37273.0,  X load:   -3102.75,  Y load:   -2065.36,  X load (edge):   -1551.37,  Y load (edge):   -1032.68,  Angle:     213.65,  Length: 2.222,  Height: 1.788
-Load:    88182.0,  X load:   -8659.40,  Y load:   -1665.97,  X load (edge):   -4329.70,  Y load (edge):    -832.99,  Angle:     190.89,  Length: 2.606,  Height: 1.657
-Load:    75455.0,  X load:   -2183.41,  Y load:    7222.69,  X load (edge):   -1091.71,  Y load (edge):    3611.35,  Angle:     106.82,  Length: 3.778,  Height: 1.051
-Load:    28182.0,  X load:   -2687.17,  Y load:    -849.33,  X load (edge):   -1343.59,  Y load (edge):    -424.66,  Angle:     197.54,  Length: 3.071,  Height: 1.596
-Load:    40909.0,  X load:    4069.60,  Y load:     416.96,  X load (edge):    2034.80,  Y load (edge):     208.48,  Angle:       5.85,  Length: 3.394,  Height: 1.808
-Load:    41818.0,  X load:    4179.20,  Y load:    -147.40,  X load (edge):    2089.60,  Y load (edge):     -73.70,  Angle:     357.98,  Length: 2.323,  Height: 1.869
-Load:    13636.0,  X load:    1361.50,  Y load:     -75.64,  X load (edge):     680.75,  Y load (edge):     -37.82,  Angle:     356.82,  Length: 2.061,  Height: 1.576
-Load:    93636.0,  X load:   -2709.51,  Y load:   -8963.01,  X load (edge):   -1354.75,  Y load (edge):   -4481.51,  Angle:     253.18,  Length: 2.929,  Height: 1.949
-Load:    97273.0,  X load:   -7174.01,  Y load:    6569.16,  X load (edge):   -3587.01,  Y load (edge):    3284.58,  Angle:     137.52,  Length:  2.04,  Height: 1.091
-Load:    34545.0,  X load:    3454.02,  Y load:     -57.88,  X load (edge):    1727.01,  Y load (edge):     -28.94,  Angle:     359.04,  Length: 3.273,  Height: 1.566
-Load:    17273.0,  X load:    1363.73,  Y load:    1060.10,  X load (edge):     681.86,  Y load (edge):     530.05,  Angle:      37.86,  Length: 2.505,  Height: 1.434
-Load:    96364.0,  X load:    9556.57,  Y load:   -1237.79,  X load (edge):    4778.29,  Y load (edge):    -618.90,  Angle:     352.62,  Length: 3.192,  Height: 1.899
-Load:    92727.0,  X load:   -8841.58,  Y load:    2794.53,  X load (edge):   -4420.79,  Y load (edge):    1397.26,  Angle:     162.46,  Length: 2.364,  Height:  1.98
-Load:    20909.0,  X load:   -1411.51,  Y load:   -1542.56,  X load (edge):    -705.76,  Y load (edge):    -771.28,  Angle:     227.54,  Length: 2.404,  Height: 1.535
-Load:    36364.0,  X load:   -3635.89,  Y load:      60.93,  X load (edge):   -1817.94,  Y load (edge):      30.46,  Angle:     179.04,  Length: 3.495,  Height: 1.121
-Load:    21818.0,  X load:   -1117.83,  Y load:    1873.69,  X load (edge):    -558.91,  Y load (edge):     936.84,  Angle:     120.82,  Length: 3.414,  Height: 1.879
-Load:    30000.0,  X load:    2212.54,  Y load:   -2026.00,  X load (edge):    1106.27,  Y load (edge):   -1013.00,  Angle:     317.52,  Length: 2.263,  Height:  1.01
-Load:    76364.0,  X load:    7166.71,  Y load:    2636.84,  X load (edge):    3583.35,  Y load (edge):    1318.42,  Angle:       20.2,  Length: 2.202,  Height: 1.626
-Load:   100000.0,  X load:   -6004.20,  Y load:   -7996.85,  X load (edge):   -3002.10,  Y load (edge):   -3998.42,  Angle:      233.1,  Length:  2.99,  Height: 1.707
-Load:    68182.0,  X load:   -6807.70,  Y load:    -378.23,  X load (edge):   -3403.85,  Y load (edge):    -189.11,  Angle:     183.18,  Length: 3.333,  Height: 1.212
-Load:    39091.0,  X load:    3391.84,  Y load:   -1943.31,  X load (edge):    1695.92,  Y load (edge):    -971.66,  Angle:     330.19,  Length: 3.636,  Height: 1.101
-Load:    84545.0,  X load:   -6674.94,  Y load:   -5188.82,  X load (edge):   -3337.47,  Y load (edge):   -2594.41,  Angle:     217.86,  Length: 3.919,  Height: 1.404
-Load:    56364.0,  X load:   -5289.72,  Y load:    1946.24,  X load (edge):   -2644.86,  Y load (edge):     973.12,  Angle:      159.8,  Length: 3.313,  Height: 1.333
-Load:    50909.0,  X load:    5087.74,  Y load:     179.45,  X load (edge):    2543.87,  Y load (edge):      89.72,  Angle:       2.02,  Length: 3.818,  Height: 1.172
-Load:    55455.0,  X load:   -4089.88,  Y load:   -3745.06,  X load (edge):   -2044.94,  Y load (edge):   -1872.53,  Angle:     222.48,  Length: 3.374,  Height:  1.04
-Load:    48182.0,  X load:   -4793.11,  Y load:     491.09,  X load (edge):   -2396.55,  Y load (edge):     245.55,  Angle:     174.15,  Length: 2.828,  Height:  1.99
-Load:    80000.0,  X load:   -6941.43,  Y load:    3977.00,  X load (edge):   -3470.71,  Y load (edge):    1988.50,  Angle:     150.19,  Length: 3.737,  Height:   2.0
-Load:    90909.0,  X load:   -8776.19,  Y load:   -2371.28,  X load (edge):   -4388.09,  Y load (edge):   -1185.64,  Angle:     195.12,  Length: 3.212,  Height: 1.242
-Load:    60000.0,  X load:    5981.91,  Y load:    -465.53,  X load (edge):    2990.96,  Y load (edge):    -232.77,  Angle:     355.55,  Length: 2.727,  Height: 1.071
-Load:    50000.0,  X load:    4973.96,  Y load:    -509.62,  X load (edge):    2486.98,  Y load (edge):    -254.81,  Angle:     354.15,  Length: 2.283,  Height: 1.929
-Load:    67273.0,  X load:    6030.41,  Y load:   -2981.73,  X load (edge):    3015.21,  Y load (edge):   -1490.86,  Angle:     333.69,  Length: 2.646,  Height: 1.475
-Load:    30909.0,  X load:   -3052.42,  Y load:    -486.19,  X load (edge):   -1526.21,  Y load (edge):    -243.09,  Angle:     189.05,  Length: 2.848,  Height: 1.778
-Load:    98182.0,  X load:   -5895.05,  Y load:    7851.46,  X load (edge):   -2947.52,  Y load (edge):    3925.73,  Angle:      126.9,  Length: 2.566,  Height:  1.97
-Load:    25455.0,  X load:   -2513.81,  Y load:     400.40,  X load (edge):   -1256.91,  Y load (edge):     200.20,  Angle:     170.95,  Length: 3.475,  Height:  1.03
-Load:    33636.0,  X load:   -1723.32,  Y load:   -2888.60,  X load (edge):    -861.66,  Y load (edge):   -1444.30,  Angle:     239.18,  Length: 2.303,  Height: 1.343
-Load:    49091.0,  X load:    4785.01,  Y load:   -1096.79,  X load (edge):    2392.50,  Y load (edge):    -548.40,  Angle:     347.09,  Length: 3.293,  Height: 1.838
-Load:    86364.0,  X load:   -7943.35,  Y load:   -3389.77,  X load (edge):   -3971.68,  Y load (edge):   -1694.88,  Angle:     203.11,  Length: 3.717,  Height: 1.798
-Load:    79091.0,  X load:    4052.17,  Y load:    6792.19,  X load (edge):    2026.08,  Y load (edge):    3396.09,  Angle:      59.18,  Length: 3.616,  Height: 1.081
-Load:    42727.0,  X load:    2884.39,  Y load:    3152.18,  X load (edge):    1442.20,  Y load (edge):    1576.09,  Angle:      47.54,  Length:   2.0,  Height: 1.859
-Load:    52727.0,  X load:    3559.47,  Y load:   -3889.93,  X load (edge):    1779.73,  Y load (edge):   -1944.96,  Angle:     312.46,  Length: 2.485,  Height: 1.162
-Load:    74545.0,  X load:   -7432.03,  Y load:    -578.39,  X load (edge):   -3716.01,  Y load (edge):    -289.19,  Angle:     184.45,  Length: 2.949,  Height: 1.192
-Load:    46364.0,  X load:   -4519.20,  Y load:    1035.87,  X load (edge):   -2259.60,  Y load (edge):     517.93,  Angle:     167.09,  Length: 3.515,  Height: 1.515
-Load:    71818.0,  X load:   -7177.34,  Y load:    -253.15,  X load (edge):   -3588.67,  Y load (edge):    -126.57,  Angle:     182.02,  Length: 3.535,  Height: 1.364
-Load:    83636.0,  X load:   -8338.39,  Y load:     648.92,  X load (edge):   -4169.19,  Y load (edge):     324.46,  Angle:     175.55,  Length: 2.384,  Height: 1.273
-Load:    73636.0,  X load:    2130.78,  Y load:    7048.57,  X load (edge):    1065.39,  Y load (edge):    3524.29,  Angle:      73.18,  Length: 3.152,  Height: 1.889
-Load:    19091.0,  X load:    1820.34,  Y load:    -575.35,  X load (edge):     910.17,  Y load (edge):    -287.67,  Angle:     342.46,  Length: 3.172,  Height: 1.667
-Load:    27273.0,  X load:    1637.53,  Y load:   -2180.98,  X load (edge):     818.76,  Y load (edge):   -1090.49,  Angle:      306.9,  Length:  2.02,  Height: 1.697
-Load:    89091.0,  X load:   -8903.56,  Y load:     314.03,  X load (edge):   -4451.78,  Y load (edge):     157.02,  Angle:     177.98,  Length: 3.354,  Height: 1.636
+Load:    57273.0,  X load:    -876.20,  Y load:   -5659.88,  Angle:      261.2,  Length: 2.465,  Height: 1.111
+Load:    11818.0,  X load:     180.80,  Y load:   -1167.89,  Angle:      278.8,  Length:  3.98,  Height: 1.313
+Load:    58182.0,  X load:   -5048.33,  Y load:   -2892.38,  Angle:     209.81,  Length: 3.657,  Height: 1.909
+Load:    70000.0,  X load:    6873.94,  Y load:    1322.47,  Angle:      10.89,  Length: 3.939,  Height: 1.202
+Load:    99091.0,  X load:    9730.65,  Y load:   -1872.07,  Angle:     349.11,  Length: 2.121,  Height: 1.374
+Load:    16364.0,  X load:   -1595.04,  Y load:    -365.60,  Angle:     192.91,  Length:  3.96,  Height: 1.586
+Load:    43636.0,  X load:    1784.57,  Y load:    3982.00,  Angle:      65.86,  Length: 2.747,  Height: 1.465
+Load:    81818.0,  X load:    4912.52,  Y load:    6542.86,  Angle:       53.1,  Length: 3.455,  Height: 1.556
+Load:    91818.0,  X load:   -7643.28,  Y load:    5087.80,  Angle:     146.35,  Length: 2.424,  Height: 1.737
+Load:    54545.0,  X load:    5119.01,  Y load:   -1883.43,  Angle:      339.8,  Length: 3.838,  Height: 1.354
+Load:    66364.0,  X load:   -5948.93,  Y load:   -2941.44,  Angle:     206.31,  Length: 2.444,  Height: 1.727
+Load:    63636.0,  X load:    5024.14,  Y load:   -3905.56,  Angle:     322.14,  Length:  3.01,  Height: 1.606
+Load:    85455.0,  X load:       0.00,  Y load:    8545.50,  Angle:       90.0,  Length: 2.808,  Height: 1.919
+Load:    44545.0,  X load:    4453.87,  Y load:      74.63,  Angle:       0.96,  Length: 3.051,  Height: 1.303
+Load:    65455.0,  X load:    3353.54,  Y load:   -5621.15,  Angle:     300.82,  Length: 2.182,  Height: 1.495
+Load:    18182.0,  X load:    1795.57,  Y load:     286.00,  Angle:       9.05,  Length: 2.707,  Height: 1.545
+Load:    78182.0,  X load:   -7818.20,  Y load:       0.00,  Angle:      180.0,  Length: 2.626,  Height: 1.141
+Load:    45455.0,  X load:   -4180.74,  Y load:    1784.10,  Angle:     156.89,  Length: 3.677,  Height: 1.414
+Load:    40000.0,  X load:    4000.00,  Y load:       0.00,  Angle:        0.0,  Length: 2.081,  Height: 1.152
+Load:    64545.0,  X load:   -6338.27,  Y load:    1219.41,  Angle:     169.11,  Length: 2.343,  Height: 1.505
+Load:    10000.0,  X load:    -994.79,  Y load:    -101.92,  Angle:     185.85,  Length: 3.232,  Height: 1.455
+Load:    59091.0,  X load:    5434.91,  Y load:   -2319.31,  Angle:     336.89,  Length: 3.253,  Height: 1.646
+Load:    62727.0,  X load:    1815.11,  Y load:   -6004.34,  Angle:     286.82,  Length: 2.909,  Height: 1.424
+Load:    22727.0,  X load:   -2253.87,  Y load:     291.93,  Angle:     172.62,  Length:  2.97,  Height: 1.525
+Load:    32727.0,  X load:   -1338.43,  Y load:   -2986.50,  Angle:     245.86,  Length: 3.576,  Height: 1.444
+Load:    38182.0,  X load:    2815.97,  Y load:    2578.56,  Angle:      42.48,  Length:   4.0,  Height: 1.182
+Load:    72727.0,  X load:      -0.00,  Y load:   -7272.70,  Angle:      270.0,  Length: 3.859,  Height: 1.222
+Load:    15455.0,  X load:    1341.00,  Y load:     768.31,  Angle:      29.81,  Length: 3.596,  Height: 1.253
+Load:    35455.0,  X load:    2951.41,  Y load:    1964.63,  Angle:      33.65,  Length: 2.242,  Height: 1.818
+Load:    90000.0,  X load:    8067.68,  Y load:    3989.05,  Angle:      26.31,  Length: 3.434,  Height: 1.061
+Load:    69091.0,  X load:    6734.45,  Y load:    1543.63,  Angle:      12.91,  Length: 3.131,  Height: 1.384
+Load:    70909.0,  X load:    6845.42,  Y load:    1849.60,  Angle:      15.12,  Length: 3.879,  Height:  1.96
+Load:    53636.0,  X load:    5177.92,  Y load:   -1399.05,  Angle:     344.88,  Length: 2.869,  Height:  1.02
+Load:    47273.0,  X load:   -3732.26,  Y load:    2901.31,  Angle:     142.14,  Length: 2.545,  Height: 1.939
+Load:    12727.0,  X load:    -859.17,  Y load:     938.93,  Angle:     132.46,  Length: 3.556,  Height: 1.747
+Load:    60909.0,  X load:    2490.98,  Y load:   -5558.24,  Angle:     294.14,  Length: 3.899,  Height: 1.283
+Load:    61818.0,  X load:    6163.16,  Y load:     479.64,  Angle:       4.45,  Length: 2.788,  Height: 1.263
+Load:    95455.0,  X load:   -8958.39,  Y load:   -3296.04,  Angle:      200.2,  Length: 2.141,  Height: 1.828
+Load:    94545.0,  X load:    9376.18,  Y load:    1214.43,  Angle:       7.38,  Length: 3.111,  Height:   1.0
+Load:    26364.0,  X load:   -1078.20,  Y load:    2405.84,  Angle:     114.14,  Length: 3.758,  Height: 1.323
+Load:    82727.0,  X load:    7608.84,  Y load:    3247.02,  Angle:      23.11,  Length: 2.162,  Height: 1.687
+Load:    10909.0,  X load:     908.11,  Y load:    -604.49,  Angle:     326.35,  Length: 2.101,  Height: 1.616
+Load:    31818.0,  X load:    3176.90,  Y load:     176.50,  Angle:       3.18,  Length: 2.768,  Height: 1.293
+Load:    24545.0,  X load:    2340.38,  Y load:     739.72,  Angle:      17.54,  Length: 2.525,  Height: 1.131
+Load:    77273.0,  X load:   -7663.29,  Y load:    -992.57,  Angle:     187.38,  Length: 3.697,  Height: 1.485
+Load:    87273.0,  X load:   -8713.86,  Y load:     484.13,  Angle:     176.82,  Length: 3.091,  Height: 1.848
+Load:    14545.0,  X load:   -1454.30,  Y load:     -24.37,  Angle:     180.96,  Length: 3.798,  Height: 1.768
+Load:    51818.0,  X load:    5117.29,  Y load:    -815.08,  Angle:     350.95,  Length: 2.889,  Height: 1.677
+Load:    23636.0,  X load:   -2281.78,  Y load:     616.52,  Angle:     164.88,  Length: 2.667,  Height: 1.394
+Load:    29091.0,  X load:   -2607.74,  Y load:    1289.39,  Angle:     153.69,  Length: 2.687,  Height: 1.717
+Load:    80909.0,  X load:    1237.79,  Y load:    7995.66,  Angle:       81.2,  Length:  3.03,  Height: 1.232
+Load:    20000.0,  X load:    -305.97,  Y load:    1976.46,  Angle:       98.8,  Length: 2.586,  Height: 1.758
+Load:    37273.0,  X load:   -3102.75,  Y load:   -2065.36,  Angle:     213.65,  Length: 2.222,  Height: 1.788
+Load:    88182.0,  X load:   -8659.40,  Y load:   -1665.97,  Angle:     190.89,  Length: 2.606,  Height: 1.657
+Load:    75455.0,  X load:   -2183.41,  Y load:    7222.69,  Angle:     106.82,  Length: 3.778,  Height: 1.051
+Load:    28182.0,  X load:   -2687.17,  Y load:    -849.33,  Angle:     197.54,  Length: 3.071,  Height: 1.596
+Load:    40909.0,  X load:    4069.60,  Y load:     416.96,  Angle:       5.85,  Length: 3.394,  Height: 1.808
+Load:    41818.0,  X load:    4179.20,  Y load:    -147.40,  Angle:     357.98,  Length: 2.323,  Height: 1.869
+Load:    13636.0,  X load:    1361.50,  Y load:     -75.64,  Angle:     356.82,  Length: 2.061,  Height: 1.576
+Load:    93636.0,  X load:   -2709.51,  Y load:   -8963.01,  Angle:     253.18,  Length: 2.929,  Height: 1.949
+Load:    97273.0,  X load:   -7174.01,  Y load:    6569.16,  Angle:     137.52,  Length:  2.04,  Height: 1.091
+Load:    34545.0,  X load:    3454.02,  Y load:     -57.88,  Angle:     359.04,  Length: 3.273,  Height: 1.566
+Load:    17273.0,  X load:    1363.73,  Y load:    1060.10,  Angle:      37.86,  Length: 2.505,  Height: 1.434
+Load:    96364.0,  X load:    9556.57,  Y load:   -1237.79,  Angle:     352.62,  Length: 3.192,  Height: 1.899
+Load:    92727.0,  X load:   -8841.58,  Y load:    2794.53,  Angle:     162.46,  Length: 2.364,  Height:  1.98
+Load:    20909.0,  X load:   -1411.51,  Y load:   -1542.56,  Angle:     227.54,  Length: 2.404,  Height: 1.535
+Load:    36364.0,  X load:   -3635.89,  Y load:      60.93,  Angle:     179.04,  Length: 3.495,  Height: 1.121
+Load:    21818.0,  X load:   -1117.83,  Y load:    1873.69,  Angle:     120.82,  Length: 3.414,  Height: 1.879
+Load:    30000.0,  X load:    2212.54,  Y load:   -2026.00,  Angle:     317.52,  Length: 2.263,  Height:  1.01
+Load:    76364.0,  X load:    7166.71,  Y load:    2636.84,  Angle:       20.2,  Length: 2.202,  Height: 1.626
+Load:   100000.0,  X load:   -6004.20,  Y load:   -7996.85,  Angle:      233.1,  Length:  2.99,  Height: 1.707
+Load:    68182.0,  X load:   -6807.70,  Y load:    -378.23,  Angle:     183.18,  Length: 3.333,  Height: 1.212
+Load:    39091.0,  X load:    3391.84,  Y load:   -1943.31,  Angle:     330.19,  Length: 3.636,  Height: 1.101
+Load:    84545.0,  X load:   -6674.94,  Y load:   -5188.82,  Angle:     217.86,  Length: 3.919,  Height: 1.404
+Load:    56364.0,  X load:   -5289.72,  Y load:    1946.24,  Angle:      159.8,  Length: 3.313,  Height: 1.333
+Load:    50909.0,  X load:    5087.74,  Y load:     179.45,  Angle:       2.02,  Length: 3.818,  Height: 1.172
+Load:    55455.0,  X load:   -4089.88,  Y load:   -3745.06,  Angle:     222.48,  Length: 3.374,  Height:  1.04
+Load:    48182.0,  X load:   -4793.11,  Y load:     491.09,  Angle:     174.15,  Length: 2.828,  Height:  1.99
+Load:    80000.0,  X load:   -6941.43,  Y load:    3977.00,  Angle:     150.19,  Length: 3.737,  Height:   2.0
+Load:    90909.0,  X load:   -8776.19,  Y load:   -2371.28,  Angle:     195.12,  Length: 3.212,  Height: 1.242
+Load:    60000.0,  X load:    5981.91,  Y load:    -465.53,  Angle:     355.55,  Length: 2.727,  Height: 1.071
+Load:    50000.0,  X load:    4973.96,  Y load:    -509.62,  Angle:     354.15,  Length: 2.283,  Height: 1.929
+Load:    67273.0,  X load:    6030.41,  Y load:   -2981.73,  Angle:     333.69,  Length: 2.646,  Height: 1.475
+Load:    30909.0,  X load:   -3052.42,  Y load:    -486.19,  Angle:     189.05,  Length: 2.848,  Height: 1.778
+Load:    98182.0,  X load:   -5895.05,  Y load:    7851.46,  Angle:      126.9,  Length: 2.566,  Height:  1.97
+Load:    25455.0,  X load:   -2513.81,  Y load:     400.40,  Angle:     170.95,  Length: 3.475,  Height:  1.03
+Load:    33636.0,  X load:   -1723.32,  Y load:   -2888.60,  Angle:     239.18,  Length: 2.303,  Height: 1.343
+Load:    49091.0,  X load:    4785.01,  Y load:   -1096.79,  Angle:     347.09,  Length: 3.293,  Height: 1.838
+Load:    86364.0,  X load:   -7943.35,  Y load:   -3389.77,  Angle:     203.11,  Length: 3.717,  Height: 1.798
+Load:    79091.0,  X load:    4052.17,  Y load:    6792.19,  Angle:      59.18,  Length: 3.616,  Height: 1.081
+Load:    42727.0,  X load:    2884.39,  Y load:    3152.18,  Angle:      47.54,  Length:   2.0,  Height: 1.859
+Load:    52727.0,  X load:    3559.47,  Y load:   -3889.93,  Angle:     312.46,  Length: 2.485,  Height: 1.162
+Load:    74545.0,  X load:   -7432.03,  Y load:    -578.39,  Angle:     184.45,  Length: 2.949,  Height: 1.192
+Load:    46364.0,  X load:   -4519.20,  Y load:    1035.87,  Angle:     167.09,  Length: 3.515,  Height: 1.515
+Load:    71818.0,  X load:   -7177.34,  Y load:    -253.15,  Angle:     182.02,  Length: 3.535,  Height: 1.364
+Load:    83636.0,  X load:   -8338.39,  Y load:     648.92,  Angle:     175.55,  Length: 2.384,  Height: 1.273
+Load:    73636.0,  X load:    2130.78,  Y load:    7048.57,  Angle:      73.18,  Length: 3.152,  Height: 1.889
+Load:    19091.0,  X load:    1820.34,  Y load:    -575.35,  Angle:     342.46,  Length: 3.172,  Height: 1.667
+Load:    27273.0,  X load:    1637.53,  Y load:   -2180.98,  Angle:      306.9,  Length:  2.02,  Height: 1.697
+Load:    89091.0,  X load:   -8903.56,  Y load:     314.03,  Angle:     177.98,  Length: 3.354,  Height: 1.636

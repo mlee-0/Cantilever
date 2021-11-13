@@ -75,7 +75,7 @@ def write_samples(samples):
             ))
     # Write samples to text file.
     text = [
-        f'Load: {load_sample:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  X load (edge): {load_x/2:>10.2f},  Y load (edge): {load_y/2:>10.2f},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
+        f'Load: {load_sample:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
         for load_sample, angle_sample, length_sample, height_sample, (load_x, load_y) in zip(*samples, load_components)
         ]
     with open(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES), 'w') as file:
