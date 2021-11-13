@@ -36,13 +36,13 @@ FLST,3,1,8
 FITEM,3,0,0,0   
 K, ,P51X
 FLST,3,1,8  
-FITEM,3,samples(4,i,1),0,0   
+FITEM,3,samples(5,i,1),0,0   
 K, ,P51X
 FLST,3,1,8  
-FITEM,3,samples(4,i,1),samples(5,i,1),0   
+FITEM,3,samples(5,i,1),samples(6,i,1),0   
 K, ,P51X
 FLST,3,1,8  
-FITEM,3,0,samples(5,i,1),0   
+FITEM,3,0,samples(6,i,1),0   
 K, ,P51X
 FLST,2,4,3  
 FITEM,2,1   
@@ -63,7 +63,7 @@ MPTEMP,,,,,,,,
 MPTEMP,1,0  
 MPDATA,EX,1,,200e9  
 MPDATA,PRXY,1,,0.3  
-ESIZE,0,10, 
+! placeholder_mesh_divisions
 MSHAPE,0,2D 
 MSHKEY,0
 !*  
@@ -106,25 +106,25 @@ FITEM,2,13
 FITEM,2,-21 
 !*  
 /GO 
-F,P51X,FX,samples(1,i,1)  
+F,P51X,FX,samples(2,i,1)  
 FLST,2,9,1,ORDE,2   
 FITEM,2,13  
 FITEM,2,-21 
 !*  
 /GO 
-F,P51X,FY,samples(2,i,1) 
+F,P51X,FY,samples(3,i,1) 
 FLST,2,2,1,ORDE,2   
 FITEM,2,2   
 FITEM,2,12  
 !*  
 /GO 
-F,P51X,FY,samples(2,i,1)/2
+F,P51X,FY,samples(3,i,1)/2
 FLST,2,2,1,ORDE,2   
 FITEM,2,2   
 FITEM,2,12  
 !*  
 /GO 
-F,P51X,FX,samples(1,i,1)/2   
+F,P51X,FX,samples(2,i,1)/2   
 FLST,2,1,4,ORDE,1   
 FITEM,2,4   
 !*  
@@ -178,6 +178,11 @@ SET,FIRST
 /REPLOT
 /REPLOT
 !*  
-/IMAGE CAPTURE
+
+*VGET,stress,NODE,,S,EQV
+*CFOPEN,'stress_%i%','txt'
+*VWRITE,stress(1)
+(F20.5)
+*CFCLOS
 
 ! placeholder_loop_end
