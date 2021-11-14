@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageOps
 
-from main import load, angle, length, height, ANGLE_PEAKS, generate_input_images, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, OUTPUT_SIZE
+from main import load, angle, length, height, ANGLE_PEAKS, generate_input_images, OUTPUT_SIZE, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, NUMBER_DIGITS
 
 
 # Dataset size.
@@ -78,44 +78,13 @@ def write_samples(samples):
             ))
     # Write samples to text file.
     text = [
-        f'Load: {load_sample:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
-        for load_sample, angle_sample, length_sample, height_sample, (load_x, load_y) in zip(*samples, load_components)
+        f'{str(i+1).zfill(NUMBER_DIGITS)},  Load: {load_sample:>10},  X load: {load_x:>10.2f},  Y load: {load_y:>10.2f},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
+        for i, (load_sample, angle_sample, length_sample, height_sample, (load_x, load_y)) in enumerate(zip(*samples, load_components))
         ]
     with open(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES), 'w') as file:
         file.writelines(text)
     print(f'Wrote samples in {FILENAME_SAMPLES}.')
     return load_components
-
-# Write a text file containing ANSYS commands used to perform FEA and generate stress contour images.
-def write_ansys_script(samples, load_components):
-    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_TEMPLATE), 'r') as file:
-        lines = file.readlines()
-    
-    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_SCRIPT), 'w') as file:
-        # Add loop commands.
-        command_loop_start = f'*DO,i,1,{NUMBER_SAMPLES},1\n'
-        placeholder_loop_start = '! placeholder_loop_start\n'
-        command_loop_end = f'*ENDDO\n'
-        placeholder_loop_end = '! placeholder_loop_end\n'
-        lines[lines.index(placeholder_loop_start)] = command_loop_start
-        lines[lines.index(placeholder_loop_end)] = command_loop_end
-        # Add meshing commands.
-        placeholder_mesh_divisions = '! placeholder_mesh_divisions\n'
-        command_mesh_divisions = f'ESIZE,0,{NUMBER_ELEMENTS}\n'
-        lines[lines.index(placeholder_mesh_divisions)] = command_mesh_divisions
-        # Add commands that define the array containing generated samples.
-        array_name = 'samples'
-        placeholder_define_samples = '! placeholder_define_samples\n'
-        command_define_samples = f'*DIM,{array_name},ARRAY,{6},{NUMBER_SAMPLES}\n'
-        lines_define_samples = [None] * (NUMBER_SAMPLES+1)
-        lines_define_samples[0] = command_define_samples
-        for i in range(NUMBER_SAMPLES):
-            lines_define_samples[i+1] = f'{array_name}(1,{i+1}) = {samples[0][i]},{load_components[i][0]},{load_components[i][1]},{samples[1][i]},{samples[2][i]},{samples[3][i]}\n'
-        index_placeholder = lines.index(placeholder_define_samples)
-        lines = lines[:index_placeholder] + lines_define_samples + lines[index_placeholder+1:]
-        file.writelines(lines)
-        print(f'Wrote {FILENAME_ANSYS_SCRIPT}.')
-
 
 # Return the sample values found in the text file previously generated.
 def read_samples():
@@ -123,8 +92,8 @@ def read_samples():
     filename = os.path.join(FOLDER_ROOT, FILENAME_SAMPLES)
     try:
         with open(filename, 'r') as file:
-            for string in file.readlines():
-                load, *_, angle, length, height = [float(string.split(':')[1]) for string in string.split(',')]
+            for line in file.readlines():
+                load, *_, angle, length, height = [float(line.split(':')[1]) for line in line.split(',')[1:]]
                 load_samples.append(load)
                 angle_samples.append(angle)
                 length_samples.append(length)
@@ -135,6 +104,49 @@ def read_samples():
     else:
         print(f'Found samples in {filename}.')
         return load_samples, angle_samples, length_samples, height_samples
+
+# Write a text file containing ANSYS commands used to perform FEA and generate stress contour images.
+def write_ansys_script(samples, load_components):
+    # Read the template script.
+    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_TEMPLATE), 'r') as file:
+        lines = file.readlines()
+    
+    # Replace placeholder lines in the template script.
+    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_SCRIPT), 'w') as file:
+        # Initialize dictionary of placeholder strings (keys) and strings they should be replaced with (values).
+        placeholder_substitutions = {}
+        # Define names of variables.
+        loop_variable = 'i'
+        samples_variable = 'samples'
+        # Add loop commands.
+        placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{NUMBER_SAMPLES},1\n'
+        placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
+        # Add commands that define the array containing generated samples.
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{6},{NUMBER_SAMPLES}\n']
+        for i in range(NUMBER_SAMPLES):
+            commands_define_samples.append(
+                f'{samples_variable}(1,{i+1}) = {samples[0][i]},{load_components[i][0]},{load_components[i][1]},{samples[1][i]},{samples[2][i]},{samples[3][i]}\n'
+                )
+        placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
+        # Add meshing commands.
+        placeholder_substitutions['! placeholder_mesh_divisions\n'] = f'ESIZE,0,{NUMBER_ELEMENTS}\n'
+        # Add commands that format and create the output files.
+        placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
+        placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
+        placeholder_substitutions['! placeholder_define_filename\n'] = f'filename = \'stress_%STRFILL(suffix,number,{NUMBER_DIGITS}-STRLENG(number)+1)%\'\n'
+        # Substitute all commands into placeholders.
+        for placeholder in placeholder_substitutions:
+            command = placeholder_substitutions[placeholder]
+            if isinstance(command, list):
+                index = lines.index(placeholder)
+                for sub_command in command[::-1]:
+                    lines.insert(index+1, sub_command)
+                del lines[index]
+            else:
+                lines[lines.index(placeholder)] = command
+        # Write the file.
+        file.writelines(lines)
+        print(f'Wrote {FILENAME_ANSYS_SCRIPT}.')
 
 # # Crop and resize the stress contour images.
 # def crop_output_images(samples):
@@ -208,6 +220,6 @@ load_components = write_samples(samples)
 write_ansys_script(samples, load_components)
 generate_input_images(samples, FOLDER_TRAIN_INPUTS)
 
-convert_fea_to_spreadsheet(samples)
+# convert_fea_to_spreadsheet(samples)
 # # Crop and resize stress contour images generated by FEA. This only needs to run the first time the images are added to the folder.
 # crop_output_images(samples)

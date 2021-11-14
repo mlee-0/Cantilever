@@ -180,7 +180,10 @@ SET,FIRST
 !*  
 
 *VGET,stress,NODE,,S,EQV
-*CFOPEN,'stress_%i%','txt'
+! placeholder_define_suffix
+! placeholder_define_number
+! placeholder_define_filename
+*CFOPEN,filename,'txt'
 *VWRITE,stress(1)
 (F20.5)
 *CFCLOS

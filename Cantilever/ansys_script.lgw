@@ -280,7 +280,10 @@ SET,FIRST
 !*  
 
 *VGET,stress,NODE,,S,EQV
-*CFOPEN,'stress_%i%','txt'
+suffix = '000000'
+number = CHRVAL(i)
+filename = 'stress_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
+*CFOPEN,filename,'txt'
 *VWRITE,stress(1)
 (F20.5)
 *CFCLOS

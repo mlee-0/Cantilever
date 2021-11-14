@@ -63,6 +63,9 @@ FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_INPUTS = os.path.join(FOLDER_ROOT, 'Test Inputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 
+# Number of digits used for file names.
+NUMBER_DIGITS = 6
+
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
@@ -77,8 +80,7 @@ def generate_input_images(samples, folder_inputs):
         os.remove(filename)
     print(f'Deleted {len(filenames)} existing images in {folder_inputs}.')
 
-    filenames = []
-    for load_sample, angle_sample, length_sample, height_sample in zip(*samples):
+    for i, (load_sample, angle_sample, length_sample, height_sample) in enumerate(zip(*samples)):
         image = np.zeros((INPUT_SIZE[1], INPUT_SIZE[0], INPUT_SIZE[2]))
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
         r = np.arange(max(INPUT_SIZE))
@@ -96,12 +98,10 @@ def generate_input_images(samples, folder_inputs):
             1
             ] = 255
         # Write image files.
-        filename = os.path.join(folder_inputs, f'input_{load_sample}_{angle_sample}_{length_sample}_{height_sample}.png')
+        filename = os.path.join(folder_inputs, f'input_{str(i+1).zfill(NUMBER_DIGITS)}.png')
         with Image.fromarray(image.astype(np.uint8), 'LA') as file:
             file.save(filename)
-            filenames.append(filename)
     print(f'Wrote {len(samples[0])} input images in {folder_inputs}.')
-    return filenames
 
 # Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
 def rgb_to_hue(array):
@@ -127,26 +127,27 @@ class CantileverDataset(Dataset):
     def __init__(self, folder_inputs, folder_outputs=None):
         self.folder_inputs = folder_inputs
         self.folder_outputs = folder_outputs
-        # Get all input image filenames in the inputs folder.
-        self.filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
-        self.filename_suffixes = [os.path.basename(filename)[:-4].split('_')[1:] for filename in self.filenames]
+        # Get all input and output filenames in the respective folders.
+        self.input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
+        self.input_filenames = sorted(self.input_filenames)
+        if folder_outputs is not None:
+            self.output_filenames = glob.glob(os.path.join(self.folder_outputs, '*.txt'))
+            self.output_filenames = sorted(self.output_filenames)
+        # self.filename_suffixes = [os.path.basename(filename)[:-4].split('_')[1:] for filename in self.input_filenames]
 
     def __len__(self):
-        return len(self.filenames)
+        return len(self.input_filenames)
     
     def __getitem__(self, index):
-        filename_input = self.filenames[index]
-        image_input = np.asarray(Image.open(filename_input), np.uint8)
+        input_filename = self.input_filenames[index]
+        image_input = np.asarray(Image.open(input_filename), np.uint8)
         image_input = np.transpose(image_input, [2, 0, 1])  # Make channel dimension the first dimension
         if self.folder_outputs is not None:
-            filename_output = os.path.join(
-                self.folder_outputs,
-                f'{"_".join(["stress"] + self.filename_suffixes[index])}.png',
-                )
-            image_output = np.asarray(Image.open(filename_output), np.uint8)[:, :, :3]
+            output_filename = self.output_filenames[index]
+            image_output = np.asarray(Image.open(output_filename), np.uint8)[:, :, :3]
             image_output = rgb_to_hue(image_output).flatten()
         else:
-            image_output = 0
+            image_output = 0  # Using None is invalid
         return image_input, image_output
 
 # A CNN that predicts the stress contour in a cantilever beam with a point load at the free end.
@@ -268,7 +269,7 @@ if __name__ == '__main__':
     print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
     
     # Test the model on the input images found in the folder.
-    for index, (test_input, _) in enumerate(test_dataloader):
+    for i, (test_input, _) in enumerate(test_dataloader):
         test_output = model(test_input).detach().numpy()[0, :]
         test_output = test_output.reshape(OUTPUT_SIZE, order='F')
         # Convert the output to an RGB array.
@@ -279,6 +280,6 @@ if __name__ == '__main__':
         with Image.fromarray(test_output) as image:
             image.save(os.path.join(
                 FOLDER_TEST_OUTPUTS,
-                f'{"_".join(["test"] + test_dataset.filename_suffixes[index])}.png',
+                f'{"_".join(["test"] + test_dataset.filename_suffixes[i])}.png',
                 ))
     print(f'Wrote {len(test_dataloader)} output images in {FOLDER_TEST_OUTPUTS}.')
