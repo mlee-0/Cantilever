@@ -72,7 +72,7 @@ NUMBER_DIGITS = 6
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 10
+EPOCHS = 2000
 
 
 # Create images for the sample values provided inside the specified folder.
@@ -137,9 +137,6 @@ class CantileverDataset(Dataset):
             output_filename = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS, '*.csv'))[0]
             self.stresses = np.genfromtxt(output_filename, delimiter=',')
             self.stresses = np.reshape(self.stresses, (*OUTPUT_SIZE[::-1], round(self.stresses.size / (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]))))
-            # self.output_filenames = glob.glob(os.path.join(self.folder_outputs, '*.txt'))
-            # self.output_filenames = sorted(self.output_filenames)
-        # self.filename_suffixes = [os.path.basename(filename)[:-4].split('_')[1:] for filename in self.input_filenames]
 
     def __len__(self):
         return len(self.input_filenames)
@@ -150,9 +147,6 @@ class CantileverDataset(Dataset):
         image_input = np.transpose(image_input, [2, 0, 1])  # Make channel dimension the first dimension
         if self.folder_outputs is not None:
             image_output = self.stresses[:, :, index].flatten()
-            # output_filename = self.output_filenames[index]
-            # image_output = np.asarray(Image.open(output_filename), np.uint8)[:, :, :3]
-            # image_output = rgb_to_hue(image_output).flatten()
         else:
             image_output = 0  # Using None is invalid
         return image_input, image_output
@@ -174,21 +168,21 @@ class StressContourCnn(nn.Module):
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=1),
-            nn.BatchNorm2d(2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            # nn.BatchNorm2d(4),
+            # nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            # nn.BatchNorm2d(4),
+            # nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=1),
+            # nn.BatchNorm2d(2),
+            # nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
         )
         self.linear = nn.Sequential(
-            nn.Linear(in_features=12, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
+            nn.Linear(in_features=160, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
         )
     
     def forward(self, x):
@@ -214,9 +208,9 @@ def train(dataloader, model, loss_function, optimizer):
         # Adjust model parameters.
         optimizer.step()
 
-        if batch % (BATCH_SIZE * 10) == 0:
-            loss, current = loss.item(), batch * len(data)
-            print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
+        # if batch % (BATCH_SIZE * 10) == 0:
+        #     loss, current = loss.item(), batch * len(data)
+        #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
 
 # Test the model for one epoch only.
 def test(dataloader, model, loss_function):
