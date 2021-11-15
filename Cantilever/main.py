@@ -69,10 +69,12 @@ FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 # Number of digits used for file names.
 NUMBER_DIGITS = 6
 
+# Model parameters file name and path.
+FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 2000
+EPOCHS = 20
 
 
 # Create images for the sample values provided inside the specified folder.
@@ -234,8 +236,14 @@ if __name__ == '__main__':
     device = 'cpu'  #'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
-    # Initialize the model.
+    # Initialize the model and load its parameters if it has already been trained.
     model = StressContourCnn()
+    if os.path.exists(FILEPATH_MODEL):
+        model.load_state_dict(torch.load(FILEPATH_MODEL))
+        model.eval()
+        print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
+        if not input('Continue training this model? (y/n) ').lower().startswith('y'):
+            EPOCHS = 0
     
     # Set up the training data.
     train_dataset = CantileverDataset(FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS)
@@ -250,6 +258,10 @@ if __name__ == '__main__':
         train(train_dataloader, model, loss_function, optimizer)
         test_loss = test(train_dataloader, model, loss_function)
         test_loss_values.append(test_loss)
+    
+    # Save the model parameters.
+    torch.save(model.state_dict(), FILEPATH_MODEL)
+    print(f'Saved model parameters to {FILEPATH_MODEL}.')
     
     # Plot the loss history.
     plt.figure()
@@ -282,6 +294,5 @@ if __name__ == '__main__':
             image.save(os.path.join(
                 FOLDER_TEST_OUTPUTS,
                 f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
-                # f'{"_".join(["test"] + test_dataset.filename_suffixes[i])}.png',
                 ))
     print(f'Wrote {len(test_dataloader)} output images in {FOLDER_TEST_OUTPUTS}.')
