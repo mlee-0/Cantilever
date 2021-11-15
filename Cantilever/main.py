@@ -74,7 +74,7 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 20
+EPOCHS = 100
 
 
 # Create images for the sample values provided inside the specified folder.
