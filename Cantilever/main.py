@@ -56,6 +56,9 @@ assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input im
 # Size of output images produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_SIZE = INPUT_SIZE[:2]
 
+# FEA meshing settings.
+NUMBER_DIVISIONS = (99, 49)  # Along (length, height)
+
 # Folders.
 FOLDER_ROOT = 'Cantilever'
 FOLDER_TRAIN_INPUTS = os.path.join(FOLDER_ROOT, 'Train Inputs')
@@ -69,7 +72,7 @@ NUMBER_DIGITS = 6
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 40
+EPOCHS = 10
 
 
 # Create images for the sample values provided inside the specified folder.
@@ -131,8 +134,11 @@ class CantileverDataset(Dataset):
         self.input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
         self.input_filenames = sorted(self.input_filenames)
         if folder_outputs is not None:
-            self.output_filenames = glob.glob(os.path.join(self.folder_outputs, '*.txt'))
-            self.output_filenames = sorted(self.output_filenames)
+            output_filename = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS, '*.csv'))[0]
+            self.stresses = np.genfromtxt(output_filename, delimiter=',')
+            self.stresses = np.reshape(self.stresses, (*OUTPUT_SIZE[::-1], round(self.stresses.size / (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]))))
+            # self.output_filenames = glob.glob(os.path.join(self.folder_outputs, '*.txt'))
+            # self.output_filenames = sorted(self.output_filenames)
         # self.filename_suffixes = [os.path.basename(filename)[:-4].split('_')[1:] for filename in self.input_filenames]
 
     def __len__(self):
@@ -143,9 +149,10 @@ class CantileverDataset(Dataset):
         image_input = np.asarray(Image.open(input_filename), np.uint8)
         image_input = np.transpose(image_input, [2, 0, 1])  # Make channel dimension the first dimension
         if self.folder_outputs is not None:
-            output_filename = self.output_filenames[index]
-            image_output = np.asarray(Image.open(output_filename), np.uint8)[:, :, :3]
-            image_output = rgb_to_hue(image_output).flatten()
+            image_output = self.stresses[:, :, index].flatten()
+            # output_filename = self.output_filenames[index]
+            # image_output = np.asarray(Image.open(output_filename), np.uint8)[:, :, :3]
+            # image_output = rgb_to_hue(image_output).flatten()
         else:
             image_output = 0  # Using None is invalid
         return image_input, image_output
@@ -167,21 +174,21 @@ class StressContourCnn(nn.Module):
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(2),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=1),
+            nn.BatchNorm2d(2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
         self.linear = nn.Sequential(
-            nn.Linear(in_features=160, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
+            nn.Linear(in_features=12, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
         )
     
     def forward(self, x):
@@ -280,6 +287,7 @@ if __name__ == '__main__':
         with Image.fromarray(test_output) as image:
             image.save(os.path.join(
                 FOLDER_TEST_OUTPUTS,
-                f'{"_".join(["test"] + test_dataset.filename_suffixes[i])}.png',
+                f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
+                # f'{"_".join(["test"] + test_dataset.filename_suffixes[i])}.png',
                 ))
     print(f'Wrote {len(test_dataloader)} output images in {FOLDER_TEST_OUTPUTS}.')
