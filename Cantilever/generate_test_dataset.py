@@ -1,4 +1,4 @@
-from main import FOLDER_TEST_INPUTS, generate_input_images, calculate_load_components, write_ansys_script
+from main import FOLDER_TEST_INPUTS, generate_samples, generate_input_images, calculate_load_components, write_ansys_script
 
 
 if __name__ == '__main__':

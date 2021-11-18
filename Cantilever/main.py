@@ -61,7 +61,7 @@ assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input im
 OUTPUT_SIZE = INPUT_SIZE[:2]
 
 # FEA meshing settings.
-NUMBER_DIVISIONS = (99, 49)  # Along (length, height)
+MESH_DIVISIONS = (99, 49)  # Along (length, height)
 
 # Folders.
 FOLDER_ROOT = 'Cantilever'
@@ -80,6 +80,49 @@ BATCH_SIZE = 1
 LEARNING_RATE = 0.1
 EPOCHS = 100
 
+
+# Generate sample values for each parameter.
+def generate_samples(number_samples, show_histogram=False) -> tuple:
+    # Helper function for generating unevenly spaced samples within a defined range. Setting "increasing" to True makes spacings increase as values increase.
+    generate_logspace_samples = lambda low, high, increasing: (((
+        np.logspace(
+            0, 1, round(number_samples/4)+1
+            ) - 1) / 9) * (1 if increasing else -1) + (0 if increasing else 1)
+        ) * (high - low) + low
+    # Generate samples.
+    load_samples = np.linspace(load.low, load.high, number_samples)
+    angle_samples = np.concatenate((
+        generate_logspace_samples(angle.low, (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, increasing=True)[:-1],
+        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, ANGLE_PEAKS[1], increasing=False)[1:],
+        generate_logspace_samples(ANGLE_PEAKS[1], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], increasing=True)[:-1],
+        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], angle.high, increasing=False)[1:],
+        ))
+    length_samples = np.linspace(length.low, length.high, number_samples)
+    height_samples = np.linspace(height.low, height.high, number_samples)
+    # Randomize ordering of samples.
+    np.random.shuffle(load_samples)
+    np.random.shuffle(angle_samples)
+    np.random.shuffle(length_samples)
+    np.random.shuffle(height_samples)
+    # Round samples to a fixed number of decimal places.
+    load_samples = np.round(load_samples, load.precision)
+    angle_samples = np.round(angle_samples, angle.precision)
+    length_samples = np.round(length_samples, length.precision)
+    height_samples = np.round(height_samples, height.precision)
+    
+    # Plot histograms for angle samples.
+    if show_histogram:
+        plt.figure()
+        plt.hist(
+            angle_samples,
+            bins=round(angle.high-angle.low),
+            rwidth=0.75,
+            color='#0095ff',
+            )
+        plt.xticks(np.linspace(angle.low, angle.high, 5))
+        plt.title(angle.name)
+        plt.show()
+    return load_samples, angle_samples, length_samples, height_samples
 
 # Create images for the sample values provided inside the specified folder.
 def generate_input_images(samples, folder_inputs):
@@ -118,8 +161,8 @@ def calculate_load_components(load_samples, angle_samples) -> list:
     for load_sample, angle_sample in zip(load_samples, angle_samples):
         angle_sample *= (np.pi / 180)
         load_components.append((
-            np.round(np.cos(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
-            np.round(np.sin(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
+            np.round(np.cos(angle_sample) * load_sample / (MESH_DIVISIONS[1]), NUMBER_DIGITS),
+            np.round(np.sin(angle_sample) * load_sample / (MESH_DIVISIONS[1]), NUMBER_DIGITS),
             ))
     return load_components
 
@@ -148,8 +191,8 @@ def write_ansys_script(samples, load_components, filename) -> None:
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add meshing commands.
-        placeholder_substitutions['! placeholder_mesh_length\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[0]}, , , , ,1\n'
-        placeholder_substitutions['! placeholder_mesh_height\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[1]}, , , , ,1\n'
+        placeholder_substitutions['! placeholder_mesh_length\n'] = f'LESIZE,_Y1, , ,{MESH_DIVISIONS[0]}, , , , ,1\n'
+        placeholder_substitutions['! placeholder_mesh_height\n'] = f'LESIZE,_Y1, , ,{MESH_DIVISIONS[1]}, , , , ,1\n'
         # Add commands that format and create the output files.
         placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
         placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
@@ -187,6 +230,17 @@ def hsv_to_rgb(array):
             rgb = colorsys.hsv_to_rgb(array[i, j, 0], array[i, j, 1], array[i, j, 2])
             for k in range(3):
                 array[i, j, k] = rgb[k] * 255
+    return array
+
+# Convert the model's output array to a color image.
+def array_to_colormap(array):
+    # Invert the values so that red represents high stresses.
+    array = 1 - array
+    # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.
+    array = array * (240/360)
+    # Convert the output to an RGB array.
+    array = np.dstack((array, np.ones(array.shape, float), 2/3 * np.ones(array.shape, float)))
+    array = hsv_to_rgb(array)
     return array
 
 # Dataset that retrieves input and output images for the CNN. Output images are not retrieved if the outputs folder is not specified.
@@ -348,12 +402,11 @@ if __name__ == '__main__':
     # Test the model on the input images found in the folder.
     for i, (test_input, _) in enumerate(test_dataloader):
         test_output = model(test_input).detach().numpy()[0, :]
-        test_output = test_output.reshape(OUTPUT_SIZE, order='F')
-        # Convert the output to an RGB array.
-        test_output = np.dstack((test_output, np.ones(OUTPUT_SIZE, float), 2/3 * np.ones(OUTPUT_SIZE, float)))
-        test_output = hsv_to_rgb(test_output)
+        test_output = test_output.reshape(OUTPUT_SIZE[::-1], order='C')
+        # Convert the output to a color image.
+        test_output = array_to_colormap(test_output)
         # Save the generated output image.
-        test_output = test_output.transpose((1, 0, 2)).astype(np.uint8)
+        test_output = test_output.astype(np.uint8)
         with Image.fromarray(test_output) as image:
             image.save(os.path.join(
                 FOLDER_TEST_OUTPUTS,
