@@ -29,6 +29,10 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 
 
+# Dataset size.
+NUMBER_SAMPLES = 100
+assert NUMBER_SAMPLES % 4 == 0, 'Sample size must be divisible by 4 for angles to be generated properly.'
+
 # A dataclass that stores settings for each parameter.
 @dataclass
 class Parameter:
@@ -66,7 +70,7 @@ FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_INPUTS = os.path.join(FOLDER_ROOT, 'Test Inputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 
-# Number of digits used for file names.
+# Number of digits used for numerical file names.
 NUMBER_DIGITS = 6
 
 # Model parameters file name and path.
@@ -107,6 +111,64 @@ def generate_input_images(samples, folder_inputs):
         with Image.fromarray(image.astype(np.uint8), 'LA') as file:
             file.save(filename)
     print(f'Wrote {len(samples[0])} input images in {folder_inputs}.')
+
+# Return the x- and y-components of the specified loads and corresponding angles.
+def calculate_load_components(load_samples, angle_samples) -> list:
+    load_components = []
+    for load_sample, angle_sample in zip(load_samples, angle_samples):
+        angle_sample *= (np.pi / 180)
+        load_components.append((
+            np.round(np.cos(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
+            np.round(np.sin(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
+            ))
+    return load_components
+
+# Write a text file containing ANSYS commands used to automate FEA and generate stress contour images.
+def write_ansys_script(samples, load_components, filename) -> None:
+    # Read the template script.
+    with open(os.path.join(FOLDER_ROOT, 'ansys_template.lgw'), 'r') as file:
+        lines = file.readlines()
+    
+    # Replace placeholder lines in the template script.
+    with open(os.path.join(FOLDER_ROOT, filename), 'w') as file:
+        # Initialize dictionary of placeholder strings (keys) and strings they should be replaced with (values).
+        placeholder_substitutions = {}
+        # Define names of variables.
+        loop_variable = 'i'
+        samples_variable = 'samples'
+        # Add loop commands.
+        placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{NUMBER_SAMPLES},1\n'
+        placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
+        # Add commands that define the array containing generated samples.
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{6},{NUMBER_SAMPLES}\n']
+        for i, (load_sample, angle_sample, length_sample, height_sample, (load_x, load_y)) in enumerate(zip(*samples, load_components)):
+            commands_define_samples.append(
+                f'{samples_variable}(1,{i+1}) = {load_sample},{load_x},{load_y},{angle_sample},{length_sample},{height_sample}\n'
+                # f'{samples_variable}(1,{i+1}) = {samples[0][i]},{load_components[i][0]},{load_components[i][1]},{samples[1][i]},{samples[2][i]},{samples[3][i]}\n'
+                )
+        placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
+        # Add meshing commands.
+        placeholder_substitutions['! placeholder_mesh_length\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[0]}, , , , ,1\n'
+        placeholder_substitutions['! placeholder_mesh_height\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[1]}, , , , ,1\n'
+        # Add commands that format and create the output files.
+        placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
+        placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
+        placeholder_substitutions['! placeholder_define_filename\n'] = f'filename = \'stress_%STRFILL(suffix,number,{NUMBER_DIGITS}-STRLENG(number)+1)%\'\n'
+        # Substitute all commands into placeholders.
+        for placeholder in placeholder_substitutions:
+            command = placeholder_substitutions[placeholder]
+            indices = [i for i, line in enumerate(lines) if line == placeholder]
+            if isinstance(command, list):
+                for index in indices:
+                    for sub_command in command[::-1]:
+                        lines.insert(index+1, sub_command)
+                    del lines[index]
+            else:
+                for index in indices:
+                    lines[index] = command
+        # Write the file.
+        file.writelines(lines)
+        print(f'Wrote {filename}.')
 
 # Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
 def rgb_to_hue(array):
@@ -238,12 +300,13 @@ if __name__ == '__main__':
 
     # Initialize the model and load its parameters if it has already been trained.
     model = StressContourCnn()
+    train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
         model.eval()
         print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
         if not input('Continue training this model? (y/n) ').lower().startswith('y'):
-            EPOCHS = 0
+            train_model = False
     
     # Set up the training data.
     train_dataset = CantileverDataset(FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS)
@@ -251,25 +314,26 @@ if __name__ == '__main__':
     loss_function = nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
-    # Train the model and record the accuracy and loss.
-    test_loss_values = []
-    for t in range(EPOCHS):
-        print(f'Epoch {t+1}\n------------------------')
-        train(train_dataloader, model, loss_function, optimizer)
-        test_loss = test(train_dataloader, model, loss_function)
-        test_loss_values.append(test_loss)
-    
-    # Save the model parameters.
-    torch.save(model.state_dict(), FILEPATH_MODEL)
-    print(f'Saved model parameters to {FILEPATH_MODEL}.')
-    
-    # Plot the loss history.
-    plt.figure()
-    plt.plot(test_loss_values, '-o', color='#ffbf00')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.grid(axis='y')
-    plt.show()
+    if train_model:
+        # Train the model and record the accuracy and loss.
+        test_loss_values = []
+        for t in range(EPOCHS):
+            print(f'Epoch {t+1}\n------------------------')
+            train(train_dataloader, model, loss_function, optimizer)
+            test_loss = test(train_dataloader, model, loss_function)
+            test_loss_values.append(test_loss)
+        
+        # Save the model parameters.
+        torch.save(model.state_dict(), FILEPATH_MODEL)
+        print(f'Saved model parameters to {FILEPATH_MODEL}.')
+        
+        # Plot the loss history.
+        plt.figure()
+        plt.plot(test_loss_values, '-o', color='#ffbf00')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.grid(axis='y')
+        plt.show()
 
     # Set up the testing data.
     test_dataset = CantileverDataset(FOLDER_TEST_INPUTS, None)

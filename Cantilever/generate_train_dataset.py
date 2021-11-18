@@ -7,21 +7,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageOps
 
-from main import load, angle, length, height, ANGLE_PEAKS, NUMBER_DIVISIONS, OUTPUT_SIZE, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, NUMBER_DIGITS, generate_input_images
+from main import NUMBER_SAMPLES, load, angle, length, height, ANGLE_PEAKS, NUMBER_DIVISIONS, OUTPUT_SIZE, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, NUMBER_DIGITS, generate_input_images, calculate_load_components, write_ansys_script
 
-
-# Dataset size.
-NUMBER_SAMPLES = 100
-assert NUMBER_SAMPLES % 4 == 0, 'Sample size must be divisible by 4 for angles to be generated properly.'
 
 # Names of files to be generated.
-FILENAME_SAMPLES = 'cantilever_samples.txt'
-FILENAME_ANSYS_TEMPLATE = 'ansys_template.lgw'
-FILENAME_ANSYS_SCRIPT = 'ansys_script.lgw'
-FILENAME_STRESS_FEA = 'stress.csv'
+FILENAME_SAMPLES = 'train_samples.txt'
 
-# Generate and store sample values for each parameter.
-def generate_samples(show_histogram=False):
+# Generate sample values for each parameter.
+def generate_samples(show_histogram=False) -> tuple:
     # Helper function for generating unevenly spaced samples within a defined range. Setting "increasing" to True makes spacings increase as values increase.
     generate_logspace_samples = lambda low, high, increasing: (((
         np.logspace(
@@ -63,16 +56,8 @@ def generate_samples(show_histogram=False):
         plt.show()
     return load_samples, angle_samples, length_samples, height_samples
 
-# Write the specified sample values to a text file, and calculate and return the load components to be used in FEA.
-def write_samples(samples):
-    # Determine the x and y components of the load.
-    load_components = []
-    for load_sample, angle_sample in zip(*samples[0:2]):
-        angle_sample *= (np.pi / 180)
-        load_components.append((
-            np.round(np.cos(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
-            np.round(np.sin(angle_sample) * load_sample / (NUMBER_DIVISIONS[1]), NUMBER_DIGITS),
-            ))
+# Write the specified sample values to a text file.
+def write_samples(samples, load_components) -> None:
     # Write samples to text file.
     text = [
         f'{str(i+1).zfill(NUMBER_DIGITS)},  Load: {load_sample:>10},  X load: {load_x:>15},  Y load: {load_y:>15},  Angle: {angle_sample:>10},  Length: {length_sample:>5},  Height: {height_sample:>5}\n'
@@ -81,10 +66,9 @@ def write_samples(samples):
     with open(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES), 'w') as file:
         file.writelines(text)
     print(f'Wrote samples in {FILENAME_SAMPLES}.')
-    return load_components
 
 # Return the sample values found in the text file previously generated.
-def read_samples():
+def read_samples() -> tuple:
     load_samples, angle_samples, length_samples, height_samples = [], [], [], []
     filename = os.path.join(FOLDER_ROOT, FILENAME_SAMPLES)
     try:
@@ -97,90 +81,13 @@ def read_samples():
                 height_samples.append(height)
     except FileNotFoundError:
         print(f'"{filename}" not found.')
-        return None
+        return
     else:
         print(f'Found samples in {filename}.')
         return load_samples, angle_samples, length_samples, height_samples
 
-# Write a text file containing ANSYS commands used to perform FEA and generate stress contour images.
-def write_ansys_script(samples, load_components):
-    # Read the template script.
-    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_TEMPLATE), 'r') as file:
-        lines = file.readlines()
-    
-    # Replace placeholder lines in the template script.
-    with open(os.path.join(FOLDER_ROOT, FILENAME_ANSYS_SCRIPT), 'w') as file:
-        # Initialize dictionary of placeholder strings (keys) and strings they should be replaced with (values).
-        placeholder_substitutions = {}
-        # Define names of variables.
-        loop_variable = 'i'
-        samples_variable = 'samples'
-        # Add loop commands.
-        placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{NUMBER_SAMPLES},1\n'
-        placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
-        # Add commands that define the array containing generated samples.
-        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{6},{NUMBER_SAMPLES}\n']
-        for i in range(NUMBER_SAMPLES):
-            commands_define_samples.append(
-                f'{samples_variable}(1,{i+1}) = {samples[0][i]},{load_components[i][0]},{load_components[i][1]},{samples[1][i]},{samples[2][i]},{samples[3][i]}\n'
-                )
-        placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
-        # Add meshing commands.
-        placeholder_substitutions['! placeholder_mesh_length\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[0]}, , , , ,1\n'
-        placeholder_substitutions['! placeholder_mesh_height\n'] = f'LESIZE,_Y1, , ,{NUMBER_DIVISIONS[1]}, , , , ,1\n'
-        # Add commands that format and create the output files.
-        placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
-        placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
-        placeholder_substitutions['! placeholder_define_filename\n'] = f'filename = \'stress_%STRFILL(suffix,number,{NUMBER_DIGITS}-STRLENG(number)+1)%\'\n'
-        # Substitute all commands into placeholders.
-        for placeholder in placeholder_substitutions:
-            command = placeholder_substitutions[placeholder]
-            indices = [i for i, line in enumerate(lines) if line == placeholder]
-            if isinstance(command, list):
-                for index in indices:
-                    for sub_command in command[::-1]:
-                        lines.insert(index+1, sub_command)
-                    del lines[index]
-            else:
-                for index in indices:
-                    lines[index] = command
-        # Write the file.
-        file.writelines(lines)
-        print(f'Wrote {FILENAME_ANSYS_SCRIPT}.')
-
-# # Crop and resize the stress contour images.
-# def crop_output_images(samples):
-#     load_samples, angle_samples, length_samples, height_samples = samples
-#     filenames = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS, '*.bmp'))
-#     for filename in filenames:
-#         # Only crop files named as a number ("1.png").
-#         try:
-#             i = int(os.path.basename(filename).split('.')[0]) - 1
-#         except ValueError:
-#             continue
-#         else:
-#             with Image.open(filename) as image:
-#                 # Crop out logo and some empty space.
-#                 image = image.crop((0, 100, 1000, image.height-1))
-#                 # Crop out all empty space and the white border around the cantilever.
-#                 area = image.convert('L').getbbox()
-#                 image_contour = image.crop((area[0]+1, area[1]+1, area[2]-1, area[3]-1))
-#                 size_contour = (
-#                     round((length_samples[i] / length.high) * OUTPUT_SIZE[0]),
-#                     round((height_samples[i] / height.high) * OUTPUT_SIZE[1]),
-#                     )
-#                 image_contour = image_contour.resize(size_contour)
-#                 # Fill the image with black.
-#                 image = image.resize(OUTPUT_SIZE)
-#                 image.paste((0,0,0), (0,0,image.width,image.height))
-#                 # Place the contour in the black image, aligned to the top left corner.
-#                 image.paste(image_contour, (0,0,size_contour[0],size_contour[1]))
-#                 image.save(
-#                     os.path.join(FOLDER_TRAIN_OUTPUTS, f'stress_{load_samples[i]}_{angle_samples[i]}_{length_samples[i]}_{height_samples[i]}.png')
-#                     )
-
 # Get properly ordered stress data in text files generated by FEA.
-def convert_fea_to_spreadsheet(samples):
+def convert_fea_to_spreadsheet(samples, output_filename):
     length_samples, height_samples = samples[2:4]
     filenames = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS, '*.txt'))
     filenames = sorted(filenames)
@@ -223,20 +130,22 @@ def convert_fea_to_spreadsheet(samples):
     stresses -= np.min(stresses)
     stresses /= np.max(stresses)
     # Write values to spreadsheet file.
+    output_filepath = os.path.join(FOLDER_TRAIN_OUTPUTS, output_filename)
     stresses.flatten().tofile(
-        os.path.join(FOLDER_TRAIN_OUTPUTS, FILENAME_STRESS_FEA),
+        output_filepath,
         sep=',',
         )
-    print(f'Wrote stress data from FEA in {FOLDER_TRAIN_OUTPUTS}.')
+    print(f'Wrote properly ordered stress data from FEA in {output_filepath}.')
 
-# Try to read sample values from the text file if it already exists. If not, generate the samples.
-samples = read_samples()
-if not samples:
-    samples = generate_samples(show_histogram=False)
-load_components = write_samples(samples)
-write_ansys_script(samples, load_components)
-generate_input_images(samples, FOLDER_TRAIN_INPUTS)
-
-convert_fea_to_spreadsheet(samples)
-# # Crop and resize stress contour images generated by FEA. This only needs to run the first time the images are added to the folder.
-# crop_output_images(samples)
+if __name__ == '__main__':
+    # Try to read sample values from the text file if it already exists. If not, generate the samples.
+    samples = read_samples()
+    if not samples:
+        samples = generate_samples(show_histogram=False)
+    load_components = calculate_load_components(*samples[0:2])
+    write_samples(samples, load_components)
+    write_ansys_script(samples, load_components, 'ansys_script_train.lgw')
+    generate_input_images(samples, FOLDER_TRAIN_INPUTS)
+    convert_fea_to_spreadsheet(samples, 'stress.csv')
+    # # Crop and resize stress contour images generated by FEA. This only needs to run the first time the images are added to the folder.
+    # crop_output_images(samples)
