@@ -1,8 +1,8 @@
-000001,  Load:    22857.0,  X load:     -433.652301,  Y load:      171.870218,  Angle:     158.38,  Length: 3.143,  Height: 1.429
-000002,  Load:    48571.0,  X load:     -991.244898,  Y load:             0.0,  Angle:      180.0,  Length: 2.286,  Height:   1.0
-000003,  Load:    10000.0,  X load:      204.081633,  Y load:             0.0,  Angle:        0.0,  Length: 2.571,  Height: 1.857
-000004,  Load:    61429.0,  X load:    -1165.455973,  Y load:     -461.907321,  Angle:     201.62,  Length: 3.429,  Height: 1.286
-000005,  Load:    35714.0,  X load:      677.580534,  Y load:      268.546746,  Angle:      21.62,  Length:   2.0,  Height: 1.714
-000006,  Load:   100000.0,  X load:            -0.0,  Y load:    -2040.816327,  Angle:      270.0,  Length: 2.857,  Height: 1.143
-000007,  Load:    74286.0,  X load:             0.0,  Y load:     1516.040816,  Angle:       90.0,  Length:   4.0,  Height: 1.571
-000008,  Load:    87143.0,  X load:     1653.312439,  Y load:     -655.260377,  Angle:     338.38,  Length: 3.714,  Height:   2.0
+000001,  Load:    85714.0,  X load:     -1626.20087,  Y load:     -644.515199,  Angle:     201.62,  Length: 2.286,  Height: 1.714
+000002,  Load:    64286.0,  X load:             0.0,  Y load:     1311.959184,  Angle:       90.0,  Length: 2.857,  Height:   1.0
+000003,  Load:    92857.0,  X load:     1895.040816,  Y load:             0.0,  Angle:        0.0,  Length: 2.571,  Height: 1.429
+000004,  Load:    57143.0,  X load:     1084.140237,  Y load:     -429.679306,  Angle:     338.38,  Length: 3.429,  Height: 1.143
+000005,  Load:    50000.0,  X load:      948.620336,  Y load:      375.968453,  Angle:      21.62,  Length: 3.714,  Height: 1.286
+000006,  Load:   100000.0,  X load:            -0.0,  Y load:    -2040.816327,  Angle:      270.0,  Length:   4.0,  Height:   2.0
+000007,  Load:    71429.0,  X load:     -1355.18004,  Y load:      537.101012,  Angle:     158.38,  Length:   2.0,  Height: 1.857
+000008,  Load:    78571.0,  X load:    -1603.489796,  Y load:             0.0,  Angle:      180.0,  Length: 3.143,  Height: 1.571

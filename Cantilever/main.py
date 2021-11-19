@@ -47,7 +47,7 @@ class Parameter:
     units: str = ''
 
 # Define the settings for each parameter.
-load = Parameter(low=10000, high=100000, precision=0, name='Load', units='N')
+load = Parameter(low=50000, high=100000, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
 length = Parameter(low=2, high=4, precision=3, name='Length', units='m')
 height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
@@ -78,7 +78,7 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 100
+EPOCHS = 800
 
 
 # Generate sample values for each parameter.
@@ -198,7 +198,7 @@ def write_ansys_script(samples, load_components, filename) -> None:
         # Add commands that format and create the output files.
         placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
         placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
-        placeholder_substitutions['! placeholder_define_filename\n'] = f'filename = \'stress_%STRFILL(suffix,number,{NUMBER_DIGITS}-STRLENG(number)+1)%\'\n'
+        placeholder_substitutions['! placeholder_define_filename\n'] = f'filename = \'fea_%STRFILL(suffix,number,{NUMBER_DIGITS}-STRLENG(number)+1)%\'\n'
         # Substitute all commands into placeholders.
         for placeholder in placeholder_substitutions:
             command = placeholder_substitutions[placeholder]
@@ -302,18 +302,14 @@ class CantileverDataset(Dataset):
         # Get all input filenames.
         self.input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
         self.input_filenames = sorted(self.input_filenames)
-        # Get FEA stress data and scale to [0, 1].
+        # Get FEA stress data.
         output_filename = glob.glob(os.path.join(folder_outputs, '*.csv'))[0]
         self.stresses = np.genfromtxt(output_filename, delimiter=',')
         self.stresses = np.reshape(self.stresses, (*OUTPUT_SIZE[::-1], round(self.stresses.size / (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]))))
-        # Scale the stress values to [0, 1].
+        # Scale the stress values to be <= 1, but not [0, 1].
         if is_train:
             self.store_stress_range(np.min(self.stresses), np.max(self.stresses))
-            self.stresses -= np.min(self.stresses)
-            self.stresses /= np.max(self.stresses)
-        else:
-            self.stresses -= CantileverDataset.minimum_stress
-            self.stresses /= (CantileverDataset.maximum_stress - CantileverDataset.minimum_stress)
+        self.stresses /= CantileverDataset.maximum_stress
         # for i in range(self.stresses.shape[2]):
         #     self.stresses[:, :, i] -= np.min(self.stresses[:, :, i])
         #     self.stresses[:, :, i] /= np.max(self.stresses[:, :, i])
@@ -491,9 +487,8 @@ if __name__ == '__main__':
             filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{i+1}.png')
             image.save(filepath)
         # Scale the outputs to the original range of stress values and compare with FEA results.
-        test_output_unscaled = test_output.copy()
-        area_metric_values.append(area_metric(test_output_unscaled, label))
-        ks_test_values.append(ks_test(test_output_unscaled, label)[0])
+        area_metric_values.append(area_metric(test_output, label))
+        ks_test_values.append(ks_test(test_output, label)[0])
         # Convert the output to a color image.
         test_output = array_to_colormap(test_output)
         # Save the generated output image.
@@ -502,6 +497,7 @@ if __name__ == '__main__':
                 FOLDER_TEST_OUTPUTS,
                 f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
                 ))
+    print(f'Wrote {len(test_dataloader)} output images and their corresponding labels in {FOLDER_TEST_OUTPUTS}.')
     # Plot evaluation metrics.
     plt.figure()
     plt.plot(area_metric_values, '*', color='#0095ff')
@@ -515,4 +511,3 @@ if __name__ == '__main__':
     plt.ylim((0, 1))
     plt.title('K-S Test')
     plt.show()
-    print(f'Wrote {len(test_dataloader)} output images in {FOLDER_TEST_OUTPUTS}.')
