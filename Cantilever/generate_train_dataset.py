@@ -3,9 +3,8 @@ import glob
 import os
 import random
 
-import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 
 from main import NUMBER_SAMPLES, FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, NUMBER_DIGITS, generate_samples, generate_input_images, calculate_load_components, write_ansys_script, write_fea_spreadsheet
 
