@@ -51,8 +51,8 @@ load = Parameter(low=50000, high=100000, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
 length = Parameter(low=2, high=4, precision=3, name='Length', units='m')
 height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
-# The two angle values near which there should be more samples than elsewhere.
-ANGLE_PEAKS = (0, 180)
+# # The two angle values near which there should be more samples than elsewhere.
+# ANGLE_PEAKS = (0, 180)
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_SIZE = (100, 50, 2)
@@ -78,12 +78,12 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.1
-EPOCHS = 800
+EPOCHS = 100
 
 
 # Generate sample values for each parameter.
 def generate_samples(number_samples, show_histogram=False) -> tuple:
-    assert number_samples % 4 == 0, f'Sample size {number_samples} must be divisible by 4 for angles to be generated properly.'
+    # assert number_samples % 4 == 0, f'Sample size {number_samples} must be divisible by 4 for angles to be generated properly.'
     # Helper function for generating unevenly spaced samples within a defined range. Setting "increasing" to True makes spacings increase as values increase.
     generate_logspace_samples = lambda low, high, increasing: (((
         np.logspace(
@@ -92,12 +92,13 @@ def generate_samples(number_samples, show_histogram=False) -> tuple:
         ) * (high - low) + low
     # Generate samples.
     load_samples = np.linspace(load.low, load.high, number_samples)
-    angle_samples = np.concatenate((
-        generate_logspace_samples(angle.low, (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, increasing=True)[:-1],
-        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, ANGLE_PEAKS[1], increasing=False)[1:],
-        generate_logspace_samples(ANGLE_PEAKS[1], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], increasing=True)[:-1],
-        generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], angle.high, increasing=False)[1:],
-        ))
+    angle_samples = np.linspace(angle.low, angle.high, number_samples)
+    # angle_samples = np.concatenate((
+    #     generate_logspace_samples(angle.low, (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, increasing=True)[:-1],
+    #     generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, ANGLE_PEAKS[1], increasing=False)[1:],
+    #     generate_logspace_samples(ANGLE_PEAKS[1], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], increasing=True)[:-1],
+    #     generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], angle.high, increasing=False)[1:],
+    #     ))
     length_samples = np.linspace(length.low, length.high, number_samples)
     height_samples = np.linspace(height.low, height.high, number_samples)
     # Randomize ordering of samples.
@@ -299,9 +300,17 @@ class CantileverDataset(Dataset):
     def __init__(self, folder_inputs, folder_outputs, is_train=False):
         self.folder_inputs = folder_inputs
         self.folder_outputs = folder_outputs
-        # Get all input filenames.
+        # Get all input images.
         self.input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
         self.input_filenames = sorted(self.input_filenames)
+        self.inputs = np.zeros((len(self.input_filenames), INPUT_SIZE[2], *INPUT_SIZE[1::-1]))
+        for i, filename in enumerate(self.input_filenames):
+            self.inputs[i, ...] = np.transpose(
+                np.asarray(Image.open(filename), np.uint8),
+                [2, 0, 1]  # Make channel dimension the first dimension
+                )
+        # Scale the input values to be inside [0, 1].
+        self.inputs /= 255
         # Get FEA stress data.
         output_filename = glob.glob(os.path.join(folder_outputs, '*.csv'))[0]
         self.stresses = np.genfromtxt(output_filename, delimiter=',')
@@ -318,11 +327,7 @@ class CantileverDataset(Dataset):
         return len(self.input_filenames)
     
     def __getitem__(self, index):
-        input_filename = self.input_filenames[index]
-        array_input = np.asarray(Image.open(input_filename), np.uint8)
-        array_input = np.transpose(array_input, [2, 0, 1])  # Make channel dimension the first dimension
-        array_output = self.stresses[:, :, index].flatten()
-        return array_input, array_output
+        return self.inputs[index, ...], self.stresses[:, :, index].flatten()
     
     # Store the minimum and maximum stress values found in the training dataset as class variables to be referenced by the test datset.
     @classmethod
@@ -374,10 +379,10 @@ class StressContourCnn(nn.Module):
             # nn.BatchNorm2d(2),
             # nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
-        )
+            )
         self.linear = nn.Sequential(
             nn.Linear(in_features=160, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
-        )
+            )
     
     def forward(self, x):
         x = x.float()

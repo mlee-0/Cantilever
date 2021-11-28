@@ -14,13 +14,3 @@ if __name__ == '__main__':
     write_ansys_script(samples, load_components, 'ansys_script_test.lgw')
     generate_input_images(samples, FOLDER_TEST_INPUTS)
     write_fea_spreadsheet(samples, FOLDER_TEST_OUTPUTS, 'stress.csv')
-    # # Generate new data not part of the training dataset.
-    # # test_loads = [90000] * 4 + [30000, 50000, 70000, 90000]
-    # # test_angles = [5, 10, 15, 30] + [270] * 4
-    # # test_lengths = [3] * 8
-    # # test_heights = [1.5] * 8
-    # # samples = (test_loads, test_angles, test_lengths, test_heights)
-    # samples = generate_samples(5, show_histogram=False)
-    # load_components = calculate_load_components(*samples[0:2])
-    # write_ansys_script(samples, load_components, 'ansys_script_test.lgw')
-    # generate_input_images(samples, FOLDER_TEST_INPUTS)
