@@ -319,6 +319,7 @@ class CantileverDataset(Dataset):
         if is_train:
             self.store_stress_range(np.min(self.stresses), np.max(self.stresses))
         self.stresses /= CantileverDataset.maximum_stress
+        self.stresses[self.stresses == 0] = 1
         # for i in range(self.stresses.shape[2]):
         #     self.stresses[:, :, i] -= np.min(self.stresses[:, :, i])
         #     self.stresses[:, :, i] /= np.max(self.stresses[:, :, i])
