@@ -62,7 +62,8 @@ angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
 # ANGLE_PEAKS = (0, 180)
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_SIZE = (50, 25, 2)
+INPUT_CHANNELS = 2
+INPUT_SIZE = (50, 25, INPUT_CHANNELS)
 assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
 # Size of output images produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_SIZE = INPUT_SIZE[:2]
@@ -358,18 +359,25 @@ class StressContourCnn(nn.Module):
         #     nn.Sigmoid(),
         #     )
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=2, out_channels=4, kernel_size=3, stride=1),
+            nn.Conv2d(in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
+            
             nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.AvgPool2d(kernel_size=2, stride=2),
+
             # nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             # nn.BatchNorm2d(4),
             # nn.ReLU(inplace=True),
