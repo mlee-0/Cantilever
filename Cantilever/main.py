@@ -42,24 +42,24 @@ NUMBER_SAMPLES = 100
 # A dataclass that stores settings for each parameter.
 @dataclass
 class Parameter:
-    # The minimum and maximum values between which samples are generated.
-    low: float
-    high: float
-    # Number of decimal places to which sample values are rounded.
-    precision: int
     # Name of the parameter.
     name: str
     # Units for the parameter.
     units: str = ''
+    # The minimum and maximum values between which samples are generated.
+    low: float = 0
+    high: float = 0
+    # Number of decimal places to which sample values are rounded.
+    precision: int = 0
 
 # Define the settings for each parameter.
 length = Parameter(low=2, high=4, precision=3, name='Length', units='m')
 height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
-elastic_modulus = Parameter(low=1e9, high=200e9, precision=0, name='Elastic modulus', units='Pa')
+elastic_modulus = Parameter(low=1e9, high=200e9, precision=0, name='Elastic Modulus', units='Pa')
 load = Parameter(low=10000, high=100000, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
-# # The two angle values near which there should be more samples than elsewhere.
-# ANGLE_PEAKS = (0, 180)
+x_load = Parameter(name='Load X', units='N')
+y_load = Parameter(name='Load Y', units='N')
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 2
@@ -71,12 +71,14 @@ OUTPUT_SIZE = INPUT_SIZE[:2]
 # FEA meshing settings.
 MESH_DIVISIONS = (49, 24)  # Along (length, height)
 
-# Folders.
+# Folders and files.
 FOLDER_ROOT = 'Cantilever'
 FOLDER_TRAIN_INPUTS = os.path.join(FOLDER_ROOT, 'Train Inputs')
 FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_INPUTS = os.path.join(FOLDER_ROOT, 'Test Inputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
+FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
+FILENAME_SAMPLES_TEST = 'samples_test.txt'
 
 # Number of digits used for numerical file names.
 NUMBER_DIGITS = 6
@@ -89,36 +91,33 @@ LEARNING_RATE = 0.1
 EPOCHS = 100
 
 
-# Generate sample values for each parameter.
-def generate_samples(number_samples, show_histogram=False) -> tuple:
-    # assert number_samples % 4 == 0, f'Sample size {number_samples} must be divisible by 4 for angles to be generated properly.'
-    # Helper function for generating unevenly spaced samples within a defined range. Setting "increasing" to True makes spacings increase as values increase.
-    generate_logspace_samples = lambda low, high, increasing: (((
-        np.logspace(
-            0, 1, round(number_samples/4)+1
-            ) - 1) / 9) * (1 if increasing else -1) + (0 if increasing else 1)
-        ) * (high - low) + low
+# Generate sample values for each parameter and return them as a dictionary.
+def generate_samples(number_samples, show_histogram=False) -> dict:
     # Generate samples.
     load_samples = np.linspace(load.low, load.high, number_samples)
     angle_samples = np.linspace(angle.low, angle.high, number_samples)
-    # angle_samples = np.concatenate((
-    #     generate_logspace_samples(angle.low, (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, increasing=True)[:-1],
-    #     generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2, ANGLE_PEAKS[1], increasing=False)[1:],
-    #     generate_logspace_samples(ANGLE_PEAKS[1], (ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], increasing=True)[:-1],
-    #     generate_logspace_samples((ANGLE_PEAKS[1]-ANGLE_PEAKS[0])/2 + ANGLE_PEAKS[1], angle.high, increasing=False)[1:],
-    #     ))
     length_samples = np.linspace(length.low, length.high, number_samples)
     height_samples = np.linspace(height.low, height.high, number_samples)
+    elastic_modulus_samples = np.linspace(elastic_modulus.low, elastic_modulus.high, number_samples)
     # Randomize ordering of samples.
     np.random.shuffle(load_samples)
     np.random.shuffle(angle_samples)
     np.random.shuffle(length_samples)
     np.random.shuffle(height_samples)
+    np.random.shuffle(elastic_modulus_samples)
+    
+    # Calculate the x- and y-components of the loads and corresponding angles.
+    x_load_samples = np.round(np.cos(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]), NUMBER_DIGITS)
+    y_load_samples = np.round(np.sin(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]), NUMBER_DIGITS)
+    
     # Round samples to a fixed number of decimal places.
     load_samples = np.round(load_samples, load.precision)
     angle_samples = np.round(angle_samples, angle.precision)
     length_samples = np.round(length_samples, length.precision)
     height_samples = np.round(height_samples, height.precision)
+    elastic_modulus_samples = np.round(elastic_modulus_samples, elastic_modulus.precision)
+    x_load_samples = np.round(x_load_samples, x_load.precision)
+    y_load_samples = np.round(y_load_samples, y_load.precision)
     
     # Plot histograms for angle samples.
     if show_histogram:
@@ -132,53 +131,95 @@ def generate_samples(number_samples, show_histogram=False) -> tuple:
         plt.xticks(np.linspace(angle.low, angle.high, 5))
         plt.title(angle.name)
         plt.show()
-    return load_samples, angle_samples, length_samples, height_samples
+    
+    return {
+        load.name: load_samples,
+        angle.name: angle_samples,
+        length.name: length_samples,
+        height.name: height_samples,
+        elastic_modulus.name: elastic_modulus_samples,
+        x_load.name: x_load_samples,
+        y_load.name: y_load_samples,
+        }
+
+# Write the specified sample values to a text file.
+def write_samples(samples, filename) -> None:
+    number_samples = get_sample_size(samples)
+    text = [None] * number_samples
+    for i in range(number_samples):
+        text[i] = ','.join(
+            [f'{str(i+1).zfill(NUMBER_DIGITS)}'] + [f'{key}:{value[i]}' for key, value in samples.items()]
+            ) + '\n'
+    with open(os.path.join(FOLDER_ROOT, filename), 'w') as file:
+        file.writelines(text)
+    print(f'Wrote samples in {filename}.')
+
+# Return the sample values found in the text file previously generated.
+def read_samples(filename) -> dict:
+    samples = {}
+    filename = os.path.join(FOLDER_ROOT, filename)
+    try:
+        with open(filename, 'r') as file:
+            for line in file.readlines():
+                for data in line.split(',')[1:]:
+                    key, value = data.split(':')
+                    key, value = key.strip(), float(value)
+                    if key in samples:
+                        samples[key].append(value)
+                    else:
+                        samples[key] = [value]
+    except FileNotFoundError:
+        print(f'"{filename}" not found.')
+        return
+    else:
+        print(f'Found samples in {filename}.')
+        return samples
 
 # Create images for the sample values provided inside the specified folder.
-def generate_input_images(samples, folder_inputs):
+def generate_input_images(samples, folder_inputs) -> None:
     # Remove existing input images in the folder.
     filenames = glob.glob(os.path.join(folder_inputs, '*.png'))
     for filename in filenames:
         os.remove(filename)
     print(f'Deleted {len(filenames)} existing images in {folder_inputs}.')
 
-    for i, (load_sample, angle_sample, length_sample, height_sample) in enumerate(zip(*samples)):
-        image = np.zeros((INPUT_SIZE[1], INPUT_SIZE[0], INPUT_SIZE[2]))
+    for i in range(get_sample_size(samples)):
+        image = np.zeros((
+            round(INPUT_SIZE[1] * (samples[height.name][i] / height.high)),
+            round(INPUT_SIZE[0] * (samples[length.name][i] / length.high)),
+            INPUT_SIZE[2]
+            ))
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
         r = np.arange(max(INPUT_SIZE))
-        x = r * np.cos(angle_sample * np.pi/180) + INPUT_SIZE[0]/2
-        y = r * np.sin(angle_sample * np.pi/180) + INPUT_SIZE[1]/2
+        x = r * np.cos(samples[angle.name][i] * np.pi/180) + INPUT_SIZE[0]/2
+        y = r * np.sin(samples[angle.name][i] * np.pi/180) + INPUT_SIZE[1]/2
         x = x.astype(int)
         y = y.astype(int)
-        inside_image = (x >= 0) * (x < INPUT_SIZE[0]) * (y >= 0) * (y < INPUT_SIZE[1])
-        image[y[inside_image], x[inside_image], 0] = 255 * (load_sample / load.high)
+        inside_image = (x >= 0) * (x < image.shape[1]) * (y >= 0) * (y < image.shape[0])
+        image[y[inside_image], x[inside_image], 0] = 255 * (samples[load.name][i] / load.high)
         image[:, :, 0] = np.flipud(image[:, :, 0])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
         image[
-            :round(height_sample/height.high * image.shape[0]),
-            :round(length_sample/length.high * image.shape[1]),
+            :round(samples[height.name][i]/height.high * image.shape[0]),
+            :round(samples[length.name][i]/length.high * image.shape[1]),
             1
             ] = 255
         # Write image files.
         filename = os.path.join(folder_inputs, f'input_{str(i+1).zfill(NUMBER_DIGITS)}.png')
         with Image.fromarray(image.astype(np.uint8), 'LA') as file:
             file.save(filename)
-    print(f'Wrote {len(samples[0])} input images in {folder_inputs}.')
+    print(f'Wrote {i+1} input images in {folder_inputs}.')
 
-# Return the x- and y-components of the specified loads and corresponding angles.
-def calculate_load_components(load_samples, angle_samples) -> list:
-    load_components = []
-    for load_sample, angle_sample in zip(load_samples, angle_samples):
-        angle_sample *= (np.pi / 180)
-        load_components.append((
-            np.round(np.cos(angle_sample) * load_sample / (MESH_DIVISIONS[1]), NUMBER_DIGITS),
-            np.round(np.sin(angle_sample) * load_sample / (MESH_DIVISIONS[1]), NUMBER_DIGITS),
-            ))
-    return load_components
-
+# Get the number of samples found in the specified sample values.
+def get_sample_size(samples) -> int:
+    sample_sizes = [len(_) for _ in samples.values()]
+    low, high = min(sample_sizes), max(sample_sizes)
+    assert low == high, 'Found different numbers of samples in the provided samples:  min. {low}, max. {high}.'
+    return low
+    
 # Write a text file containing ANSYS commands used to automate FEA and generate stress contour images.
-def write_ansys_script(samples, load_components, filename) -> None:
-    number_samples = len(samples[0])
+def write_ansys_script(samples, filename) -> None:
+    number_samples = get_sample_size(samples)
     # Read the template script.
     with open(os.path.join(FOLDER_ROOT, 'ansys_template.lgw'), 'r') as file:
         lines = file.readlines()
@@ -194,11 +235,10 @@ def write_ansys_script(samples, load_components, filename) -> None:
         placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{number_samples},1\n'
         placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
         # Add commands that define the array containing generated samples.
-        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{6},{number_samples}\n']
-        for i, (load_sample, angle_sample, length_sample, height_sample, (load_x, load_y)) in enumerate(zip(*samples, load_components)):
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{7},{number_samples}\n']
+        for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{i+1}) = {load_sample},{load_x},{load_y},{angle_sample},{length_sample},{height_sample}\n'
-                # f'{samples_variable}(1,{i+1}) = {samples[0][i]},{load_components[i][0]},{load_components[i][1]},{samples[1][i]},{samples[2][i]},{samples[3][i]}\n'
+                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[x_load.name][i]},{samples[y_load.name][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add meshing commands.
@@ -225,13 +265,13 @@ def write_ansys_script(samples, load_components, filename) -> None:
         print(f'Wrote {filename}.')
 
 # Get properly ordered stress data in text files generated by FEA.
-def write_fea_spreadsheet(samples, folder, filename):
-    number_samples = len(samples[0])
-    length_samples, height_samples = samples[2:4]
+def write_fea_spreadsheet(samples, folder, filename) -> None:
+    number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
-    assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {len(length_samples)}.'
-    stresses = np.zeros((*OUTPUT_SIZE[::-1], len(fea_filenames)))
+    assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
+    # Initialize the array to hold all stress values.
+    stresses = np.full((*OUTPUT_SIZE[::-1], len(fea_filenames)), np.nan)
     for i, fea_filename in enumerate(fea_filenames):
         with open(fea_filename, 'r') as file:
             stress = [float(line) for line in file.readlines()]
@@ -251,20 +291,19 @@ def write_fea_spreadsheet(samples, folder, filename):
         array[0, 1:-1] = stress[2+MESH_DIVISIONS[0]+MESH_DIVISIONS[1]:2+2*MESH_DIVISIONS[0]+MESH_DIVISIONS[1]-1][::-1]
         array[1:-1, 0] = stress[2+2*MESH_DIVISIONS[0]+MESH_DIVISIONS[1]:2+2*MESH_DIVISIONS[0]+2*MESH_DIVISIONS[1]-1]
         # Resize based on the size of the cantilever.
-        array_scaled = array - np.min(array)
-        array_scaled = array / np.max(array_scaled)
-        with Image.fromarray((array_scaled*255).astype(np.uint8), 'L') as image:
+        array = array - np.min(array)
+        array = array / np.max(array)
+        with Image.fromarray((array*255).astype(np.uint8), 'L') as image:
             image = image.resize((
-                round((length_samples[i] / length.high) * OUTPUT_SIZE[0]),
-                round((height_samples[i] / height.high) * OUTPUT_SIZE[1]),
+                round((samples[length.name][i] / length.high) * OUTPUT_SIZE[0]),
+                round((samples[height.name][i] / height.high) * OUTPUT_SIZE[1]),
                 ))
-            array_scaled = np.asarray(image, float) / 255
-            array_scaled *= max(stress) - min(stress)
-            array_scaled += min(stress)
+            # Restore the original range of values.
+            array = np.asarray(image, float) / 255
+            array *= max(stress) - min(stress)
+            array += min(stress)
         # Insert the resized array.
-        array[:] = 0
-        array[:array_scaled.shape[0], :array_scaled.shape[1]] = array_scaled
-        stresses[:, :, i] = array
+        stresses[:array.shape[0], :array.shape[1], i] = array
     # Write values to spreadsheet file.
     filepath = os.path.join(folder, filename)
     stresses.flatten().tofile(
@@ -274,7 +313,7 @@ def write_fea_spreadsheet(samples, folder, filename):
     print(f'Wrote properly ordered stress data from FEA in {filepath}.')
 
 # Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
-def rgb_to_hue(array):
+def rgb_to_hue(array) -> np.ndarray:
     array = array / 255
     hue_array = np.zeros((array.shape[0], array.shape[1]))
     for i in range(array.shape[0]):
@@ -284,7 +323,7 @@ def rgb_to_hue(array):
     return hue_array
 
 # Convert a 3-channel HSV array into a 3-channel RGB array.
-def hsv_to_rgb(array):
+def hsv_to_rgb(array) -> np.ndarray:
     for i in range(array.shape[0]):
         for j in range(array.shape[1]):
             rgb = colorsys.hsv_to_rgb(array[i, j, 0], array[i, j, 1], array[i, j, 2])
@@ -293,7 +332,7 @@ def hsv_to_rgb(array):
     return array
 
 # Convert the model's output array to a color image.
-def array_to_colormap(array):
+def array_to_colormap(array) -> np.ndarray:
     # Invert the values so that red represents high stresses.
     array = 1 - array
     # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.
@@ -308,32 +347,45 @@ class CantileverDataset(Dataset):
     def __init__(self, folder_inputs, folder_outputs, is_train=False):
         self.folder_inputs = folder_inputs
         self.folder_outputs = folder_outputs
-        # Get all input images.
-        self.input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
-        self.input_filenames = sorted(self.input_filenames)
-        self.inputs = np.zeros((len(self.input_filenames), INPUT_SIZE[2], *INPUT_SIZE[1::-1]))
-        for i, filename in enumerate(self.input_filenames):
-            self.inputs[i, ...] = np.transpose(
-                np.asarray(Image.open(filename), np.uint8),
+        
+        # Get all input images and store each in a list.
+        input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
+        input_filenames = sorted(input_filenames)
+        self.number_samples = len(input_filenames)
+        self.inputs = [None] * self.number_samples
+        for i, filename in enumerate(input_filenames):
+            self.inputs[i] = np.transpose(
+                np.asarray(Image.open(filename), np.uint8) / 255,  # Scale to be inside [0, 1]
                 [2, 0, 1]  # Make channel dimension the first dimension
-                )
-        # Scale the input values to be inside [0, 1].
-        self.inputs /= 255
+                ) / 255
+        
+        # Write FEA stress data.
+        write_fea_spreadsheet(
+            read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST),
+            FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
+            'stress.csv',
+            )
         # Get FEA stress data.
         output_filename = glob.glob(os.path.join(folder_outputs, '*.csv'))[0]
-        self.stresses = np.genfromtxt(output_filename, delimiter=',')
-        self.stresses = np.reshape(self.stresses, (*OUTPUT_SIZE[::-1], round(self.stresses.size / (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]))))
+        stresses = np.genfromtxt(output_filename, delimiter=',')
+        stresses = np.reshape(stresses, (*OUTPUT_SIZE[::-1], round(stresses.size / (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]))))
         # Scale the stress values to be <= 1, but not [0, 1].
         if is_train:
-            self.store_stress_range(np.min(self.stresses), np.max(self.stresses))
-        self.stresses /= CantileverDataset.maximum_stress
-        self.stresses[self.stresses == 0] = 1
+            self.store_stress_range(np.min(stresses), np.max(stresses))
+        stresses /= CantileverDataset.maximum_stress
+
         # for i in range(self.stresses.shape[2]):
         #     self.stresses[:, :, i] -= np.min(self.stresses[:, :, i])
         #     self.stresses[:, :, i] /= np.max(self.stresses[:, :, i])
+        
+        # Store each stress array in a list.
+        self.stresses = [None] * stresses.shape[-1]
+        for i in range(len(self.stresses)):
+            # Keep only non-empty regions of array.
+            self.stresses[i] = stresses[~np.isnan(stresses[:, :, i])].reshape(OUTPUT_SIZE[::-1])
 
     def __len__(self):
-        return len(self.input_filenames)
+        return self.number_samples
     
     def __getitem__(self, index):
         return self.inputs[index, ...], self.stresses[:, :, index].flatten()

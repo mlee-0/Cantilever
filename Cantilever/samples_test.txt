@@ -1,8 +1,8 @@
-000001,  Load:   100000.0,  X load:     1272.388384,  Y load:    -1595.606179,  Angle:     308.57,  Length: 3.429,  Height: 1.143
-000002,  Load:    85714.0,  X load:     -1576.09035,  Y load:      758.859883,  Angle:     154.29,  Length:   4.0,  Height: 1.286
-000003,  Load:    71429.0,  X load:    -1313.420883,  Y load:     -632.389138,  Angle:     205.71,  Length: 3.714,  Height:   2.0
-000004,  Load:    57143.0,  X load:     1166.183673,  Y load:             0.0,  Angle:        0.0,  Length: 2.571,  Height: 1.714
-000005,  Load:    92857.0,  X load:     1895.040816,  Y load:            -0.0,  Angle:      360.0,  Length:   2.0,  Height:   1.0
-000006,  Load:    78571.0,  X load:      999.728277,  Y load:     1253.683731,  Angle:      51.43,  Length: 2.286,  Height: 1.429
-000007,  Load:    64286.0,  X load:     -292.002165,  Y load:     1279.051068,  Angle:     102.86,  Length: 2.857,  Height: 1.571
-000008,  Load:    50000.0,  X load:     -227.111786,  Y load:     -994.813076,  Angle:     257.14,  Length: 3.143,  Height: 1.857
+000001,Load:87143.0,Angle:257.14,Length:4.0,Height:1.143,Elastic Modulus:171571428571.0,Load X:-808.0,Load Y:-3540.0
+000002,Load:61429.0,Angle:308.57,Length:3.143,Height:1.429,Elastic Modulus:86285714286.0,Load X:1596.0,Load Y:-2001.0
+000003,Load:10000.0,Angle:360.0,Length:2.0,Height:2.0,Elastic Modulus:143142857143.0,Load X:417.0,Load Y:-0.0
+000004,Load:74286.0,Angle:205.71,Length:2.286,Height:1.714,Elastic Modulus:29428571429.0,Load X:-2789.0,Load Y:-1343.0
+000005,Load:100000.0,Angle:102.86,Length:2.571,Height:1.286,Elastic Modulus:1000000000.0,Load X:-927.0,Load Y:4062.0
+000006,Load:35714.0,Angle:51.43,Length:3.714,Height:1.571,Elastic Modulus:114714285714.0,Load X:928.0,Load Y:1163.0
+000007,Load:22857.0,Angle:0.0,Length:2.857,Height:1.0,Elastic Modulus:200000000000.0,Load X:952.0,Load Y:0.0
+000008,Load:48571.0,Angle:154.29,Length:3.429,Height:1.857,Elastic Modulus:57857142857.0,Load X:-1823.0,Load Y:878.0
