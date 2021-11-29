@@ -77,7 +77,7 @@ LSEL, , , ,P51X
 CM,_Y1,LINE 
 CMSEL,,_Y   
 !*  
-! placeholder_mesh_length
+LESIZE,_Y1, , ,samples(8,i,1)-1, , , , ,1
 !*  
 FLST,5,2,4,ORDE,2   
 FITEM,5,2   
@@ -87,7 +87,7 @@ LSEL, , , ,P51X
 CM,_Y1,LINE 
 CMSEL,,_Y   
 !*  
-! placeholder_mesh_height
+LESIZE,_Y1, , ,samples(9,i,1)-1, , , , ,1
 !*  
 MSHAPE,0,2D 
 MSHKEY,0

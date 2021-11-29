@@ -52,14 +52,17 @@ class Parameter:
     # Number of decimal places to which sample values are rounded.
     precision: int = 0
 
-# Define the settings for each parameter.
+# Settings for each parameter.
 length = Parameter(low=2, high=4, precision=3, name='Length', units='m')
 height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
 elastic_modulus = Parameter(low=1e9, high=200e9, precision=0, name='Elastic Modulus', units='Pa')
 load = Parameter(low=10000, high=100000, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
-x_load = Parameter(name='Load X', units='N')
-y_load = Parameter(name='Load Y', units='N')
+# Names of quantities that are not generated but are still stored in the text files.
+key_x_load = 'Load X'
+key_y_load = 'Load Y'
+key_image_length = 'Image Length'
+key_image_height = 'Image Height'
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 2
@@ -107,8 +110,18 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
     np.random.shuffle(elastic_modulus_samples)
     
     # Calculate the x- and y-components of the loads and corresponding angles.
-    x_load_samples = np.round(np.cos(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]), NUMBER_DIGITS)
-    y_load_samples = np.round(np.sin(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]), NUMBER_DIGITS)
+    x_loads = np.round(
+        np.cos(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]),
+        NUMBER_DIGITS
+        )
+    y_loads = np.round(
+        np.sin(angle_samples * (np.pi/180)) * load_samples / (MESH_DIVISIONS[1]),
+        NUMBER_DIGITS
+        )
+    
+    # Calculate the image size corresponding to the geometry.
+    image_lengths = np.round(INPUT_SIZE[0] * (length_samples / length.high))
+    image_heights = np.round(INPUT_SIZE[1] * (height_samples / height.high))
     
     # Round samples to a fixed number of decimal places.
     load_samples = np.round(load_samples, load.precision)
@@ -116,8 +129,8 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
     length_samples = np.round(length_samples, length.precision)
     height_samples = np.round(height_samples, height.precision)
     elastic_modulus_samples = np.round(elastic_modulus_samples, elastic_modulus.precision)
-    x_load_samples = np.round(x_load_samples, x_load.precision)
-    y_load_samples = np.round(y_load_samples, y_load.precision)
+    x_loads = np.round(x_loads, load.precision)
+    y_loads = np.round(y_loads, load.precision)
     
     # Plot histograms for angle samples.
     if show_histogram:
@@ -138,8 +151,10 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
         length.name: length_samples,
         height.name: height_samples,
         elastic_modulus.name: elastic_modulus_samples,
-        x_load.name: x_load_samples,
-        y_load.name: y_load_samples,
+        key_x_load: x_loads,
+        key_y_load: y_loads,
+        key_image_length: image_lengths,
+        key_image_height: image_heights,
         }
 
 # Write the specified sample values to a text file.
@@ -184,26 +199,18 @@ def generate_input_images(samples, folder_inputs) -> None:
     print(f'Deleted {len(filenames)} existing images in {folder_inputs}.')
 
     for i in range(get_sample_size(samples)):
-        image = np.zeros((
-            round(INPUT_SIZE[1] * (samples[height.name][i] / height.high)),
-            round(INPUT_SIZE[0] * (samples[length.name][i] / length.high)),
-            INPUT_SIZE[2]
-            ))
+        image = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i]), INPUT_CHANNELS))
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
-        r = np.arange(max(INPUT_SIZE))
-        x = r * np.cos(samples[angle.name][i] * np.pi/180) + INPUT_SIZE[0]/2
-        y = r * np.sin(samples[angle.name][i] * np.pi/180) + INPUT_SIZE[1]/2
+        r = np.arange(max(image.shape))
+        x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
+        y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[0]/2
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < image.shape[1]) * (y >= 0) * (y < image.shape[0])
         image[y[inside_image], x[inside_image], 0] = 255 * (samples[load.name][i] / load.high)
         image[:, :, 0] = np.flipud(image[:, :, 0])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
-        image[
-            :round(samples[height.name][i]/height.high * image.shape[0]),
-            :round(samples[length.name][i]/length.high * image.shape[1]),
-            1
-            ] = 255
+        image[:, :, 1] = 255
         # Write image files.
         filename = os.path.join(folder_inputs, f'input_{str(i+1).zfill(NUMBER_DIGITS)}.png')
         with Image.fromarray(image.astype(np.uint8), 'LA') as file:
@@ -235,15 +242,12 @@ def write_ansys_script(samples, filename) -> None:
         placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{number_samples},1\n'
         placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
         # Add commands that define the array containing generated samples.
-        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{7},{number_samples}\n']
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{9},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[x_load.name][i]},{samples[y_load.name][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]}\n'
+                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[key_x_load][i]},{samples[key_y_load][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[key_image_length][i]},{samples[key_image_height][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
-        # Add meshing commands.
-        placeholder_substitutions['! placeholder_mesh_length\n'] = f'LESIZE,_Y1, , ,{MESH_DIVISIONS[0]}, , , , ,1\n'
-        placeholder_substitutions['! placeholder_mesh_height\n'] = f'LESIZE,_Y1, , ,{MESH_DIVISIONS[1]}, , , , ,1\n'
         # Add commands that format and create the output files.
         placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
         placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'
