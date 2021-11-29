@@ -353,18 +353,14 @@ class CantileverDataset(Dataset):
         
         # Scale the stress values to be <= 1, but not [0, 1].
         if is_train:
-            self.store_stress_range(np.min(stresses), np.max(stresses))
+            CantileverDataset.store_stress_range(np.max(stresses))
         stresses /= CantileverDataset.maximum_stress
-
-        # for i in range(self.stresses.shape[2]):
-        #     self.stresses[:, :, i] -= np.min(self.stresses[:, :, i])
-        #     self.stresses[:, :, i] /= np.max(self.stresses[:, :, i])
         
         # Store each stress array in a list.
         self.stresses = [None] * stresses.shape[-1]
         for i in range(len(self.stresses)):
             # Keep only non-empty regions of array.
-            self.stresses[i] = stresses[~np.isnan(stresses[:, :, i])].reshape(OUTPUT_SIZE[::-1])
+            self.stresses[i] = stresses[stresses[:, :, i] >= 0].reshape(OUTPUT_SIZE[::-1])
 
     def __len__(self):
         return self.number_samples
@@ -372,26 +368,15 @@ class CantileverDataset(Dataset):
     def __getitem__(self, index):
         return self.inputs[index, ...], self.stresses[:, :, index].flatten()
     
-    # Store the minimum and maximum stress values found in the training dataset as class variables to be referenced by the test datset.
+    # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
     @classmethod
-    def store_stress_range(cls, minimum, maximum):
-        cls.minimum_stress = minimum
+    def store_stress_range(cls, maximum):
         cls.maximum_stress = maximum
 
 # A CNN that predicts the stress contour in a cantilever beam with a point load at the free end.
 class StressContourCnn(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.se_resnet = nn.Sequential(
-        #     nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-        #     nn.BatchNorm2d(4),
-        #     nn.ReLU(inplace=True),
-        #     nn.AvgPool2d(kernel_size=2, stride=2),
-        #     nn.Linear(in_features=46, out_features=46),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(in_features=46, out_features=47*2),
-        #     nn.Sigmoid(),
-        #     )
         self.cnn = nn.Sequential(
             nn.Conv2d(in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
@@ -411,11 +396,6 @@ class StressContourCnn(nn.Module):
             
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.AvgPool2d(kernel_size=2, stride=2),
-
-            # nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
             
             # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             # nn.BatchNorm2d(4),
