@@ -277,9 +277,9 @@ def fea_txt_to_array(samples, folder) -> None:
         # Get the stress value at each node.
         with open(fea_filename, 'r') as file:
             stress = [float(line) for line in file.readlines()]
-        array = np.zeros(stresses.shape[:2])
+        array = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
         # Determine the number of mesh divisions used in this sample.
-        mesh_divisions = (samples[key_image_length][i]-1, samples[key_image_height][i]-1)
+        mesh_divisions = (int(samples[key_image_length][i]-1), int(samples[key_image_height][i]-1))
         # Interior nodes.
         array[1:-1, 1:-1] = np.flipud(
             np.reshape(stress[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
@@ -346,27 +346,28 @@ class CantileverDataset(Dataset):
                 ) / 255
         
         # Get FEA stress data.
-        stresses = fea_txt_to_array(
+        labels = fea_txt_to_array(
             read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST),
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
             )
-        
         # Scale the stress values to be <= 1, but not [0, 1].
         if is_train:
-            CantileverDataset.store_stress_range(np.max(stresses))
-        stresses /= CantileverDataset.maximum_stress
-        
+            CantileverDataset.store_stress_range(np.max(labels))
+        labels = labels / CantileverDataset.maximum_stress
         # Store each stress array in a list.
-        self.stresses = [None] * stresses.shape[-1]
-        for i in range(len(self.stresses)):
+        self.labels = [None] * labels.shape[-1]
+        for i in range(len(self.labels)):
             # Keep only non-empty regions of array.
-            self.stresses[i] = stresses[stresses[:, :, i] >= 0].reshape(OUTPUT_SIZE[::-1])
+            self.labels[i] = labels[
+                :int(np.nonzero(np.any(labels[:, :, i] >= 0, axis=1))[0][-1] + 1),
+                :int(np.nonzero(np.any(labels[:, :, i] >= 0, axis=0))[0][-1] + 1),
+                ]
 
     def __len__(self):
         return self.number_samples
     
     def __getitem__(self, index):
-        return self.inputs[index, ...], self.stresses[:, :, index].flatten()
+        return self.inputs[index], self.labels[index].flatten()
     
     # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
     @classmethod
