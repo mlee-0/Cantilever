@@ -10,6 +10,11 @@
 WPSTYLE,,,,,,,,0
 ! /REPLOT,RESIZE  
 !*  
+
+! placeholder_loop_start
+
+! placeholder_define_samples
+
 /NOPR   
 KEYW,PR_SET,1   
 KEYW,PR_STRUC,1 
@@ -31,9 +36,6 @@ KEYW,PR_MULTI,0
 !* Disable popups.
 /UIS,MSGPOP,4
 
-! placeholder_define_samples
-
-! placeholder_loop_start
 /PREP7  
 FLST,3,1,8  
 FITEM,3,0,0,0   
@@ -129,32 +131,28 @@ FITEM,2,4
 DL,P51X, ,ALL,0 
 
 !* Apply X and Y components of load on free end.
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FX,samples(2,i,1)  
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FX,samples(2,i,1)
 
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FY,samples(3,i,1)
+
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FX,samples(2,i,1)/2
 
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FY,samples(3,i,1) 
-
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FY,samples(3,i,1)/2
 
 
@@ -215,5 +213,7 @@ SET,FIRST
 *VWRITE,stress(1)
 (F20.5)
 *CFCLOS
+
+/CLEAR
 
 ! placeholder_loop_end

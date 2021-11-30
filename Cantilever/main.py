@@ -235,9 +235,6 @@ def write_ansys_script(samples, filename) -> None:
         # Define names of variables.
         loop_variable = 'i'
         samples_variable = 'samples'
-        # Add loop commands.
-        placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{number_samples},1\n'
-        placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
         # Add commands that define the array containing generated samples.
         commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{9},{number_samples}\n']
         for i in range(number_samples):
@@ -245,6 +242,9 @@ def write_ansys_script(samples, filename) -> None:
                 f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[key_x_load][i]},{samples[key_y_load][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[key_image_length][i]},{samples[key_image_height][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
+        # Add loop commands.
+        placeholder_substitutions['! placeholder_loop_start\n'] = f'*DO,{loop_variable},1,{number_samples},1\n'
+        placeholder_substitutions['! placeholder_loop_end\n'] = f'*ENDDO\n'
         # Add commands that format and create the output files.
         placeholder_substitutions['! placeholder_define_suffix\n'] = f'suffix = \'{"0"*NUMBER_DIGITS}\'\n'
         placeholder_substitutions['! placeholder_define_number\n'] = f'number = CHRVAL({loop_variable})\n'

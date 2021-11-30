@@ -10,26 +10,8 @@
 WPSTYLE,,,,,,,,0
 ! /REPLOT,RESIZE  
 !*  
-/NOPR   
-KEYW,PR_SET,1   
-KEYW,PR_STRUC,1 
-KEYW,PR_THERM,0 
-KEYW,PR_FLUID,0 
-KEYW,PR_ELMAG,0 
-KEYW,MAGNOD,0   
-KEYW,MAGEDG,0   
-KEYW,MAGHFE,0   
-KEYW,MAGELC,0   
-KEYW,PR_MULTI,0 
-/GO 
-!*  
-! /COM,   
-! /COM,Preferences for GUI filtering have been set to display:
-! /COM,  Structural   
-!*  
 
-!* Disable popups.
-/UIS,MSGPOP,4
+*DO,i,1,100,1
 
 *DIM,samples,ARRAY,9,100
 samples(1,1) = 73636.0,2471.0,1819.0,36.36,3.152,1.778,191959595960.0,39.0,22.0
@@ -133,7 +115,27 @@ samples(1,98) = 20909.0,591.0,-640.0,312.73,2.0,1.828,155777777778.0,25.0,23.0
 samples(1,99) = 85455.0,3215.0,-1530.0,334.55,2.566,1.364,153767676768.0,32.0,17.0
 samples(1,100) = 95455.0,3591.0,1709.0,25.45,2.586,1.596,55272727273.0,32.0,20.0
 
-*DO,i,1,100,1
+/NOPR   
+KEYW,PR_SET,1   
+KEYW,PR_STRUC,1 
+KEYW,PR_THERM,0 
+KEYW,PR_FLUID,0 
+KEYW,PR_ELMAG,0 
+KEYW,MAGNOD,0   
+KEYW,MAGEDG,0   
+KEYW,MAGHFE,0   
+KEYW,MAGELC,0   
+KEYW,PR_MULTI,0 
+/GO 
+!*  
+! /COM,   
+! /COM,Preferences for GUI filtering have been set to display:
+! /COM,  Structural   
+!*  
+
+!* Disable popups.
+/UIS,MSGPOP,4
+
 /PREP7  
 FLST,3,1,8  
 FITEM,3,0,0,0   
@@ -229,32 +231,28 @@ FITEM,2,4
 DL,P51X, ,ALL,0 
 
 !* Apply X and Y components of load on free end.
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FX,samples(2,i,1)  
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FX,samples(2,i,1)
 
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FY,samples(3,i,1)
+
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FX,samples(2,i,1)/2
 
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FY,samples(3,i,1) 
-
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FY,samples(3,i,1)/2
 
 
@@ -315,5 +313,7 @@ filename = 'fea_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
 *VWRITE,stress(1)
 (F20.5)
 *CFCLOS
+
+/CLEAR
 
 *ENDDO
