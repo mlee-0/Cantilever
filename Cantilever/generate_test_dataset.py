@@ -1,6 +1,7 @@
 from main import FOLDER_TEST_INPUTS, FOLDER_TEST_OUTPUTS, FILENAME_SAMPLES_TEST, generate_samples, write_samples, read_samples, generate_input_images, write_ansys_script
 from generate_train_dataset import write_samples, read_samples
 
+
 NUMBER_SAMPLES = 8
 
 if __name__ == '__main__':

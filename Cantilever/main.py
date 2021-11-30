@@ -36,9 +36,6 @@ from torch.utils.data import Dataset, DataLoader
 from metrics import *
 
 
-# Dataset size.
-NUMBER_SAMPLES = 100
-
 # A dataclass that stores settings for each parameter.
 @dataclass
 class Parameter:
@@ -344,7 +341,7 @@ class CantileverDataset(Dataset):
             self.inputs[i] = np.transpose(
                 np.asarray(Image.open(filename), np.uint8) / 255,  # Scale to be inside [0, 1]
                 [2, 0, 1]  # Make channel dimension the first dimension
-                ) / 255
+                )
         
         # Get FEA stress data.
         labels = fea_txt_to_array(
@@ -388,40 +385,38 @@ class StressContourCnn(nn.Module):
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
             
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
+
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
             
             # nn.MaxPool2d(kernel_size=2, stride=2),
             # nn.AvgPool2d(kernel_size=2, stride=2),
             
-            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
             nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
+
             # nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
+            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            # nn.BatchNorm2d(4),
+            # nn.ReLU(inplace=True),
+
+            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            # nn.BatchNorm2d(4),
+            # nn.ReLU(inplace=True),
             
             nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
+            
             # nn.MaxPool2d(kernel_size=2, stride=2),
             nn.ConvTranspose2d(in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=3, stride=1),
             nn.BatchNorm2d(OUTPUT_CHANNELS),
