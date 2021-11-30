@@ -69,7 +69,8 @@ INPUT_CHANNELS = 2
 INPUT_SIZE = (50, 25, INPUT_CHANNELS)
 assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
 # Size of output images produced by the network. Output images produced by FEA will be resized to this size.
-OUTPUT_SIZE = INPUT_SIZE[:2]
+OUTPUT_CHANNELS = 1
+OUTPUT_SIZE = (*INPUT_SIZE[:2], OUTPUT_CHANNELS)
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever'
@@ -272,7 +273,7 @@ def fea_txt_to_array(samples, folder) -> None:
     fea_filenames = sorted(fea_filenames)
     assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
     # Initialize the array to hold all stress values.
-    stresses = np.full((*OUTPUT_SIZE[::-1], len(fea_filenames)), -1)
+    stresses = np.full((*OUTPUT_SIZE[1::-1], OUTPUT_SIZE[2], len(fea_filenames)), -1)
     for i, fea_filename in enumerate(fea_filenames):
         # Get the stress value at each node.
         with open(fea_filename, 'r') as file:
@@ -295,7 +296,7 @@ def fea_txt_to_array(samples, folder) -> None:
         array[0, 1:-1] = stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
         array[1:-1, 0] = stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
         # Insert the resized array.
-        stresses[:array.shape[0], :array.shape[1], i] = array
+        stresses[:array.shape[0], :array.shape[1], :, i] = np.expand_dims(array, array.ndim)
     return stresses
 
 # Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
@@ -359,15 +360,19 @@ class CantileverDataset(Dataset):
         for i in range(len(self.labels)):
             # Keep only non-empty regions of array.
             self.labels[i] = labels[
-                :int(np.nonzero(np.any(labels[:, :, i] >= 0, axis=1))[0][-1] + 1),
-                :int(np.nonzero(np.any(labels[:, :, i] >= 0, axis=0))[0][-1] + 1),
+                :int(np.nonzero(np.any(labels[:, :, :, i] >= 0, axis=1))[0][-1] + 1),
+                :int(np.nonzero(np.any(labels[:, :, :, i] >= 0, axis=0))[0][-1] + 1),
+                :,
+                i,
                 ]
+            # Make channel dimension the first dimension.
+            self.labels[i] = np.transpose(self.labels[i], [2, 0, 1])
 
     def __len__(self):
         return self.number_samples
     
     def __getitem__(self, index):
-        return self.inputs[index], self.labels[index].flatten()
+        return self.inputs[index], self.labels[index]
     
     # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
     @classmethod
@@ -386,6 +391,10 @@ class StressContourCnn(nn.Module):
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
+            
+            nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
             nn.BatchNorm2d(4),
@@ -395,31 +404,38 @@ class StressContourCnn(nn.Module):
             nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
             
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.AvgPool2d(kernel_size=2, stride=2),
             
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=2, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(2),
-            # nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
+            
+            nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(inplace=True),
             # nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ConvTranspose2d(in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=3, stride=1),
+            nn.BatchNorm2d(OUTPUT_CHANNELS),
+            nn.ReLU(inplace=True),
             )
-        self.linear = nn.Sequential(
-            nn.Linear(in_features=160, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
-            )
+        # self.linear = nn.Sequential(
+        #     nn.Linear(in_features=160, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]),
+        #     )
     
     def forward(self, x):
         x = x.float()
         x = self.cnn(x)
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
+        # x = x.view(x.size(0), -1)
+        # x = self.linear(x)
         return x
 
 # Train the model for one epoch only.
@@ -515,9 +531,8 @@ if __name__ == '__main__':
     area_metric_values = []
     ks_test_values = []
     for i, (test_input, label) in enumerate(test_dataloader):
-        test_output = model(test_input).detach().numpy()[0, :]
-        test_output = test_output.reshape(OUTPUT_SIZE[::-1], order='C')
-        label = label.reshape(OUTPUT_SIZE[::-1]).numpy()
+        test_output = model(test_input).detach().numpy()[0, 0, :]
+        label = label[0, 0, :].numpy()
         # Write FEA images.
         with Image.fromarray((array_to_colormap(label)).astype(np.uint8)) as image:
             filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{i+1}.png')
@@ -533,7 +548,7 @@ if __name__ == '__main__':
                 FOLDER_TEST_OUTPUTS,
                 f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
                 ))
-    print(f'Wrote {len(test_dataloader)} output images and their corresponding labels in {FOLDER_TEST_OUTPUTS}.')
+    print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
     # Plot evaluation metrics.
     plt.figure()
     plt.plot(area_metric_values, '*', color='#0095ff')
