@@ -62,7 +62,7 @@ key_image_length = 'Image Length'
 key_image_height = 'Image Height'
 
 # Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 2
+INPUT_CHANNELS = 1
 INPUT_SIZE = (50, 25, INPUT_CHANNELS)
 assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
 # Size of output images produced by the network. Output images produced by FEA will be resized to this size.
@@ -205,10 +205,10 @@ def generate_input_images(samples, folder_inputs) -> None:
         image[y[inside_image], x[inside_image], 0] = 255 * (samples[load.name][i] / load.high)
         image[:, :, 0] = np.flipud(image[:, :, 0])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
-        image[:, :, 1] = 255
+        # image[:, :, 1] = 255
         # Write image files.
         filename = os.path.join(folder_inputs, f'input_{str(i+1).zfill(NUMBER_DIGITS)}.png')
-        with Image.fromarray(image.astype(np.uint8), 'LA') as file:
+        with Image.fromarray(image.astype(np.uint8)[:,:,0], 'L') as file:
             file.save(filename)
     print(f'Wrote {i+1} input images in {folder_inputs}.')
 
@@ -338,10 +338,11 @@ class CantileverDataset(Dataset):
         self.number_samples = len(input_filenames)
         self.inputs = [None] * self.number_samples
         for i, filename in enumerate(input_filenames):
-            self.inputs[i] = np.transpose(
-                np.asarray(Image.open(filename), np.uint8) / 255,  # Scale to be inside [0, 1]
-                [2, 0, 1]  # Make channel dimension the first dimension
-                )
+            array = np.asarray(Image.open(filename), np.uint8) / 255,  # Scale to be inside [0, 1]
+            array = array[0]
+            if array.ndim < 3:
+                array = np.expand_dims(array, axis=2)
+            self.inputs[i] = np.transpose(array, [2, 0, 1])  # Make channel dimension the first dimension
         
         # Get FEA stress data.
         labels = fea_txt_to_array(
