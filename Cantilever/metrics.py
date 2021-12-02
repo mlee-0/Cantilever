@@ -11,10 +11,12 @@ def area_metric(network, fea):
     cdf_network = np.cumsum(histogram_network)
     cdf_fea = np.cumsum(histogram_fea)
     statistic = np.max(np.abs(cdf_network - cdf_fea))
-    # print(f'Area metric:  {statistic}')
     return statistic
 
 def ks_test(network, fea):
     statistic, pvalue = stats.kstest(network.flatten(), fea.flatten())
-    # print(f'K-S test:  {statistic}, {pvalue} (p-value)')
     return statistic, pvalue
+
+def max_value(network, fea):
+    network_max, fea_max = np.max(network.flatten()), np.max(fea.flatten())
+    return network_max, fea_max
