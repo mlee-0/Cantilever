@@ -1211,7 +1211,7 @@ number = CHRVAL(i)
 filename = 'fea_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
 *CFOPEN,filename,'txt'
 *VWRITE,stress(1)
-(F20.5)
+(F0.5)
 *CFCLOS
 
 /CLEAR
