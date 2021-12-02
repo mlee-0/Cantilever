@@ -1,8 +1,8 @@
-000001,Load:74286.0,Angle:51.43,Length:2.0,Height:1.857,Elastic Modulus:57857142857.0,Load X:2105.0,Load Y:2640.0,Image Length:25.0,Image Height:23.0
-000002,Load:35714.0,Angle:308.57,Length:3.143,Height:2.0,Elastic Modulus:86285714286.0,Load X:928.0,Load Y:-1163.0,Image Length:39.0,Image Height:25.0
-000003,Load:48571.0,Angle:257.14,Length:2.857,Height:1.286,Elastic Modulus:143142857143.0,Load X:-721.0,Load Y:-3157.0,Image Length:36.0,Image Height:16.0
-000004,Load:100000.0,Angle:0.0,Length:2.286,Height:1.0,Elastic Modulus:200000000000.0,Load X:9091.0,Load Y:0.0,Image Length:29.0,Image Height:12.0
-000005,Load:61429.0,Angle:102.86,Length:4.0,Height:1.143,Elastic Modulus:171571428571.0,Load X:-1051.0,Load Y:4607.0,Image Length:50.0,Image Height:14.0
-000006,Load:22857.0,Angle:205.71,Length:3.714,Height:1.571,Elastic Modulus:1000000000.0,Load X:-1084.0,Load Y:-522.0,Image Length:46.0,Image Height:20.0
-000007,Load:10000.0,Angle:360.0,Length:3.429,Height:1.429,Elastic Modulus:114714285714.0,Load X:588.0,Load Y:-0.0,Image Length:43.0,Image Height:18.0
-000008,Load:87143.0,Angle:154.29,Length:2.571,Height:1.714,Elastic Modulus:29428571429.0,Load X:-3926.0,Load Y:1890.0,Image Length:32.0,Image Height:21.0
+000001,Load:100000.0,Angle:0.0,Length:2.0,Height:1.0,Elastic Modulus:29428571429.0,Load X:9091.0,Load Y:0.0,Image Length:25.0,Image Height:12.0
+000002,Load:22857.0,Angle:360.0,Length:3.143,Height:1.714,Elastic Modulus:1000000000.0,Load X:1143.0,Load Y:-0.0,Image Length:39.0,Image Height:21.0
+000003,Load:87143.0,Angle:257.14,Length:2.286,Height:1.143,Elastic Modulus:114714285714.0,Load X:-1492.0,Load Y:-6535.0,Image Length:29.0,Image Height:14.0
+000004,Load:35714.0,Angle:308.57,Length:2.857,Height:2.0,Elastic Modulus:143142857143.0,Load X:928.0,Load Y:-1163.0,Image Length:36.0,Image Height:25.0
+000005,Load:61429.0,Angle:154.29,Length:2.571,Height:1.286,Elastic Modulus:57857142857.0,Load X:-3690.0,Load Y:1777.0,Image Length:32.0,Image Height:16.0
+000006,Load:48571.0,Angle:205.71,Length:3.429,Height:1.429,Elastic Modulus:86285714286.0,Load X:-2574.0,Load Y:-1240.0,Image Length:43.0,Image Height:18.0
+000007,Load:74286.0,Angle:102.86,Length:3.714,Height:1.857,Elastic Modulus:171571428571.0,Load X:-751.0,Load Y:3292.0,Image Length:46.0,Image Height:23.0
+000008,Load:10000.0,Angle:51.43,Length:4.0,Height:1.571,Elastic Modulus:200000000000.0,Load X:328.0,Load Y:411.0,Image Length:50.0,Image Height:20.0
