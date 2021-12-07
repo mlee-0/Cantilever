@@ -389,49 +389,23 @@ class StressContourCnn(nn.Module):
     def __init__(self):
         super().__init__()
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=INPUT_CHANNELS, out_channels=64, kernel_size=3, stride=1),
+            nn.Conv2d(in_channels=INPUT_CHANNELS, out_channels=64, kernel_size=3, stride=2),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=3),
+            # nn.BatchNorm2d(128),
+            # nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2),
 
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1),
+            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, stride=2),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.AvgPool2d(kernel_size=2, stride=2),
-            
-            # # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-            
-            # nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(4),
-            # nn.ReLU(inplace=True),
-            
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.ConvTranspose2d(in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=3, stride=1),
-            # nn.BatchNorm2d(OUTPUT_CHANNELS),
-            # nn.ReLU(inplace=True),
             )
         self.linear = nn.Sequential(
-            nn.Linear(in_features=1024, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_CHANNELS),
+            nn.Linear(in_features=512, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_CHANNELS),
             )
     
     def forward(self, x):
@@ -569,9 +543,10 @@ if __name__ == '__main__':
     plt.ylim((0, 1))
     plt.title('K-S Test')
     plt.show()
-    plt.figure()
-    plt.plot([_[0] for _ in max_stress_values], '*', color='#0095ff')
-    plt.plot([_[1] for _ in max_stress_values], '*', color='#ff4040')
+    f = plt.figure()
+    plt.plot([_[0] for _ in max_stress_values], '*', color='#0095ff', label='CNN')
+    plt.plot([_[1] for _ in max_stress_values], 'o', color='#ff4040', label='FEA')
+    f.legend()
     plt.xlabel('Sample')
     plt.title('Max. Stress')
     plt.show()
