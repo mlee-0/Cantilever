@@ -1,8 +1,11 @@
-from main import FOLDER_TEST_INPUTS, FOLDER_TEST_OUTPUTS, FILENAME_SAMPLES_TEST, generate_samples, write_samples, read_samples, generate_input_images, write_ansys_script
-from generate_train_dataset import write_samples, read_samples
+'''
+Write files used for testing.
+'''
+
+from setup import *
 
 
-NUMBER_SAMPLES = 8
+NUMBER_SAMPLES = 10
 
 if __name__ == '__main__':
     # Try to read sample values from the text file if it already exists. If not, generate the samples.

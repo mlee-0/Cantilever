@@ -1,15 +1,11 @@
-import colorsys
-import glob
-import os
-import random
+'''
+Write files used for training.
+'''
 
-import numpy as np
-from PIL import Image
-
-from main import FOLDER_ROOT, FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, FILENAME_SAMPLES_TRAIN, generate_samples, write_samples, read_samples, generate_input_images, write_ansys_script
+from setup import *
 
 
-NUMBER_SAMPLES = 100
+NUMBER_SAMPLES = 500
 
 if __name__ == '__main__':
     # Try to read sample values from the text file if it already exists. If not, generate the samples.
