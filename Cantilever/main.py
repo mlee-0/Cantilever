@@ -93,40 +93,76 @@ class CantileverDataset(Dataset):
 class StressContourCnn(nn.Module):
     def __init__(self):
         super().__init__()
-        self.convolution = nn.Sequential(
-            nn.Conv2d(in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=3, stride=3, padding=1, padding_mode='replicate'),
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=3, padding=1, padding_mode='replicate'),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            # nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=3, padding=1, padding_mode='replicate'),
-            # nn.BatchNorm2d(32),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=6, stride=3, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
-
-            nn.ConvTranspose2d(in_channels=8, out_channels=OUTPUT_CHANNELS, kernel_size=6, stride=3, padding=1),
-            nn.BatchNorm2d(OUTPUT_CHANNELS),
+        # Return a sequence of layers related to convolution.
+        convolution = lambda in_channels, out_channels, kernel_size=3, stride=3: nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=1, padding_mode='replicate'),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             )
+        # Return a sequence of layers related to deconvolution.
+        deconvolution = lambda in_channels, out_channels, kernel_size=3, stride=3: nn.Sequential(
+            nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            )
+        
+        self.convolution_1 = convolution(in_channels=INPUT_CHANNELS, out_channels=8)
+        self.convolution_2 = convolution(in_channels=8, out_channels=16)
+        self.deconvolution_1 = deconvolution(in_channels=16, out_channels=8, kernel_size=4)
+        self.deconvolution_2 = deconvolution(in_channels=8, out_channels=OUTPUT_CHANNELS, kernel_size=4)
+        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
+        self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
+
+        self.autoencoder = nn.Sequential(
+            nn.Linear(in_features=48, out_features=24),
+            nn.Linear(in_features=24, out_features=12),
+            nn.Linear(in_features=12, out_features=24),
+            nn.Linear(in_features=24, out_features=48),
+            )
+
         self.linear = nn.Sequential(
-            nn.Linear(in_features=403, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_CHANNELS),
+            nn.Linear(in_features=5050, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_CHANNELS),
             )
     
     def forward(self, x):
+        ### CONV-DECONV
+        # x = x.float()
+        # # Convolution.
+        # x = self.convolution_1(x)
+        # x = self.pooling(x)
+        # x = self.convolution_2(x)
+        # x = self.pooling(x)
+        # # Deconvolution.
+        # x = self.deconvolution_1(x)
+        # x = self.deconvolution_2(x)
+        # x = self.deconvolution_3(x)
+        # # Fully connected.
+        # x = x.view(x.size(0), -1)
+        # x = self.linear(x)
+        
+        ### AUTOENCODER
         x = x.float()
-        x = self.convolution(x)
+        # Convolution.
+        x = self.convolution_1(x)
+        size_1 = x.size()
+        x, indices_1 = self.pooling(x)
+        x = self.convolution_2(x)
+        size_2 = x.size()
+        x, indices_2 = self.pooling(x)
+        # Autoencoding.
+        size_encoding = x.size()
+        x = self.autoencoder(x.flatten())
+        x = x.reshape(size_encoding)
+        # Deconvolution.
+        x = self.unpooling(x, indices_2, output_size=size_2)
+        x = self.deconvolution_1(x)
+        x = self.unpooling(x, indices_1, output_size=size_1)
+        x = self.deconvolution_2(x)
+        # Fully connected.
         x = x.view(x.size(0), -1)
         x = self.linear(x)
-        x = x.reshape((BATCH_SIZE, OUTPUT_CHANNELS, *OUTPUT_SIZE[1::-1]))
-        return x
+
+        return x.reshape((BATCH_SIZE, OUTPUT_CHANNELS, *OUTPUT_SIZE[1::-1]))
 
 # Train the model for one epoch only.
 def train(dataloader, model, loss_function, optimizer):
@@ -165,6 +201,12 @@ def test(dataloader, model, loss_function):
     print(f'Average loss: {test_loss:>8f}')
     return test_loss
 
+# Save model parameters to a file.
+def save(model):
+    # Save the model parameters.
+    torch.save(model.state_dict(), FILEPATH_MODEL)
+    print(f'Saved model parameters to {FILEPATH_MODEL}.')
+
 
 # Train and test the model.
 if __name__ == '__main__':
@@ -195,10 +237,12 @@ if __name__ == '__main__':
             train(train_dataloader, model, loss_function, optimizer)
             test_loss = test(train_dataloader, model, loss_function)
             test_loss_values.append(test_loss)
+            # Save the model parameters periodically.
+            if t % 10 == 0:
+                save(model)
         
         # Save the model parameters.
-        torch.save(model.state_dict(), FILEPATH_MODEL)
-        print(f'Saved model parameters to {FILEPATH_MODEL}.')
+        save(model)
         
         # Plot the loss history.
         plt.figure()
@@ -256,8 +300,8 @@ if __name__ == '__main__':
     plt.title('K-S Test')
     plt.show()
     f = plt.figure()
-    plt.plot([_[0] for _ in max_stress_values], '*', color='#0095ff', label='CNN')
     plt.plot([_[1] for _ in max_stress_values], 'o', color='#ff4040', label='FEA')
+    plt.plot([_[0] for _ in max_stress_values], '*', color='#0095ff', label='CNN')
     f.legend()
     plt.xlabel('Sample')
     plt.title('Max. Stress')
