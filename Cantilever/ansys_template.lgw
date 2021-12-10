@@ -211,7 +211,7 @@ SET,FIRST
 ! placeholder_define_filename
 *CFOPEN,filename,'txt'
 *VWRITE,stress(1)
-(F0.5)
+(F0.0)
 *CFCLOS
 
 /CLEAR

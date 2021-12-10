@@ -6,6 +6,7 @@ import colorsys
 from dataclasses import dataclass
 import glob
 import os
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,20 +18,22 @@ from PIL import Image
 class Parameter:
     # Name of the parameter.
     name: str
+    # The minimum and maximum values between which samples are generated.
+    low: float
+    high: float
+    # Spacing between adjacent values.
+    step: int
     # Units for the parameter.
     units: str = ''
-    # The minimum and maximum values between which samples are generated.
-    low: float = 0
-    high: float = 0
     # Number of decimal places to which sample values are rounded.
     precision: int = 0
 
 # Settings for each parameter.
-length = Parameter(low=2, high=4, precision=3, name='Length', units='m')
-height = Parameter(low=1, high=2, precision=3, name='Height', units='m')
-elastic_modulus = Parameter(low=1e9, high=200e9, precision=0, name='Elastic Modulus', units='Pa')
-load = Parameter(low=10000, high=100000, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=360, precision=2, name='Angle', units='Degrees')
+length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m')
+height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
+elastic_modulus = Parameter(low=150e9, high=200e9, step=1e9, precision=0, name='Elastic Modulus', units='Pa')
+load = Parameter(low=50000, high=100000, step=1000, precision=0, name='Load', units='N')
+angle = Parameter(low=0, high=359, step=1, precision=2, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
 key_x_load = 'Load X'
 key_y_load = 'Load Y'
@@ -61,46 +64,38 @@ NUMBER_DIGITS = 6
 # Generate sample values for each parameter and return them as a dictionary.
 def generate_samples(number_samples, show_histogram=False) -> dict:
     # Generate samples.
-    load_samples = np.linspace(load.low, load.high, number_samples)
-    angle_samples = np.linspace(angle.low, angle.high, number_samples)
-    length_samples = np.linspace(length.low, length.high, number_samples)
-    height_samples = np.linspace(height.low, height.high, number_samples)
-    elastic_modulus_samples = np.linspace(elastic_modulus.low, elastic_modulus.high, number_samples)
-    # Randomize ordering of samples.
-    np.random.shuffle(load_samples)
-    np.random.shuffle(angle_samples)
-    np.random.shuffle(length_samples)
-    np.random.shuffle(height_samples)
-    np.random.shuffle(elastic_modulus_samples)
+    samples = {}
+    for parameter in [load, angle, length, height, elastic_modulus]:
+        assert isinstance(parameter, Parameter)
+        values = np.arange(parameter.low, parameter.high+parameter.step, parameter.step)
+        samples[parameter.name] = np.round(
+            random.choices(values, k=number_samples,),
+            parameter.precision,
+            )
     
     # Calculate the image size corresponding to the geometry.
-    image_lengths = np.round(INPUT_SIZE[0] * (length_samples / length.high))
-    image_heights = np.round(INPUT_SIZE[1] * (height_samples / height.high))
+    image_lengths = np.round(INPUT_SIZE[0] * (samples[length.name] / length.high))
+    image_heights = np.round(INPUT_SIZE[1] * (samples[height.name] / height.high))
+    samples[key_image_length] = image_lengths
+    samples[key_image_height] = image_heights
     
     # Calculate the x- and y-components of the loads and corresponding angles.
     x_loads = np.round(
-        np.cos(angle_samples * (np.pi/180)) * load_samples / (image_heights-1),
-        NUMBER_DIGITS
+        np.cos(samples[angle.name] * (np.pi/180)) * samples[load.name] / (image_heights-1),
+        load.precision
         )
     y_loads = np.round(
-        np.sin(angle_samples * (np.pi/180)) * load_samples / (image_heights-1),
-        NUMBER_DIGITS
+        np.sin(samples[angle.name] * (np.pi/180)) * samples[load.name] / (image_heights-1),
+        load.precision
         )
-    
-    # Round samples to a fixed number of decimal places.
-    load_samples = np.round(load_samples, load.precision)
-    angle_samples = np.round(angle_samples, angle.precision)
-    length_samples = np.round(length_samples, length.precision)
-    height_samples = np.round(height_samples, height.precision)
-    elastic_modulus_samples = np.round(elastic_modulus_samples, elastic_modulus.precision)
-    x_loads = np.round(x_loads, load.precision)
-    y_loads = np.round(y_loads, load.precision)
-    
+    samples[key_x_load] = x_loads
+    samples[key_y_load] = y_loads
+
     # Plot histograms for angle samples.
     if show_histogram:
         plt.figure()
         plt.hist(
-            angle_samples,
+            samples[angle.name],
             bins=round(angle.high-angle.low),
             rwidth=0.75,
             color='#0095ff',
@@ -109,17 +104,7 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
         plt.title(angle.name)
         plt.show()
     
-    return {
-        load.name: load_samples,
-        angle.name: angle_samples,
-        length.name: length_samples,
-        height.name: height_samples,
-        elastic_modulus.name: elastic_modulus_samples,
-        key_x_load: x_loads,
-        key_y_load: y_loads,
-        key_image_length: image_lengths,
-        key_image_height: image_heights,
-        }
+    return samples
 
 # Write the specified sample values to a text file.
 def write_samples(samples, filename) -> None:
@@ -238,7 +223,7 @@ def write_ansys_script(samples, filename) -> None:
         print(f'Wrote {filename}.')
 
 # Properly order stress data in text files generated by FEA and return them as a 3D array.
-def fea_to_array(samples, folder) -> None:
+def fea_to_array(samples, folder) -> np.ndarray:
     number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)

@@ -77,6 +77,11 @@ class CantileverDataset(Dataset):
         for i in range(len(self.labels)):
             # Make channel dimension the first dimension.
             self.labels[i] = np.transpose(labels[:, :, :, i], [2, 0, 1])
+        # # Write FEA images.
+        # for i, label in enumerate(self.labels):
+        #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
+        #         filepath = os.path.join(FOLDER_TRAIN_OUTPUTS, f'fea_{i+1}.png')
+        #         image.save(filepath)
 
     def __len__(self):
         return self.number_samples
