@@ -24,6 +24,7 @@ The output images used as labels during training are stress contours generated b
 import glob
 import os
 
+from cycler import cycler
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -32,7 +33,7 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 
 from setup import *
-from metrics import *
+import metrics
 
 
 # Model parameters file name and path.
@@ -247,46 +248,42 @@ if __name__ == '__main__':
     print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
     
     # Test the model on the input images found in the folder.
-    area_metric_values = []
-    ks_test_values = []
-    max_stress_values = []
+    evaluation_results = {}
     for i, (test_input, label) in enumerate(test_dataloader):
-        test_output = model(test_input).detach().numpy()[0, 0, :]
-        label = label[0, 0, :].numpy()
+        test_output = model(test_input).detach().numpy()[0, 0, ...]
+        label_stress = label[0, 0, ...].numpy()
         # Write FEA images.
-        with Image.fromarray((array_to_colormap(label)).astype(np.uint8)) as image:
+        with Image.fromarray((array_to_colormap(label_stress)).astype(np.uint8)) as image:
             filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{i+1}.png')
             image.save(filepath)
-        # Scale the outputs to the original range of stress values and compare with FEA results.
-        area_metric_values.append(area_metric(test_output, label))
-        ks_test_values.append(ks_test(test_output, label)[0])
-        max_stress_values.append(max_value(test_output, label))
-        # Convert the output to a color image.
+        # Evaluate outputs with multiple evaluation metrics.
+        evaluation_result = metrics.evaluate(test_output, label_stress)
+        for name, result in evaluation_result.items():
+            try:
+                evaluation_results[name].append(result)
+            except KeyError:
+                evaluation_results[name] = [result]
+        # Save the output image.
         test_output = array_to_colormap(test_output)
-        # Save the generated output image.
         with Image.fromarray(test_output.astype(np.uint8)) as image:
             image.save(os.path.join(
                 FOLDER_TEST_OUTPUTS,
                 f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
                 ))
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
+
     # Plot evaluation metrics.
-    plt.figure()
-    plt.plot(area_metric_values, '*', color='#0095ff')
-    plt.xlabel('Sample')
-    plt.ylim((0, 1))
-    plt.title('Area Metric')
-    plt.show()
-    plt.figure()
-    plt.plot(ks_test_values, '*', color='#0095ff')
-    plt.xlabel('Sample')
-    plt.ylim((0, 1))
-    plt.title('K-S Test')
-    plt.show()
-    f = plt.figure()
-    plt.plot([_[1] for _ in max_stress_values], 'o', color='#ff4040', label='FEA')
-    plt.plot([_[0] for _ in max_stress_values], '*', color='#0095ff', label='CNN')
-    f.legend()
-    plt.xlabel('Sample')
-    plt.title('Max. Stress')
+    plt.rc('axes', prop_cycle=cycler(color=['#0095ff', '#ff4040']))
+    plt.rc('font', family='Source Code Pro', size=12.0, weight='semibold')
+    figure = plt.figure()
+    for i, (name, result) in enumerate(evaluation_results.items()):
+        plt.subplot(1, len(evaluation_results), i+1)
+        plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
+        if isinstance(result[0], tuple):
+            plt.legend()
+        plt.grid(visible=True, axis='y')
+        plt.xlabel('Sample')
+        plt.xticks(range(len(test_dataset)))
+        plt.ylim((0, 1))
+        plt.title(name, fontweight='bold')
     plt.show()
