@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import glob
 import os
 import random
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,18 +41,16 @@ key_y_load = 'Load Y'
 key_image_length = 'Image Length'
 key_image_height = 'Image Height'
 
-# Size of input images. Must have the same aspect ratio as the largest possible cantilever geometry.
+# Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 4
-INPUT_SIZE = (100, 50, INPUT_CHANNELS)
-assert (INPUT_SIZE[1] / INPUT_SIZE[0]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever.'
-# Size of output images produced by the network. Output images produced by FEA will be resized to this size.
+INPUT_SIZE = (INPUT_CHANNELS, 50, 100)
+assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
+# Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNELS = 1
-OUTPUT_SIZE = (*INPUT_SIZE[:2], OUTPUT_CHANNELS)
+OUTPUT_SIZE = (OUTPUT_CHANNELS, *INPUT_SIZE[1:3])
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever'
-FOLDER_TRAIN_INPUTS = os.path.join(FOLDER_ROOT, 'Train Inputs')
-FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_INPUTS = os.path.join(FOLDER_ROOT, 'Test Inputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
@@ -74,7 +73,7 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
             )
     
     # Calculate the image size corresponding to the geometry.
-    image_lengths = np.round(INPUT_SIZE[0] * (samples[length.name] / length.high))
+    image_lengths = np.round(INPUT_SIZE[2] * (samples[length.name] / length.high))
     image_heights = np.round(INPUT_SIZE[1] * (samples[height.name] / height.high))
     samples[key_image_length] = image_lengths
     samples[key_image_height] = image_heights
@@ -139,37 +138,31 @@ def read_samples(filename) -> dict:
         print(f'Found samples in {filename}.')
         return samples
 
-# Create images for the sample values provided inside the specified folder.
-def generate_input_images(samples, folder_inputs) -> None:
-    # Remove existing input images in the folder.
-    filenames = glob.glob(os.path.join(folder_inputs, '*.png'))
-    for filename in filenames:
-        os.remove(filename)
-    print(f'Deleted {len(filenames)} existing images in {folder_inputs}.')
-
-    for i in range(get_sample_size(samples)):
+# Return a list of images for each of the specified sample values.
+def generate_input_images(samples) -> List[np.ndarray]:
+    number_samples = get_sample_size(samples)
+    inputs = [None] * number_samples
+    for i in range(number_samples):
         pixel_length, pixel_height = int(samples[key_image_length][i]), int(samples[key_image_height][i])
-        image = np.zeros((*INPUT_SIZE[1::-1], INPUT_SIZE[2]))
+        image = np.zeros(INPUT_SIZE)
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
-        r = np.arange(max(image.shape))
-        x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
-        y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[0]/2
+        r = np.arange(max(image.shape[1:]))
+        x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[2]/2
+        y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
         x = x.astype(int)
         y = y.astype(int)
-        inside_image = (x >= 0) * (x < image.shape[1]) * (y >= 0) * (y < image.shape[0])
+        inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
         image[y[inside_image], x[inside_image], 0] = 255 * (samples[load.name][i] / load.high)
-        image[:, :, 0] = np.flipud(image[:, :, 0])
+        image[0, :, :] = np.flipud(image[0, :, :])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
-        image[:pixel_height, :pixel_length, 1] = 255
+        image[1, :pixel_height, :pixel_length] = 255
         # Create a channel with the elastic modulus distribution.
-        image[:pixel_height, :pixel_length, 2] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        image[2, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
         # Create a channel with the fixed boundary conditions.
-        image[:pixel_height, 0, 3] = 255
-        # Write image files.
-        filename = os.path.join(folder_inputs, f'input_{str(i+1).zfill(NUMBER_DIGITS)}.png')
-        with Image.fromarray(image.astype(np.uint8), 'RGBA') as file:
-            file.save(filename)
-    print(f'Wrote {i+1} input images in {folder_inputs}.')
+        image[3, :pixel_height, 0] = 255
+        # Append the image to the list.
+        inputs[i] = image
+    return inputs
 
 # Get the number of samples found in the specified sample values.
 def get_sample_size(samples) -> int:
@@ -222,38 +215,56 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-# Properly order stress data in text files generated by FEA and return them as a 3D array.
-def fea_to_array(samples, folder) -> np.ndarray:
+# Return a list of images for each of the FEA text files. Divide all stress values by the specified value, if provided.
+def generate_label_images(samples, folder, normalization_stress=None) -> List[np.ndarray]:
     number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
     assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
-    # Initialize the array to hold all stress values.
-    stresses = np.full((*OUTPUT_SIZE[1::-1], OUTPUT_SIZE[2], len(fea_filenames)), -1)
+
+    # Store all stress data in a single array, initialized with a specific background value.
+    BACKGROUND_VALUE_INITIAL = -1
+    BACKGROUND_VALUE = 0
+    labels = np.full(
+        (*OUTPUT_SIZE, len(fea_filenames)),
+        BACKGROUND_VALUE_INITIAL,
+        dtype=float,
+        )
     for i, fea_filename in enumerate(fea_filenames):
-        # Get the stress value at each node.
+        # Initialize a 2D array to hold stresses.
+        stress = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
+        # Read the nodal stress values.
         with open(fea_filename, 'r') as file:
             stress = [float(line) for line in file.readlines()]
-        array = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
         # Determine the number of mesh divisions used in this sample.
         mesh_divisions = (int(samples[key_image_length][i]-1), int(samples[key_image_height][i]-1))
-        # Interior nodes.
-        array[1:-1, 1:-1] = np.flipud(
+        # Stresses for interior nodes.
+        stress[1:-1, 1:-1] = np.flipud(
             np.reshape(stress[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
             )
-        # Corner nodes.
-        array[-1, 0] = stress[0]
-        array[-1, -1] = stress[1]
-        array[0, -1] = stress[1+mesh_divisions[0]]
-        array[0, 0] = stress[1+mesh_divisions[0]+mesh_divisions[1]]
-        # Edge nodes.
-        array[-1, 1:-1] = stress[2:2+mesh_divisions[0]-1]
-        array[1:-1, -1] = stress[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-        array[0, 1:-1] = stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-        array[1:-1, 0] = stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
-        # Insert the array.
-        stresses[:array.shape[0], :array.shape[1], :, i] = np.expand_dims(array, array.ndim)
-    return stresses
+        # Stresses for corner nodes.
+        stress[-1, 0] = stress[0]
+        stress[-1, -1] = stress[1]
+        stress[0, -1] = stress[1+mesh_divisions[0]]
+        stress[0, 0] = stress[1+mesh_divisions[0]+mesh_divisions[1]]
+        # Stresses for edge nodes.
+        stress[-1, 1:-1] = stress[2:2+mesh_divisions[0]-1]
+        stress[1:-1, -1] = stress[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
+        stress[0, 1:-1] = stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
+        stress[1:-1, 0] = stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
+        # Insert the stress array.
+        labels[0, :stress.shape[0], :stress.shape[1], :, i] = np.expand_dims(stress, stress.ndim)
+    
+    # Normalize values (<= 1) by dividing by the maximum value found among all samples.
+    maximum_stress = np.max(labels[0, ...])
+    if normalization_stress is None:
+        normalization_stress = maximum_stress
+    else:
+        assert normalization_stress >= maximum_stress, 'The normalization stress {normalization_stress} < {maximum_stress} will cause some normalized values to be > 1. Generating a new test datset may fix this.'
+    labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_stress
+    labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
+
+    return [labels[..., i] for i in range(labels.shape[-1])], maximum_stress
 
 # Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
 def rgb_to_hue(array) -> np.ndarray:
@@ -281,6 +292,7 @@ def array_to_colormap(array) -> np.ndarray:
     # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.
     array = array * (240/360)
     # Convert the output to an RGB array.
-    array = np.dstack((array, np.ones(array.shape, float), 2/3 * np.ones(array.shape, float)))
+    SATURATION, VALUE = 1, 2/3
+    array = np.dstack((array, SATURATION * np.ones(array.shape, float), VALUE * np.ones(array.shape, float)))
     array = hsv_to_rgb(array)
     return array

@@ -45,38 +45,23 @@ EPOCHS = 100
 
 # Dataset that retrieves input and output images for the CNN. Output images are not retrieved if the outputs folder is not specified.
 class CantileverDataset(Dataset):
-    def __init__(self, folder_inputs, folder_outputs, is_train=False):
-        self.folder_inputs = folder_inputs
-        self.folder_outputs = folder_outputs
+    maximum_stress = None
+
+    def __init__(self, is_train=False):
+        # Create input images and store each in a list.
+        samples = read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST)
+        self.number_samples = get_sample_size(samples)
+        self.inputs = generate_input_images(samples)
         
-        # Get all input images and store each in a list.
-        input_filenames = glob.glob(os.path.join(self.folder_inputs, '*.png'))
-        input_filenames = sorted(input_filenames)
-        self.number_samples = len(input_filenames)
-        self.inputs = [None] * self.number_samples
-        for i, filename in enumerate(input_filenames):
-            array = np.asarray(Image.open(filename), np.uint8) / 255,  # Scale to be <= 1
-            array = array[0]
-            if array.ndim < 3:
-                array = np.expand_dims(array, axis=2)
-            self.inputs[i] = np.transpose(array, [2, 0, 1])  # Make channel dimension the first dimension
-        
-        # Get FEA stress data.
-        labels = fea_to_array(
-            read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST),
+        # Create label images from FEA stress data.
+        self.labels, maximum_stress = generate_label_images(
+            samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
+            CantileverDatatset.maximum_stress,
             )
-        # Scale the stress values to be <= 1, but not [0, 1].
+        # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
         if is_train:
-            CantileverDataset.store_stress_range(np.max(labels))
-        labels = labels / CantileverDataset.maximum_stress
-        # Replace background values.
-        labels[labels < 0] = 0
-        # Store each stress array in a list.
-        self.labels = [None] * labels.shape[-1]
-        for i in range(len(self.labels)):
-            # Make channel dimension the first dimension.
-            self.labels[i] = np.transpose(labels[:, :, :, i], [2, 0, 1])
+            CantileverDataset.maximum_stress = maximum_stress
         # # Write FEA images.
         # for i, label in enumerate(self.labels):
         #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
@@ -88,11 +73,6 @@ class CantileverDataset(Dataset):
     
     def __getitem__(self, index):
         return self.inputs[index], self.labels[index]
-    
-    # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
-    @classmethod
-    def store_stress_range(cls, maximum):
-        cls.maximum_stress = maximum
 
 # A CNN that predicts the stress contour in a cantilever beam with a point load at the free end.
 class StressContourCnn(nn.Module):
@@ -208,7 +188,6 @@ def test(dataloader, model, loss_function):
 
 # Save model parameters to a file.
 def save(model):
-    # Save the model parameters.
     torch.save(model.state_dict(), FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
@@ -229,7 +208,7 @@ if __name__ == '__main__':
             train_model = False
     
     # Set up the training data.
-    train_dataset = CantileverDataset(FOLDER_TRAIN_INPUTS, FOLDER_TRAIN_OUTPUTS, is_train=True)
+    train_dataset = CantileverDataset(is_train=True)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     loss_function = nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
@@ -258,7 +237,7 @@ if __name__ == '__main__':
         plt.show()
 
     # Set up the testing data.
-    test_dataset = CantileverDataset(FOLDER_TEST_INPUTS, FOLDER_TEST_OUTPUTS, is_train=False)
+    test_dataset = CantileverDataset(is_train=False)
     test_dataloader = DataLoader(test_dataset, shuffle=True)
     
     # Remove existing output images in the folder.

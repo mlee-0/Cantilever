@@ -14,4 +14,3 @@ if __name__ == '__main__':
         samples = generate_samples(NUMBER_SAMPLES, show_histogram=False)
     write_samples(samples, FILENAME_SAMPLES_TRAIN)
     write_ansys_script(samples, 'ansys_script_train.lgw')
-    generate_input_images(samples, FOLDER_TRAIN_INPUTS)
