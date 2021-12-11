@@ -57,7 +57,7 @@ class CantileverDataset(Dataset):
         self.labels, maximum_stress = generate_label_images(
             samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
-            CantileverDatatset.maximum_stress,
+            CantileverDataset.maximum_stress,
             )
         # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
         if is_train:
@@ -106,7 +106,7 @@ class StressContourCnn(nn.Module):
             )
 
         self.linear = nn.Sequential(
-            nn.Linear(in_features=5050, out_features=OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_CHANNELS),
+            nn.Linear(in_features=5050, out_features=np.prod(OUTPUT_SIZE)),
             )
     
     def forward(self, x):
@@ -147,7 +147,7 @@ class StressContourCnn(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.linear(x)
 
-        return x.reshape((BATCH_SIZE, OUTPUT_CHANNELS, *OUTPUT_SIZE[1::-1]))
+        return x.reshape((BATCH_SIZE, *OUTPUT_SIZE))
 
 # Train the model for one epoch only.
 def train(dataloader, model, loss_function, optimizer):
@@ -222,7 +222,7 @@ if __name__ == '__main__':
             test_loss = test(train_dataloader, model, loss_function)
             test_loss_values.append(test_loss)
             # Save the model parameters periodically.
-            if t % 10 == 0:
+            if t % 10 == 0 and t > 0:
                 save(model)
         
         # Save the model parameters.

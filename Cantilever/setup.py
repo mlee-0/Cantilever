@@ -51,7 +51,7 @@ OUTPUT_SIZE = (OUTPUT_CHANNELS, *INPUT_SIZE[1:3])
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever'
-FOLDER_TEST_INPUTS = os.path.join(FOLDER_ROOT, 'Test Inputs')
+FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
 FILENAME_SAMPLES_TEST = 'samples_test.txt'
@@ -152,7 +152,7 @@ def generate_input_images(samples) -> List[np.ndarray]:
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
-        image[y[inside_image], x[inside_image], 0] = 255 * (samples[load.name][i] / load.high)
+        image[0, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
         image[0, :, :] = np.flipud(image[0, :, :])
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
         image[1, :pixel_height, :pixel_length] = 255
@@ -235,25 +235,25 @@ def generate_label_images(samples, folder, normalization_stress=None) -> List[np
         stress = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
         # Read the nodal stress values.
         with open(fea_filename, 'r') as file:
-            stress = [float(line) for line in file.readlines()]
+            raw_stress = [float(line) for line in file.readlines()]
         # Determine the number of mesh divisions used in this sample.
         mesh_divisions = (int(samples[key_image_length][i]-1), int(samples[key_image_height][i]-1))
         # Stresses for interior nodes.
         stress[1:-1, 1:-1] = np.flipud(
-            np.reshape(stress[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
+            np.reshape(raw_stress[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
             )
         # Stresses for corner nodes.
-        stress[-1, 0] = stress[0]
-        stress[-1, -1] = stress[1]
-        stress[0, -1] = stress[1+mesh_divisions[0]]
-        stress[0, 0] = stress[1+mesh_divisions[0]+mesh_divisions[1]]
+        stress[-1, 0] = raw_stress[0]
+        stress[-1, -1] = raw_stress[1]
+        stress[0, -1] = raw_stress[1+mesh_divisions[0]]
+        stress[0, 0] = raw_stress[1+mesh_divisions[0]+mesh_divisions[1]]
         # Stresses for edge nodes.
-        stress[-1, 1:-1] = stress[2:2+mesh_divisions[0]-1]
-        stress[1:-1, -1] = stress[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-        stress[0, 1:-1] = stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-        stress[1:-1, 0] = stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
+        stress[-1, 1:-1] = raw_stress[2:2+mesh_divisions[0]-1]
+        stress[1:-1, -1] = raw_stress[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
+        stress[0, 1:-1] = raw_stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
+        stress[1:-1, 0] = raw_stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
         # Insert the stress array.
-        labels[0, :stress.shape[0], :stress.shape[1], :, i] = np.expand_dims(stress, stress.ndim)
+        labels[0, :stress.shape[0], :stress.shape[1], i] = stress
     
     # Normalize values (<= 1) by dividing by the maximum value found among all samples.
     maximum_stress = np.max(labels[0, ...])
