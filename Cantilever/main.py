@@ -58,7 +58,8 @@ class CantileverDataset(Dataset):
         self.labels, maximum_stress = generate_label_images(
             samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
-            CantileverDataset.maximum_stress,
+            normalization_stress=CantileverDataset.maximum_stress,
+            clip_high_stresses=is_train,
             )
         # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
         if is_train:

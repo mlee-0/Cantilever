@@ -215,8 +215,8 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-# Return a list of images for each of the FEA text files. Divide all stress values by the specified value, if provided.
-def generate_label_images(samples, folder, normalization_stress=None) -> Tuple[np.ndarray, float]:
+# Return a list of images for each of the FEA text files. Divide all stresses by the specified value, if provided. Reduce stresses above a threshold, if True specified.
+def generate_label_images(samples, folder, normalization_stress=None, clip_high_stresses=False) -> Tuple[np.ndarray, float]:
     number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
@@ -255,12 +255,18 @@ def generate_label_images(samples, folder, normalization_stress=None) -> Tuple[n
         # Insert the stress array.
         labels[0, :stress.shape[0], :stress.shape[1], i] = stress
     
+    # Reduce stresses above a threshold to the threshold value to prevent a large portion of the dataset having values near zero.
+    if clip_high_stresses:
+        stresses = labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL]
+        threshold_stress = np.mean(stresses) + 3 * np.std(stresses)
+        labels[0, ...] = np.clip(labels[0, ...], None, threshold_stress)
+
     # Normalize values (<= 1) by dividing by the maximum value found among all samples.
     maximum_stress = np.max(labels[0, ...])
     if normalization_stress is None:
         normalization_stress = maximum_stress
     else:
-        assert normalization_stress >= maximum_stress, f'The value by which stresses are divided {normalization_stress} is less than the maximum stress value found {maximum_stress}, which will cause normalized values to be > 1. Generating a new test dataset may fix this.'
+        assert normalization_stress >= maximum_stress, f'The value by which stresses are divided {normalization_stress} is less than the maximum stress value found {maximum_stress}, which will cause normalized values to be > 1.'
     labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_stress
     labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
 
