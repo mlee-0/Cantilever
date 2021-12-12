@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import glob
 import os
 import random
-from typing import List
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -216,7 +216,7 @@ def write_ansys_script(samples, filename) -> None:
         print(f'Wrote {filename}.')
 
 # Return a list of images for each of the FEA text files. Divide all stress values by the specified value, if provided.
-def generate_label_images(samples, folder, normalization_stress=None) -> List[np.ndarray]:
+def generate_label_images(samples, folder, normalization_stress=None) -> Tuple[np.ndarray, float]:
     number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
@@ -251,7 +251,7 @@ def generate_label_images(samples, folder, normalization_stress=None) -> List[np
         stress[-1, 1:-1] = raw_stress[2:2+mesh_divisions[0]-1]
         stress[1:-1, -1] = raw_stress[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
         stress[0, 1:-1] = raw_stress[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-        stress[1:-1, 0] = raw_stress[2+2*mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+2*mesh_divisions[1]-1]
+        stress[1:-1, 0] = raw_stress[2+2*mesh_divisions[0]+mesh_divisions[1]-1:2+2*mesh_divisions[0]+2*mesh_divisions[1]-2]
         # Insert the stress array.
         labels[0, :stress.shape[0], :stress.shape[1], i] = stress
     
@@ -260,7 +260,7 @@ def generate_label_images(samples, folder, normalization_stress=None) -> List[np
     if normalization_stress is None:
         normalization_stress = maximum_stress
     else:
-        assert normalization_stress >= maximum_stress, 'The normalization stress {normalization_stress} < {maximum_stress} will cause some normalized values to be > 1. Generating a new test datset may fix this.'
+        assert normalization_stress >= maximum_stress, f'The value by which stresses are divided {normalization_stress} is less than the maximum stress value found {maximum_stress}, which will cause normalized values to be > 1. Generating a new test dataset may fix this.'
     labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_stress
     labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
 
