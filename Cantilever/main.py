@@ -76,27 +76,66 @@ class CantileverDataset(Dataset):
     def __getitem__(self, index):
         return self.inputs[index], self.labels[index]
 
-# A CNN that predicts the stress contour in a cantilever beam with a point load at the free end.
-class StressContourCnn(nn.Module):
+# Base class with common helper methods used by all CNN classes.
+class BaseCnn(nn.Module):
+    # Return a sequence of layers related to convolution.
+    @staticmethod
+    def convolution(in_channels, out_channels, **kwargs):
+        return nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, **kwargs, padding_mode='replicate'),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            )
+    
+    # Return a sequence of layers related to deconvolution.
+    @staticmethod
+    def deconvolution(in_channels, out_channels, **kwargs):
+        return nn.Sequential(
+            nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, **kwargs),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            )
+
+class UNetCnn(BaseCnn):
     def __init__(self):
         super().__init__()
-        # Return a sequence of layers related to convolution.
-        convolution = lambda in_channels, out_channels, kernel_size=3, stride=3: nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=1, padding_mode='replicate'),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            )
-        # Return a sequence of layers related to deconvolution.
-        deconvolution = lambda in_channels, out_channels, kernel_size=3, stride=3: nn.Sequential(
-            nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            )
+
+        pass
+    
+    def forward(self, x):
+        x = x.float()
+        # Convolution.
+        x = self.convolution_1(x)
+        x = self.pooling(x)
+        x = self.convolution_2(x)
+        x = self.pooling(x)
+        # Deconvolution.
+        x = self.deconvolution_1(x)
+        x = self.deconvolution_2(x)
+        x = self.deconvolution_3(x)
+        # Fully connected.
+        x = x.view(x.size(0), -1)
+        x = self.linear(x)
+        x = x.reshape((BATCH_SIZE, *OUTPUT_SIZE))
         
-        self.convolution_1 = convolution(in_channels=INPUT_CHANNELS, out_channels=8)
-        self.convolution_2 = convolution(in_channels=8, out_channels=16)
-        self.deconvolution_1 = deconvolution(in_channels=16, out_channels=8, kernel_size=4)
-        self.deconvolution_2 = deconvolution(in_channels=8, out_channels=OUTPUT_CHANNELS, kernel_size=4)
+        return x
+
+class AutoencoderCnn(BaseCnn):
+    def __init__(self):
+        super().__init__()
+        
+        self.convolution_1 = self.convolution(
+            in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=3, stride=3, padding=0
+            )
+        self.convolution_2 = self.convolution(
+            in_channels=8, out_channels=16, kernel_size=3, stride=3, padding=1
+            )
+        self.deconvolution_1 = self.deconvolution(
+            in_channels=16, out_channels=8, kernel_size=3, stride=3, padding=1, output_padding=(1,0)
+            )
+        self.deconvolution_2 = self.deconvolution(
+            in_channels=8, out_channels=OUTPUT_CHANNELS, kernel_size=3, stride=3, padding=0, output_padding=(0,1)
+            )
         self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
         self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
 
@@ -107,28 +146,9 @@ class StressContourCnn(nn.Module):
             nn.Linear(in_features=24, out_features=48),
             )
 
-        self.linear = nn.Sequential(
-            nn.Linear(in_features=5050, out_features=np.prod(OUTPUT_SIZE)),
-            )
-    
     def forward(self, x):
-        ### CONV-DECONV
-        # x = x.float()
-        # # Convolution.
-        # x = self.convolution_1(x)
-        # x = self.pooling(x)
-        # x = self.convolution_2(x)
-        # x = self.pooling(x)
-        # # Deconvolution.
-        # x = self.deconvolution_1(x)
-        # x = self.deconvolution_2(x)
-        # x = self.deconvolution_3(x)
-        # # Fully connected.
-        # x = x.view(x.size(0), -1)
-        # x = self.linear(x)
-        
-        ### AUTOENCODER
         x = x.float()
+        x = nn.functional.pad(x, (0, 1, 1, 1))  # Add one row to bottom, and one column on both left and right
         # Convolution.
         x = self.convolution_1(x)
         size_1 = x.size()
@@ -145,11 +165,9 @@ class StressContourCnn(nn.Module):
         x = self.deconvolution_1(x)
         x = self.unpooling(x, indices_1, output_size=size_1)
         x = self.deconvolution_2(x)
-        # Fully connected.
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
+        x = x[..., :-1, :]  # Remove last row added before first convolution
 
-        return x.reshape((BATCH_SIZE, *OUTPUT_SIZE))
+        return x
 
 # Train the model for one epoch only.
 def train(dataloader, model, loss_function, optimizer):
@@ -200,7 +218,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = StressContourCnn()
+    model = AutoencoderCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))

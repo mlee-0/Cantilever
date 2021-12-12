@@ -259,6 +259,7 @@ def generate_label_images(samples, folder, normalization_stress=None, clip_high_
     if clip_high_stresses:
         stresses = labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL]
         threshold_stress = np.mean(stresses) + 3 * np.std(stresses)
+        print(f'Clipping stresses to reduce maximum from {np.max(stresses)} to {threshold_stress}.')
         labels[0, ...] = np.clip(labels[0, ...], None, threshold_stress)
 
     # Normalize values (<= 1) by dividing by the maximum value found among all samples.
