@@ -14,9 +14,9 @@ import numpy as np
 from PIL import Image
 
 
-# A dataclass that stores settings for each parameter.
 @dataclass
 class Parameter:
+    """A dataclass that stores settings for a parameter."""
     # Name of the parameter.
     name: str
     # The minimum and maximum values between which samples are generated.
@@ -60,8 +60,9 @@ FILENAME_SAMPLES_TEST = 'samples_test.txt'
 NUMBER_DIGITS = 6
 
 
-# Generate sample values for each parameter and return them as a dictionary.
 def generate_samples(number_samples, show_histogram=False) -> dict:
+    """Generate sample values for each parameter and return them as a dictionary."""
+
     # Generate samples.
     samples = {}
     for parameter in [load, angle, length, height, elastic_modulus]:
@@ -105,8 +106,9 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
     
     return samples
 
-# Write the specified sample values to a text file.
 def write_samples(samples, filename) -> None:
+    """Write the specified sample values to a text file."""
+
     number_samples = get_sample_size(samples)
     text = [None] * number_samples
     for i in range(number_samples):
@@ -117,8 +119,9 @@ def write_samples(samples, filename) -> None:
         file.writelines(text)
     print(f'Wrote samples in {filename}.')
 
-# Return the sample values found in the text file previously generated.
 def read_samples(filename) -> dict:
+    """Return the sample values found in the text file previously generated."""
+
     samples = {}
     filename = os.path.join(FOLDER_ROOT, filename)
     try:
@@ -138,8 +141,9 @@ def read_samples(filename) -> dict:
         print(f'Found samples in {filename}.')
         return samples
 
-# Return a list of images for each of the specified sample values.
 def generate_input_images(samples) -> List[np.ndarray]:
+    """Return a list of images for each of the specified sample values."""
+
     number_samples = get_sample_size(samples)
     inputs = [None] * number_samples
     for i in range(number_samples):
@@ -164,15 +168,17 @@ def generate_input_images(samples) -> List[np.ndarray]:
         inputs[i] = image
     return inputs
 
-# Get the number of samples found in the specified sample values.
 def get_sample_size(samples) -> int:
+    """Get the number of samples found in the specified sample values."""
+
     sample_sizes = [len(_) for _ in samples.values()]
     low, high = min(sample_sizes), max(sample_sizes)
     assert low == high, 'Found different numbers of samples in the provided samples:  min. {low}, max. {high}.'
     return low
     
-# Write a text file containing ANSYS commands used to automate FEA and generate stress contour images.
 def write_ansys_script(samples, filename) -> None:
+    """Write a text file containing ANSYS commands used to automate FEA and generate stress contour images."""
+
     number_samples = get_sample_size(samples)
     # Read the template script.
     with open(os.path.join(FOLDER_ROOT, 'ansys_template.lgw'), 'r') as file:
@@ -215,8 +221,13 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-# Return a list of images for each of the FEA text files. Divide all stresses by the specified value, if provided. Reduce stresses above a threshold, if True specified.
-def generate_label_images(samples, folder, normalization_stress=None, clip_high_stresses=False) -> Tuple[np.ndarray, float]:
+def generate_label_images(samples, folder, normalization_stress=None, clip_high_stresses=False) -> Tuple[List[np.ndarray], float]:
+    """
+    Return a list of images for each of the FEA text files and the maximum stress found.
+
+    `normalization_stress`: Divide all stresses by this value. If not provided, use the maximum stress found.
+    `clip_high_stresses`: Reduce stresses above a threshold to the threshold.
+    """
     number_samples = get_sample_size(samples)
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
@@ -273,8 +284,9 @@ def generate_label_images(samples, folder, normalization_stress=None, clip_high_
 
     return [labels[..., i] for i in range(labels.shape[-1])], maximum_stress
 
-# Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1].
 def rgb_to_hue(array) -> np.ndarray:
+    """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
+
     array = array / 255
     hue_array = np.zeros((array.shape[0], array.shape[1]))
     for i in range(array.shape[0]):
@@ -283,8 +295,9 @@ def rgb_to_hue(array) -> np.ndarray:
             hue_array[i, j] = hsv[0]
     return hue_array
 
-# Convert a 3-channel HSV array into a 3-channel RGB array.
 def hsv_to_rgb(array) -> np.ndarray:
+    """Convert a 3-channel HSV array into a 3-channel RGB array."""
+
     for i in range(array.shape[0]):
         for j in range(array.shape[1]):
             rgb = colorsys.hsv_to_rgb(array[i, j, 0], array[i, j, 1], array[i, j, 2])
@@ -292,8 +305,9 @@ def hsv_to_rgb(array) -> np.ndarray:
                 array[i, j, k] = rgb[k] * 255
     return array
 
-# Convert the model's output array to a color image.
 def array_to_colormap(array) -> np.ndarray:
+    """Convert a 2D array of values in [0, 1] to a color image."""
+
     # Invert the values so that red represents high stresses.
     array = 1 - array
     # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.

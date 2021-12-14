@@ -8,8 +8,9 @@ from torch import nn
 from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE
 
 
-# Base class with common helper methods used by all CNN classes.
 class BaseCnn(nn.Module):
+    """Base class with common helper methods used by all CNN classes."""
+
     # Return a sequence of layers related to convolution.
     @staticmethod
     def convolution(in_channels, out_channels, **kwargs):

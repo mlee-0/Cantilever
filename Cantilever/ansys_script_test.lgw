@@ -14,16 +14,16 @@ WPSTYLE,,,,,,,,0
 *DO,i,1,10,1
 
 *DIM,samples,ARRAY,9,10
-samples(1,1) = 10000.0,-219.0,80.0,160.0,2.444,1.778,177888888889.0,61.0,44.0
-samples(1,2) = 60000.0,-1611.0,-586.0,200.0,3.556,1.444,89444444444.0,89.0,36.0
-samples(1,3) = 80000.0,1251.0,1049.0,40.0,3.111,2.0,23111111111.0,78.0,50.0
-samples(1,4) = 50000.0,1277.0,-1071.0,320.0,3.333,1.222,200000000000.0,83.0,31.0
-samples(1,5) = 20000.0,129.0,-729.0,280.0,2.222,1.111,67333333333.0,56.0,28.0
-samples(1,6) = 90000.0,2812.0,0.0,0.0,2.889,1.333,155777777778.0,72.0,33.0
-samples(1,7) = 40000.0,-526.0,-912.0,240.0,4.0,1.556,133666666667.0,100.0,39.0
-samples(1,8) = 100000.0,2174.0,-0.0,360.0,2.667,1.889,45222222222.0,67.0,47.0
-samples(1,9) = 30000.0,-366.0,634.0,120.0,2.0,1.667,111555555556.0,50.0,42.0
-samples(1,10) = 70000.0,506.0,2872.0,80.0,3.778,1.0,1000000000.0,94.0,25.0
+samples(1,1) = 79000.0,-2306.0,1801.0,142.0,3.4,1.1,179000000000.0,85.0,28.0
+samples(1,2) = 62000.0,830.0,-955.0,311.0,3.8,2.0,162000000000.0,95.0,50.0
+samples(1,3) = 98000.0,2642.0,185.0,4.0,3.9,1.5,172000000000.0,98.0,38.0
+samples(1,4) = 59000.0,-529.0,2120.0,104.0,3.1,1.1,173000000000.0,78.0,28.0
+samples(1,5) = 95000.0,2509.0,-2106.0,320.0,4.0,1.2,156000000000.0,100.0,30.0
+samples(1,6) = 99000.0,-56.0,3193.0,91.0,3.0,1.3,197000000000.0,75.0,32.0
+samples(1,7) = 58000.0,1326.0,-1074.0,321.0,2.1,1.4,167000000000.0,52.0,35.0
+samples(1,8) = 55000.0,319.0,2269.0,82.0,4.0,1.0,172000000000.0,100.0,25.0
+samples(1,9) = 83000.0,-1222.0,1881.0,123.0,2.2,1.5,173000000000.0,55.0,38.0
+samples(1,10) = 60000.0,526.0,1446.0,70.0,3.4,1.6,199000000000.0,85.0,40.0
 
 /NOPR   
 KEYW,PR_SET,1   
@@ -43,9 +43,10 @@ KEYW,PR_MULTI,0
 ! /COM,  Structural   
 !*  
 
-!* Disable popups.
+! Disable popups.
 /UIS,MSGPOP,4
 
+! Create keypoints at corners.
 /PREP7  
 FLST,3,1,8  
 FITEM,3,0,0,0   
@@ -59,6 +60,14 @@ K, ,P51X
 FLST,3,1,8  
 FITEM,3,0,samples(6,i,1),0   
 K, ,P51X
+
+! Create lines.
+!LSTR,       1,       2
+!LSTR,       2,       3
+!LSTR,       3,       4
+!LSTR,       4,       1
+
+! Create area.
 FLST,2,4,3  
 FITEM,2,1   
 FITEM,2,2   
@@ -66,21 +75,23 @@ FITEM,2,3
 FITEM,2,4   
 A,P51X  
 
-!*  Define element type.
+!  Define element type.
 ET,1,PLANE182   
-!*  
+ 
 KEYOPT,1,1,0
 KEYOPT,1,3,3
 KEYOPT,1,6,0
-!*  Define thickness.
+
+!  Define thickness.
 R,1,1,  
-!*  Define material properties.
+
+!  Define material properties.
 MPTEMP,,,,,,,,  
 MPTEMP,1,0  
 MPDATA,EX,1,,samples(7,i,1)
 MPDATA,PRXY,1,,0.3  
 
-!*  Create the mesh.
+!  Create the mesh.
 FLST,5,2,4,ORDE,2   
 FITEM,5,1   
 FITEM,5,3   
@@ -88,9 +99,9 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
+
 LESIZE,_Y1, , ,samples(8,i,1)-1, , , , ,1
-!*  
+
 FLST,5,2,4,ORDE,2   
 FITEM,5,2   
 FITEM,5,4   
@@ -98,20 +109,20 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
+
 LESIZE,_Y1, , ,samples(9,i,1)-1, , , , ,1
-!*  
+
 MSHAPE,0,2D 
 MSHKEY,0
-!*  
+
 CM,_Y,AREA  
 ASEL, , , ,       1 
 CM,_Y1,AREA 
 CHKMSH,'AREA'   
 CMSEL,S,_Y  
-!*  
+
 AMESH,_Y1   
-!*  
+
 CMDELE,_Y   
 CMDELE,_Y1  
 CMDELE,_Y2  
@@ -131,7 +142,7 @@ CMDELE,_Y2
 !*  
 ! /REPLOT,RESIZE  
 
-!*  Apply displacement boundary condition.
+!  Apply displacement boundary condition.
 FINISH  
 /SOL
 FLST,2,1,4,ORDE,1   
@@ -140,7 +151,7 @@ FITEM,2,4
 /GO 
 DL,P51X, ,ALL,0 
 
-!* Apply X and Y components of load on free end.
+! Apply X and Y components of load on free end.
 FLST,2,samples(9,i,1)-2,1,ORDE,2
 FITEM,2,samples(8,i,1)+2
 FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
@@ -221,7 +232,7 @@ number = CHRVAL(i)
 filename = 'fea_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
 *CFOPEN,filename,'txt'
 *VWRITE,stress(1)
-(F0.5)
+(F0.0)
 *CFCLOS
 
 /CLEAR

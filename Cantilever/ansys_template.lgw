@@ -33,9 +33,10 @@ KEYW,PR_MULTI,0
 ! /COM,  Structural   
 !*  
 
-!* Disable popups.
+! Disable popups.
 /UIS,MSGPOP,4
 
+! Create keypoints at corners.
 /PREP7  
 FLST,3,1,8  
 FITEM,3,0,0,0   
@@ -49,6 +50,14 @@ K, ,P51X
 FLST,3,1,8  
 FITEM,3,0,samples(6,i,1),0   
 K, ,P51X
+
+! Create lines.
+!LSTR,       1,       2
+!LSTR,       2,       3
+!LSTR,       3,       4
+!LSTR,       4,       1
+
+! Create area.
 FLST,2,4,3  
 FITEM,2,1   
 FITEM,2,2   
@@ -56,21 +65,23 @@ FITEM,2,3
 FITEM,2,4   
 A,P51X  
 
-!*  Define element type.
+!  Define element type.
 ET,1,PLANE182   
-!*  
+ 
 KEYOPT,1,1,0
 KEYOPT,1,3,3
 KEYOPT,1,6,0
-!*  Define thickness.
+
+!  Define thickness.
 R,1,1,  
-!*  Define material properties.
+
+!  Define material properties.
 MPTEMP,,,,,,,,  
 MPTEMP,1,0  
 MPDATA,EX,1,,samples(7,i,1)
 MPDATA,PRXY,1,,0.3  
 
-!*  Create the mesh.
+!  Create the mesh.
 FLST,5,2,4,ORDE,2   
 FITEM,5,1   
 FITEM,5,3   
@@ -78,9 +89,9 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
+
 LESIZE,_Y1, , ,samples(8,i,1)-1, , , , ,1
-!*  
+
 FLST,5,2,4,ORDE,2   
 FITEM,5,2   
 FITEM,5,4   
@@ -88,20 +99,20 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
+
 LESIZE,_Y1, , ,samples(9,i,1)-1, , , , ,1
-!*  
+
 MSHAPE,0,2D 
 MSHKEY,0
-!*  
+
 CM,_Y,AREA  
 ASEL, , , ,       1 
 CM,_Y1,AREA 
 CHKMSH,'AREA'   
 CMSEL,S,_Y  
-!*  
+
 AMESH,_Y1   
-!*  
+
 CMDELE,_Y   
 CMDELE,_Y1  
 CMDELE,_Y2  
@@ -121,7 +132,7 @@ CMDELE,_Y2
 !*  
 ! /REPLOT,RESIZE  
 
-!*  Apply displacement boundary condition.
+!  Apply displacement boundary condition.
 FINISH  
 /SOL
 FLST,2,1,4,ORDE,1   
@@ -130,7 +141,7 @@ FITEM,2,4
 /GO 
 DL,P51X, ,ALL,0 
 
-!* Apply X and Y components of load on free end.
+! Apply X and Y components of load on free end.
 FLST,2,samples(9,i,1)-2,1,ORDE,2
 FITEM,2,samples(8,i,1)+2
 FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)

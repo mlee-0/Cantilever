@@ -45,8 +45,9 @@ LEARNING_RATE = 0.1
 EPOCHS = 100
 
 
-# Dataset that retrieves input and output images for the CNN. Output images are not retrieved if the outputs folder is not specified.
 class CantileverDataset(Dataset):
+    """Dataset that gets input and label images during training."""
+
     maximum_stress = None
 
     def __init__(self, is_train=False):
@@ -77,8 +78,9 @@ class CantileverDataset(Dataset):
     def __getitem__(self, index):
         return self.inputs[index], self.labels[index]
 
-# Train the model for one epoch only.
 def train(dataloader, model, loss_function, optimizer):
+    """Train the model for one epoch only."""
+
     for batch, (data, label) in enumerate(dataloader):
         data = data.to(device)
         label = label.to(device)
@@ -97,8 +99,9 @@ def train(dataloader, model, loss_function, optimizer):
         #     loss, current = loss.item(), batch * len(data)
         #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
 
-# Test the model for one epoch only.
 def test(dataloader, model, loss_function):
+    """Test the model for one epoch only."""
+
     batch_count = len(dataloader)
     test_loss = 0
 
@@ -114,8 +117,8 @@ def test(dataloader, model, loss_function):
     print(f'Average loss: {test_loss:>8f}')
     return test_loss
 
-# Save model parameters to a file.
 def save(model):
+    """Save model parameters to a file."""
     torch.save(model.state_dict(), FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
@@ -126,7 +129,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = UNetCnn()
+    model = AutoencoderCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))

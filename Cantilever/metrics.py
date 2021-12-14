@@ -2,8 +2,9 @@ import numpy as np
 from scipy import stats
 
 
-# Return a dictionary containing the names (keys) and results (values) of multiple evaluation metrics.
 def evaluate(network, fea):
+    """Return a dictionary containing the names (keys) and results (values) of multiple evaluation metrics."""
+    
     results = {}
 
     # Area metric.
