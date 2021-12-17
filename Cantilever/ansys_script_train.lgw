@@ -717,12 +717,14 @@ SET,FIRST
 !*  
 
 *VGET,stress,NODE,,S,EQV
+*VGET,displacement_x,NODE,,U,X
+*VGET,displacement_y,NODE,,U,Y
 suffix = '000000'
 number = CHRVAL(i)
 filename = 'fea_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
 *CFOPEN,filename,'txt'
-*VWRITE,stress(1)
-(F0.0)
+*VWRITE,stress(1),',',displacement_x(1),',',displacement_y(1)
+(F0.0, A, E10.4, A, E10.4)
 *CFCLOS
 
 /CLEAR

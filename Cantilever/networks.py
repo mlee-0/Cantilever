@@ -39,18 +39,18 @@ class UNetCnn(BaseCnn):
             in_channels=8, out_channels=16, kernel_size=3, stride=3, padding=1,
             )
         self.deconvolution_1 = self.deconvolution(
-            in_channels=16, out_channels=8, kernel_size=3, stride=3, padding=1,
+            in_channels=16, out_channels=8, kernel_size=7, stride=3, padding=1,
             )
         self.deconvolution_2 = self.deconvolution(
-            in_channels=8, out_channels=4, kernel_size=3, stride=3, padding=1,
+            in_channels=8, out_channels=4, kernel_size=7, stride=3, padding=1,
             )
         self.deconvolution_3 = self.deconvolution(
-            in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=3, stride=3, padding=1,
+            in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=7, stride=3, padding=1,
             )
         self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
         self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
 
-        self.linear = nn.Linear(in_features=55, out_features=np.prod(OUTPUT_SIZE))
+        self.linear = nn.Linear(in_features=11342, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
         x = x.float()

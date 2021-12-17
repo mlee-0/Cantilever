@@ -24,6 +24,6 @@ def evaluate(network, fea):
 
     # Maximum stress value.
     network_max, fea_max = np.max(network.flatten()), np.max(fea.flatten())
-    results['Max. Stress'] = (network_max, fea_max)
+    results['Max. Value'] = (network_max, fea_max)
 
     return results

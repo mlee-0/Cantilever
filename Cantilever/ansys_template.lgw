@@ -217,12 +217,14 @@ SET,FIRST
 !*  
 
 *VGET,stress,NODE,,S,EQV
+*VGET,displacement_x,NODE,,U,X
+*VGET,displacement_y,NODE,,U,Y
 ! placeholder_define_suffix
 ! placeholder_define_number
 ! placeholder_define_filename
 *CFOPEN,filename,'txt'
-*VWRITE,stress(1)
-(F0.0)
+*VWRITE,stress(1),',',displacement_x(1),',',displacement_y(1)
+(F0.0, A, E10.4, A, E10.4)
 *CFCLOS
 
 /CLEAR

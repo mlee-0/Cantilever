@@ -41,14 +41,14 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 EPOCHS = 100
 
 
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
 
-    maximum_stress = None
+    maxima = (None, None)
 
     def __init__(self, is_train=False):
         # Create input images and store each in a list.
@@ -57,15 +57,15 @@ class CantileverDataset(Dataset):
         self.inputs = generate_input_images(samples)
         
         # Create label images from FEA stress data.
-        self.labels, maximum_stress = generate_label_images(
+        self.labels, maxima = generate_label_images(
             samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
-            normalization_stress=CantileverDataset.maximum_stress,
-            clip_high_stresses=True, #is_train,
+            normalization_values=CantileverDataset.maxima,  #(1100000, None),  # Manually selected value,
+            clip_high_stresses=False,
             )
-        # Store the maximum stress value found in the training dataset as a class variable to be referenced by the test datset.
+        # Store the maximum values found in the training dataset as a class variable to be referenced by the test datset.
         if is_train:
-            CantileverDataset.maximum_stress = maximum_stress
+            CantileverDataset.maxima = maxima
         # # Write FEA images.
         # for i, label in enumerate(self.labels):
         #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = AutoencoderCnn()
+    model = UNetCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
@@ -178,42 +178,45 @@ if __name__ == '__main__':
     print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
     
     # Test the model on the input images found in the folder.
-    evaluation_results = {}
+    evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
     for i, (test_input, label) in enumerate(test_dataloader):
-        test_output = model(test_input).detach().numpy()[0, 0, ...]
-        label_stress = label[0, 0, ...].numpy()
-        # Write FEA images.
-        with Image.fromarray((array_to_colormap(label_stress)).astype(np.uint8)) as image:
-            filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{i+1}.png')
-            image.save(filepath)
-        # Evaluate outputs with multiple evaluation metrics.
-        evaluation_result = metrics.evaluate(test_output, label_stress)
-        for name, result in evaluation_result.items():
-            try:
-                evaluation_results[name].append(result)
-            except KeyError:
-                evaluation_results[name] = [result]
-        # Save the output image.
-        test_output = array_to_colormap(test_output)
-        with Image.fromarray(test_output.astype(np.uint8)) as image:
-            image.save(os.path.join(
-                FOLDER_TEST_OUTPUTS,
-                f'test_{str(i+1).zfill(NUMBER_DIGITS)}.png',
-                ))
+        test_output = model(test_input).detach().numpy()[0, :, ...]
+        label = label[0, :, ...].numpy()
+        
+        for channel in range(OUTPUT_CHANNELS):
+            channel_name = ('stress', 'displacement')[channel]
+            # Write FEA images.
+            with Image.fromarray((array_to_colormap(label[channel, ...])).astype(np.uint8)) as image:
+                filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{channel_name}_{i+1}.png')
+                image.save(filepath)
+            # Evaluate outputs with multiple evaluation metrics.
+            evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
+            for name, result in evaluation_result.items():
+                try:
+                    evaluation_results[channel][name].append(result)
+                except KeyError:
+                    evaluation_results[channel][name] = [result]
+            # Save the output image.
+            with Image.fromarray(array_to_colormap(test_output[channel, ...]).astype(np.uint8)) as image:
+                image.save(os.path.join(
+                    FOLDER_TEST_OUTPUTS,
+                    f'test_{channel_name}_{str(i+1).zfill(NUMBER_DIGITS)}.png',
+                    ))
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
 
     # Plot evaluation metrics.
-    plt.rc('axes', prop_cycle=cycler(color=['#0095ff', '#ff4040']))
-    plt.rc('font', family='Source Code Pro', size=12.0, weight='semibold')
-    figure = plt.figure()
-    for i, (name, result) in enumerate(evaluation_results.items()):
-        plt.subplot(1, len(evaluation_results), i+1)
-        plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
-        if isinstance(result[0], tuple):
-            plt.legend()
-        plt.grid(visible=True, axis='y')
-        plt.xlabel('Sample')
-        plt.xticks(range(len(test_dataset)))
-        plt.ylim((0, 1))
-        plt.title(name, fontweight='bold')
-    plt.show()
+    for channel in range(OUTPUT_CHANNELS):
+        plt.rc('axes', prop_cycle=cycler(color=['#0095ff', '#ff4040']))
+        plt.rc('font', family='Source Code Pro', size=12.0, weight='semibold')
+        figure = plt.figure()
+        for i, (name, result) in enumerate(evaluation_results[channel].items()):
+            plt.subplot(1, len(evaluation_results[channel]), i+1)
+            plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
+            if isinstance(result[0], tuple):
+                plt.legend()
+            plt.grid(visible=True, axis='y')
+            plt.xlabel('Sample')
+            plt.xticks(range(len(test_dataset)))
+            plt.ylim((0, 1))
+            plt.title(name, fontweight='bold')
+        plt.show()
