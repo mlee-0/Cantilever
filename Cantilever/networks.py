@@ -228,33 +228,41 @@ class AutoencoderCnn(BaseCnn):
             )
         self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
         self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
-
+        self.dropout = nn.Dropout(0.8)
+        
+        self.flatten = nn.Flatten()
         self.autoencoder = nn.Sequential(
             nn.Linear(in_features=48, out_features=24),
             nn.Linear(in_features=24, out_features=12),
             nn.Linear(in_features=12, out_features=24),
             nn.Linear(in_features=24, out_features=48),
             )
+        self.unflatten = nn.Unflatten(1, (16, 1, 3))
 
     def forward(self, x):
         x = x.float()
         x = nn.functional.pad(x, (0, 1, 1, 1))  # Add one row to bottom, and one column on both left and right
         # Convolution.
         x = self.convolution_1(x)
+        x = self.dropout(x)
         size_1 = x.size()
         x, indices_1 = self.pooling(x)
         x = self.convolution_2(x)
+        x = self.dropout(x)
         size_2 = x.size()
         x, indices_2 = self.pooling(x)
         # Autoencoding.
         size_encoding = x.size()
-        x = self.autoencoder(x.flatten())
-        x = x.reshape(size_encoding)
+        x = self.flatten(x)
+        x = self.autoencoder(x)
+        x = self.unflatten(x)  #x = x.reshape(size_encoding)
         # Deconvolution.
         x = self.unpooling(x, indices_2, output_size=size_2)
         x = self.deconvolution_1(x)
+        x = self.dropout(x)
         x = self.unpooling(x, indices_1, output_size=size_1)
         x = self.deconvolution_2(x)
+        x = self.dropout(x)
         x = x[..., :-1, :]  # Remove last row added before first convolution
 
         return x

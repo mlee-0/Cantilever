@@ -40,8 +40,8 @@ from setup import *
 # Model parameters file name and path.
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
-BATCH_SIZE = 5 #1
-LEARNING_RATE = 0.01  # 0.001
+BATCH_SIZE = 1
+LEARNING_RATE = 0.001
 EPOCHS = 10
 
 
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = FullyCnn()  #UNet(INPUT_CHANNELS, OUTPUT_CHANNELS)
+    model = AutoencoderCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
