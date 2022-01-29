@@ -5,7 +5,7 @@ Write files used for training.
 from setup import *
 
 
-NUMBER_SAMPLES = 500
+NUMBER_SAMPLES = 10_000
 
 if __name__ == '__main__':
     # Try to read sample values from the text file if it already exists. If not, generate the samples.

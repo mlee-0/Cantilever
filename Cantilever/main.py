@@ -33,16 +33,16 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 
 import metrics
-from networks import AutoencoderCnn, UNetCnn
+from networks import *
 from setup import *
 
 
 # Model parameters file name and path.
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
-BATCH_SIZE = 1
-LEARNING_RATE = 0.01
-EPOCHS = 100
+BATCH_SIZE = 5 #1
+LEARNING_RATE = 0.01  # 0.001
+EPOCHS = 10
 
 
 class CantileverDataset(Dataset):
@@ -55,6 +55,7 @@ class CantileverDataset(Dataset):
         samples = read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST)
         self.number_samples = get_sample_size(samples)
         self.inputs = generate_input_images(samples)
+        # self.inputs = [np.zeros(INPUT_SIZE)] * self.number_samples  # Blank arrays to reduce startup time for debugging
         
         # Create label images from FEA stress data.
         self.labels, maxima = generate_label_images(
@@ -63,6 +64,7 @@ class CantileverDataset(Dataset):
             normalization_values=CantileverDataset.maxima,  #(1100000, None),  # Manually selected value,
             clip_high_stresses=False,
             )
+        # self.labels, maxima = [np.zeros(OUTPUT_SIZE)] * self.number_samples, 0  # Blank arrays to reduce startup time for debugging
         # Store the maximum values found in the training dataset as a class variable to be referenced by the test datset.
         if is_train:
             CantileverDataset.maxima = maxima
@@ -86,6 +88,8 @@ def train(dataloader, model, loss_function, optimizer):
         label = label.to(device)
 
         output = model(data)
+        # # Resize the output to the correct size.
+        # output = nn.functional.interpolate(output, size=OUTPUT_SIZE[1:])
         loss = loss_function(output, label.float())
 
         # Reset gradients of model parameters.
@@ -98,6 +102,8 @@ def train(dataloader, model, loss_function, optimizer):
         # if batch % (BATCH_SIZE * 10) == 0:
         #     loss, current = loss.item(), batch * len(data)
         #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
+        print(f'Batch {batch}...', end='\r')
+    print()
 
 def test(dataloader, model, loss_function):
     """Test the model for one epoch only."""
@@ -111,6 +117,8 @@ def test(dataloader, model, loss_function):
             label = label.to(device)
 
             output = model(data)
+            # # Resize the output to the correct size.
+            # output = nn.functional.interpolate(output, size=OUTPUT_SIZE[1:])
             test_loss += loss_function(output, label.float())
 
     test_loss /= batch_count
@@ -129,7 +137,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = UNetCnn()
+    model = FullyCnn()  #UNet(INPUT_CHANNELS, OUTPUT_CHANNELS)
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
@@ -153,7 +161,7 @@ if __name__ == '__main__':
             test_loss = test(train_dataloader, model, loss_function)
             test_loss_values.append(test_loss)
             # Save the model parameters periodically.
-            if t % 10 == 0 and t > 0:
+            if (t+1) % 1 == 0:
                 save(model)
         
         # Save the model parameters.
@@ -180,7 +188,10 @@ if __name__ == '__main__':
     # Test the model on the input images found in the folder.
     evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
     for i, (test_input, label) in enumerate(test_dataloader):
-        test_output = model(test_input).detach().numpy()[0, :, ...]
+        test_output = model(test_input)
+        # # Resize the output to the correct size.
+        # test_output = nn.functional.interpolate(test_output, size=OUTPUT_SIZE[1:])
+        test_output = test_output.detach().numpy()[0, :, ...]
         label = label[0, :, ...].numpy()
         
         for channel in range(OUTPUT_CHANNELS):
