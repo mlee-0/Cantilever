@@ -10,6 +10,21 @@
 WPSTYLE,,,,,,,,0
 ! /REPLOT,RESIZE  
 !*  
+
+*DO,i,1,10,1
+
+*DIM,samples,ARRAY,9,10
+samples(1,1) = 90000.0,-1365.0,1229.0,138.0,3.2,2.0,174000000000.0,80.0,50.0
+samples(1,2) = 62000.0,842.0,-1348.0,302.0,3.4,1.6,190000000000.0,85.0,40.0
+samples(1,3) = 52000.0,1182.0,21.0,1.0,3.6,1.8,182000000000.0,90.0,45.0
+samples(1,4) = 86000.0,-286.0,1807.0,99.0,2.7,1.9,164000000000.0,68.0,48.0
+samples(1,5) = 100000.0,-2622.0,-654.0,194.0,2.6,1.5,190000000000.0,65.0,38.0
+samples(1,6) = 82000.0,-1665.0,2056.0,129.0,2.6,1.3,197000000000.0,65.0,32.0
+samples(1,7) = 71000.0,-390.0,-1566.0,256.0,3.0,1.8,170000000000.0,75.0,45.0
+samples(1,8) = 100000.0,-3423.0,420.0,173.0,2.4,1.2,158000000000.0,60.0,30.0
+samples(1,9) = 89000.0,1892.0,66.0,2.0,3.7,1.9,198000000000.0,92.0,48.0
+samples(1,10) = 83000.0,1858.0,328.0,10.0,3.4,1.8,176000000000.0,85.0,45.0
+
 /NOPR   
 KEYW,PR_SET,1   
 KEYW,PR_STRUC,1 
@@ -28,20 +43,10 @@ KEYW,PR_MULTI,0
 ! /COM,  Structural   
 !*  
 
-!* Disable popups.
+! Disable popups.
 /UIS,MSGPOP,4
 
-*DIM,samples,ARRAY,6,8
-samples(1,1) = 100000.0,1272.388384,-1595.606179,308.57,3.429,1.143
-samples(1,2) = 85714.0,-1576.09035,758.859883,154.29,4.0,1.286
-samples(1,3) = 71429.0,-1313.420883,-632.389138,205.71,3.714,2.0
-samples(1,4) = 57143.0,1166.183673,0.0,0.0,2.571,1.714
-samples(1,5) = 92857.0,1895.040816,-0.0,360.0,2.0,1.0
-samples(1,6) = 78571.0,999.728277,1253.683731,51.43,2.286,1.429
-samples(1,7) = 64286.0,-292.002165,1279.051068,102.86,2.857,1.571
-samples(1,8) = 50000.0,-227.111786,-994.813076,257.14,3.143,1.857
-
-*DO,i,1,8,1
+! Create keypoints at corners.
 /PREP7  
 FLST,3,1,8  
 FITEM,3,0,0,0   
@@ -55,6 +60,14 @@ K, ,P51X
 FLST,3,1,8  
 FITEM,3,0,samples(6,i,1),0   
 K, ,P51X
+
+! Create lines.
+!LSTR,       1,       2
+!LSTR,       2,       3
+!LSTR,       3,       4
+!LSTR,       4,       1
+
+! Create area.
 FLST,2,4,3  
 FITEM,2,1   
 FITEM,2,2   
@@ -62,21 +75,23 @@ FITEM,2,3
 FITEM,2,4   
 A,P51X  
 
-!*  Define element type.
+!  Define element type.
 ET,1,PLANE182   
-!*  
+ 
 KEYOPT,1,1,0
 KEYOPT,1,3,3
 KEYOPT,1,6,0
-!*  Define thickness.
+
+!  Define thickness.
 R,1,1,  
-!*  Define material properties.
+
+!  Define material properties.
 MPTEMP,,,,,,,,  
 MPTEMP,1,0  
-MPDATA,EX,1,,200e9  
+MPDATA,EX,1,,samples(7,i,1)
 MPDATA,PRXY,1,,0.3  
 
-!*  Create the mesh.
+!  Create the mesh.
 FLST,5,2,4,ORDE,2   
 FITEM,5,1   
 FITEM,5,3   
@@ -84,9 +99,9 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
-LESIZE,_Y1, , ,99, , , , ,1
-!*  
+
+LESIZE,_Y1, , ,samples(8,i,1)-1, , , , ,1
+
 FLST,5,2,4,ORDE,2   
 FITEM,5,2   
 FITEM,5,4   
@@ -94,20 +109,20 @@ CM,_Y,LINE
 LSEL, , , ,P51X 
 CM,_Y1,LINE 
 CMSEL,,_Y   
-!*  
-LESIZE,_Y1, , ,49, , , , ,1
-!*  
+
+LESIZE,_Y1, , ,samples(9,i,1)-1, , , , ,1
+
 MSHAPE,0,2D 
 MSHKEY,0
-!*  
+
 CM,_Y,AREA  
 ASEL, , , ,       1 
 CM,_Y1,AREA 
 CHKMSH,'AREA'   
 CMSEL,S,_Y  
-!*  
+
 AMESH,_Y1   
-!*  
+
 CMDELE,_Y   
 CMDELE,_Y1  
 CMDELE,_Y2  
@@ -127,7 +142,7 @@ CMDELE,_Y2
 !*  
 ! /REPLOT,RESIZE  
 
-!*  Apply displacement boundary condition.
+!  Apply displacement boundary condition.
 FINISH  
 /SOL
 FLST,2,1,4,ORDE,1   
@@ -136,33 +151,29 @@ FITEM,2,4
 /GO 
 DL,P51X, ,ALL,0 
 
-!* Apply X and Y components of load on free end.
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FX,samples(2,i,1)  
+! Apply X and Y components of load on free end.
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FX,samples(2,i,1)
 
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,samples(9,i,1)-2,1,ORDE,2
+FITEM,2,samples(8,i,1)+2
+FITEM,2,-(samples(8,i,1)+samples(9,i,1)-1)
+/GO
+F,P51X,FY,samples(3,i,1)
+
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FX,samples(2,i,1)/2
 
-FLST,2,48,1,ORDE,2  
-FITEM,2,102 
-FITEM,2,-149
-!*  
-/GO 
-F,P51X,FY,samples(3,i,1) 
-
-FLST,2,2,1,ORDE,2   
-FITEM,2,2   
-FITEM,2,101 
-!*  
-/GO 
+FLST,2,2,1,ORDE,2
+FITEM,2,2
+FITEM,2,samples(8,i,1)+1
+/GO
 F,P51X,FY,samples(3,i,1)/2
 
 
@@ -216,12 +227,16 @@ SET,FIRST
 !*  
 
 *VGET,stress,NODE,,S,EQV
+*VGET,displacement_x,NODE,,U,X
+*VGET,displacement_y,NODE,,U,Y
 suffix = '000000'
 number = CHRVAL(i)
 filename = 'fea_%STRFILL(suffix,number,6-STRLENG(number)+1)%'
 *CFOPEN,filename,'txt'
-*VWRITE,stress(1)
-(F20.5)
+*VWRITE,stress(1),',',displacement_x(1),',',displacement_y(1)
+(F0.0, A, E10.4, A, E10.4)
 *CFCLOS
+
+/CLEAR
 
 *ENDDO
