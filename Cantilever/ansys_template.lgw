@@ -224,7 +224,7 @@ SET,FIRST
 ! placeholder_define_filename
 *CFOPEN,filename,'txt'
 *VWRITE,stress(1),displacement_x(1),displacement_y(1)
-(F0.0, ',', E10.4, ',', E10.4)
+(E10.4, ',', E10.4, ',', E10.4)
 *CFCLOS
 
 /CLEAR

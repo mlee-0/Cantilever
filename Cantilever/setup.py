@@ -32,9 +32,9 @@ class Parameter:
 # Settings for each parameter.
 length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m')
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
-elastic_modulus = Parameter(low=150e9, high=200e9, step=1e9, precision=0, name='Elastic Modulus', units='Pa')
-load = Parameter(low=50000, high=100000, step=1000, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=359, step=1, precision=2, name='Angle', units='Degrees')
+elastic_modulus = Parameter(low=190e9, high=210e9, step=1e9, precision=0, name='Elastic Modulus', units='Pa')
+load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
+angle = Parameter(low=0, high=355, step=5, precision=2, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
 key_x_load = 'Load X'
 key_y_load = 'Load Y'
@@ -46,7 +46,7 @@ INPUT_CHANNELS = 4
 INPUT_SIZE = (INPUT_CHANNELS, 50, 100)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
-OUTPUT_CHANNELS = 2
+OUTPUT_CHANNELS = 1
 OUTPUT_SIZE = (OUTPUT_CHANNELS, *INPUT_SIZE[1:3])
 
 # Folders and files.
@@ -250,7 +250,7 @@ def generate_label_images(samples, folder, normalization_values:tuple=(None,None
             displacement = np.sqrt(
                 np.power(np.array(displacement_x), 2) + np.power(np.array(displacement_y), 2)
                 )
-        for channel, values in enumerate([raw_stress, displacement]):
+        for channel, values in enumerate([raw_stress]): #enumerate([raw_stress, displacement]):
             # Initialize a 2D array.
             array = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
             # Determine the number of mesh divisions used in this sample.
