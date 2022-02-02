@@ -78,7 +78,7 @@ R,1,1,
 !  Define material properties.
 MPTEMP,,,,,,,,  
 MPTEMP,1,0  
-MPDATA,EX,1,,samples(7,i,1)
+MPDATA,EX,1,,samples(7,i,1)*1e9
 MPDATA,PRXY,1,,0.3  
 
 !  Create the mesh.

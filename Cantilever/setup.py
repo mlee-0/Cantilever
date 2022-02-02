@@ -32,7 +32,7 @@ class Parameter:
 # Settings for each parameter.
 length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m')
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
-elastic_modulus = Parameter(low=190e9, high=210e9, step=1e9, precision=0, name='Elastic Modulus', units='Pa')
+elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=355, step=5, precision=2, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
