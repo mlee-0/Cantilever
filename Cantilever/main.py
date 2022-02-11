@@ -102,7 +102,8 @@ def train(dataloader, model, loss_function, optimizer):
         # if batch % (BATCH_SIZE * 10) == 0:
         #     loss, current = loss.item(), batch * len(data)
         #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
-        print(f'Batch {batch}...', end='\r')
+        if batch % 10 == 0:
+            print(f'Batch {batch}...', end='\r')
     print()
 
 def test(dataloader, model, loss_function):
@@ -137,7 +138,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = AutoencoderCnn()
+    model = FullyCnn() #AutoencoderCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
@@ -161,7 +162,7 @@ if __name__ == '__main__':
             test_loss = test(train_dataloader, model, loss_function)
             test_loss_values.append(test_loss)
             # Save the model parameters periodically.
-            if (t+1) % 1 == 0:
+            if (t+1) % 5 == 0:
                 save(model)
         
         # Save the model parameters.

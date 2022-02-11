@@ -34,7 +34,7 @@ length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=355, step=5, precision=2, name='Angle', units='Degrees')
+angle = Parameter(low=90, high=90, step=1, precision=0, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
 key_x_load = 'Load X'
 key_y_load = 'Load Y'
@@ -42,7 +42,7 @@ key_image_length = 'Image Length'
 key_image_height = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 4
+INPUT_CHANNELS = 3
 INPUT_SIZE = (INPUT_CHANNELS, 50, 100)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
@@ -162,8 +162,8 @@ def generate_input_images(samples) -> List[np.ndarray]:
         image[1, :pixel_height, :pixel_length] = 255
         # Create a channel with the elastic modulus distribution.
         image[2, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
-        # Create a channel with the fixed boundary conditions.
-        image[3, :pixel_height, 0] = 255
+        # # Create a channel with the fixed boundary conditions.
+        # image[3, :pixel_height, 0] = 255
         # Append the image to the list.
         inputs[i] = image
     return inputs
