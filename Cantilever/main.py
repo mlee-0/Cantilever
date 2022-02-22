@@ -41,8 +41,8 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.001
-EPOCHS = 10
+LEARNING_RATE = 0.01
+EPOCHS = 20
 
 
 class CantileverDataset(Dataset):
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = FullyCnn() #AutoencoderCnn()
+    model = FullyCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
