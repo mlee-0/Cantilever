@@ -149,19 +149,26 @@ def generate_input_images(samples) -> List[np.ndarray]:
     for i in range(number_samples):
         pixel_length, pixel_height = int(samples[key_image_length][i]), int(samples[key_image_height][i])
         image = np.zeros(INPUT_SIZE)
-        # Create a channel with a gray line of pixels representing the load magnitude and direction.
-        r = np.arange(max(image.shape[1:]))
-        x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[2]/2
-        y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
-        x = x.astype(int)
-        y = y.astype(int)
-        inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
-        image[0, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        image[0, :, :] = np.flipud(image[0, :, :])
+
+        # # Create a channel with a gray line of pixels representing the load magnitude and direction.
+        # r = np.arange(max(image.shape[1:]))
+        # x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[2]/2
+        # y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
+        # x = x.astype(int)
+        # y = y.astype(int)
+        # inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
+        # image[0, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
+        # image[0, :, :] = np.flipud(image[0, :, :])
+
+        # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
+        image[:, round((image.shape[1] - 1) * samples[load.name][i] / load.high)] = 255
+        
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
         image[1, :pixel_height, :pixel_length] = 255
+        
         # Create a channel with the elastic modulus distribution.
         image[2, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        
         # # Create a channel with the fixed boundary conditions.
         # image[3, :pixel_height, 0] = 255
         # Append the image to the list.

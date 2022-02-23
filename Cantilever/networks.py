@@ -32,26 +32,31 @@ class FullyCnn(nn.Module):
     def __init__(self):
         super().__init__()
         self.convolution_1 = convolution(
-            in_channels=INPUT_CHANNELS, out_channels=32, kernel_size=3, stride=2, padding=1,
+            in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=3, stride=2, padding=1,
             )
         self.convolution_2 = convolution(
-            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
+            in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1,
             )
         self.convolution_3 = convolution(
+            in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_4 = convolution(
+            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_5 = convolution(
             in_channels=64, out_channels=128, kernel_size=3, stride=2, padding=1,
             )
-        self.linear = nn.Linear(in_features=11648, out_features=np.prod(OUTPUT_SIZE))
+        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
+        self.linear = nn.Linear(in_features=1024, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
         x = x.float()
         # Convolution.
         x = self.convolution_1(x)
-        x = self.dropout(x)
         x = self.convolution_2(x)
-        x = self.dropout(x)
         x = self.convolution_3(x)
-        x = self.dropout(x)
-        # x = self.convolution_4(x)
+        x = self.convolution_4(x)
+        x = self.convolution_5(x)
         # Fully connected.
         x = x.view(x.size(0), -1)
         x = self.linear(x)
