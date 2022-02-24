@@ -42,7 +42,7 @@ key_image_length = 'Image Length'
 key_image_height = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 1
+INPUT_CHANNELS = 2
 INPUT_SIZE = (INPUT_CHANNELS, 50, 100)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
@@ -174,8 +174,8 @@ def generate_input_images(samples) -> List[np.ndarray]:
         # # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
         # image[0, 0, :round(image.shape[2] * samples[load.name][i] / load.high)] = 255
         
-        # # Create a channel with a white rectangle representing the dimensions of the cantilever.
-        # image[1, :pixel_height, :pixel_length] = 255
+        # Create a channel with a white rectangle representing the dimensions of the cantilever.
+        image[1, :pixel_height, :pixel_length] = 255
         
         # # Create a channel with the elastic modulus distribution.
         # image[2, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
