@@ -41,8 +41,8 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.01
-EPOCHS = 20
+LEARNING_RATE = 0.1
+EPOCHS = 10
 
 
 class CantileverDataset(Dataset):

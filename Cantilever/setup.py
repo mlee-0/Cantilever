@@ -47,7 +47,7 @@ INPUT_SIZE = (INPUT_CHANNELS, 250, 500)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNELS = 1
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 50, 100)
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 20, 40)
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever'
@@ -74,8 +74,8 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
             )
     
     # Calculate the image size corresponding to the geometry.
-    image_lengths = np.round(INPUT_SIZE[2] * (samples[length.name] / length.high))
-    image_heights = np.round(INPUT_SIZE[1] * (samples[height.name] / height.high))
+    image_lengths = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
+    image_heights = np.round(OUTPUT_SIZE[1] * (samples[height.name] / height.high))
     samples[key_image_length] = image_lengths
     samples[key_image_height] = image_heights
     
@@ -161,8 +161,8 @@ def generate_input_images(samples) -> List[np.ndarray]:
         # image[0, :, :] = np.flipud(image[0, :, :])
 
         # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
-        image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
-        # image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
+        # image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
+        image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
 
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
         image[1, :pixel_height, :pixel_length] = 255

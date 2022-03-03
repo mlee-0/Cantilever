@@ -46,7 +46,7 @@ class FullyCnn(nn.Module):
         self.convolution_5 = convolution(
             in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
             )
-        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
+        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
         self.linear = nn.Linear(in_features=8192, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
