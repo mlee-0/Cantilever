@@ -47,7 +47,7 @@ class FullyCnn(nn.Module):
             in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
             )
         self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
-        self.linear = nn.Linear(in_features=8192, out_features=np.prod(OUTPUT_SIZE))
+        self.linear = nn.Linear(in_features=1456, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
         x = x.float()
@@ -55,13 +55,38 @@ class FullyCnn(nn.Module):
         x = self.convolution_1(x)
         x = self.convolution_2(x)
         x = self.convolution_3(x)
-        x = self.convolution_4(x)
-        x = self.convolution_5(x)
+        # x = self.convolution_4(x)
+        # x = self.convolution_5(x)
         # Fully connected.
         x = x.view(x.size(0), -1)
         x = self.linear(x)
         x = x.reshape(-1, *OUTPUT_SIZE)
         return x
+
+class Nie(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.convolution_1 = nn.Sequential(
+            nn.Conv2d(INPUT_CHANNELS, 32, kernel_size=9, stride=1, padding='same'),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+        )
+        self.convolution_2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding='same'),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+        )
+        self.convolution_3 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding='same'),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+        )
+    
+    def forward(self, x):
+        self.convolution_1(x)
+        self.convolution_2(x)
+        self.convolution_3(x)
 
 class UNetCnn(nn.Module):
     def __init__(self):
@@ -101,7 +126,6 @@ class UNetCnn(nn.Module):
         # x = self.unpooling(x, indices_1, output_size=size_1)
         x = self.deconvolution_2(x)
         x = self.deconvolution_3(x)
-        
 
         # Fully connected.
         x = x.view(x.size(0), -1)

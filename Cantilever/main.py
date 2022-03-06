@@ -41,8 +41,8 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.1
-EPOCHS = 10
+LEARNING_RATE = 0.00001
+EPOCHS = 100
 
 
 class CantileverDataset(Dataset):
@@ -61,6 +61,7 @@ class CantileverDataset(Dataset):
         self.labels, maxima = generate_label_images(
             samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
+            normalize=False,
             normalization_values=CantileverDataset.maxima,  #(1100000, None),  # Manually selected value,
             clip_high_stresses=False,
             )
@@ -195,12 +196,15 @@ if __name__ == '__main__':
         test_output = test_output.detach().numpy()[0, :, ...]
         label = label[0, :, ...].numpy()
         
+        # The maximum stress found in the dataset, a hardcoded value that changes if a new dataset is generated.
+        MAX_STRESS = 26060.0
         for channel in range(OUTPUT_CHANNELS):
             channel_name = ('stress', 'displacement')[channel]
             # Write FEA images.
-            with Image.fromarray((array_to_colormap(label[channel, ...])).astype(np.uint8)) as image:
-                filepath = os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{channel_name}_{i+1}.png')
-                image.save(filepath)
+            write_image(
+                array_to_colormap(label[channel, ...], MAX_STRESS),
+                os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{channel_name}_{i+1}.png'),
+                )
             # Evaluate outputs with multiple evaluation metrics.
             evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
             for name, result in evaluation_result.items():
@@ -209,11 +213,10 @@ if __name__ == '__main__':
                 except KeyError:
                     evaluation_results[channel][name] = [result]
             # Save the output image.
-            with Image.fromarray(array_to_colormap(test_output[channel, ...]).astype(np.uint8)) as image:
-                image.save(os.path.join(
-                    FOLDER_TEST_OUTPUTS,
-                    f'test_{channel_name}_{str(i+1).zfill(NUMBER_DIGITS)}.png',
-                    ))
+            write_image(
+                array_to_colormap(test_output[channel, ...], MAX_STRESS),
+                os.path.join(FOLDER_TEST_OUTPUTS, f'test_{channel_name}_{str(i+1).zfill(NUMBER_DIGITS)}.png'),
+                )
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
 
     # Plot evaluation metrics.

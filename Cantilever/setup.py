@@ -43,7 +43,7 @@ key_image_height = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 2
-INPUT_SIZE = (INPUT_CHANNELS, 250, 500)
+INPUT_SIZE = (INPUT_CHANNELS, 50, 100)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNELS = 1
@@ -229,7 +229,7 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def generate_label_images(samples, folder, normalization_values:tuple=(None,None), clip_high_stresses=False) -> Tuple[List[np.ndarray], List[float]]:
+def generate_label_images(samples, folder, normalize=False, normalization_values:tuple=(None,None), clip_high_stresses=False) -> Tuple[List[np.ndarray], List[float]]:
     """
     Return a list of images for each of the FEA text files and a list of maximum values found in each channel.
 
@@ -242,7 +242,7 @@ def generate_label_images(samples, folder, normalization_values:tuple=(None,None
     assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
 
     # Store all stress data in a single array, initialized with a specific background value.
-    BACKGROUND_VALUE_INITIAL = -1
+    BACKGROUND_VALUE_INITIAL = 0 #-1
     BACKGROUND_VALUE = 0
     labels = np.full(
         (*OUTPUT_SIZE, len(fea_filenames)),
@@ -292,10 +292,11 @@ def generate_label_images(samples, folder, normalization_values:tuple=(None,None
     for channel in range(OUTPUT_CHANNELS):
         maximum = np.max(labels[channel, ...])
         maxima.append(maximum)
-        normalization_value = maximum if normalization_values[channel] is None else normalization_values[channel]
-        assert normalization_value >= maximum, f'The value by which values in channel {channel} are divided {normalization_value} is less than the maximum value found {maximum}, which will cause normalized values to be > 1.'
-        labels[channel, ...][labels[channel, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_value
-        labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
+        if normalize:
+            normalization_value = maximum if normalization_values[channel] is None else normalization_values[channel]
+            assert normalization_value >= maximum, f'The value by which values in channel {channel} are divided {normalization_value} is less than the maximum value found {maximum}, which will cause normalized values to be > 1.'
+            labels[channel, ...][labels[channel, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_value
+            labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
 
     return [labels[..., i] for i in range(labels.shape[-1])], tuple(maxima)
 
@@ -320,9 +321,10 @@ def hsv_to_rgb(array) -> np.ndarray:
                 array[i, j, k] = rgb[k] * 255
     return array
 
-def array_to_colormap(array) -> np.ndarray:
-    """Convert a 2D array of values in [0, 1] to a color image."""
+def array_to_colormap(array, divide_by) -> np.ndarray:
+    """Scale a 2D array of values to be inside [0, 1] and convert to a 3D color image."""
 
+    array /= divide_by
     # Invert the values so that red represents high stresses.
     array = 1 - array
     # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.
@@ -331,4 +333,9 @@ def array_to_colormap(array) -> np.ndarray:
     SATURATION, VALUE = 1, 2/3
     array = np.dstack((array, SATURATION * np.ones(array.shape, float), VALUE * np.ones(array.shape, float)))
     array = hsv_to_rgb(array)
+    
     return array
+
+def write_image(array, filename) -> None:
+    with Image.fromarray(array.astype(np.uint8)) as image:
+        image.save(filename)
