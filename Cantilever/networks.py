@@ -46,8 +46,8 @@ class FullyCnn(nn.Module):
         self.convolution_5 = convolution(
             in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
             )
-        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
-        self.linear = nn.Linear(in_features=1456, out_features=np.prod(OUTPUT_SIZE))
+        # self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
+        self.linear = nn.Linear(in_features=512, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
         x = x.float()
@@ -55,8 +55,8 @@ class FullyCnn(nn.Module):
         x = self.convolution_1(x)
         x = self.convolution_2(x)
         x = self.convolution_3(x)
-        # x = self.convolution_4(x)
-        # x = self.convolution_5(x)
+        x = self.convolution_4(x)
+        x = self.convolution_5(x)
         # Fully connected.
         x = x.view(x.size(0), -1)
         x = self.linear(x)

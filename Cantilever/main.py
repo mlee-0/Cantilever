@@ -27,7 +27,6 @@ import os
 from cycler import cycler
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
@@ -203,7 +202,7 @@ if __name__ == '__main__':
             # Write FEA images.
             write_image(
                 array_to_colormap(label[channel, ...], MAX_STRESS),
-                os.path.join(FOLDER_TEST_OUTPUTS, f'fea_{channel_name}_{i+1}.png'),
+                os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_fea_{channel_name}.png'),
                 )
             # Evaluate outputs with multiple evaluation metrics.
             evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
@@ -215,7 +214,7 @@ if __name__ == '__main__':
             # Save the output image.
             write_image(
                 array_to_colormap(test_output[channel, ...], MAX_STRESS),
-                os.path.join(FOLDER_TEST_OUTPUTS, f'test_{channel_name}_{str(i+1).zfill(NUMBER_DIGITS)}.png'),
+                os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_test_{channel_name}.png'),
                 )
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
 
