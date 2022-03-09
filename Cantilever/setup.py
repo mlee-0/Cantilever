@@ -13,6 +13,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
+try:
+    from google.colab import drive
+except ModuleNotFoundError:
+    GOOGLE_COLAB = False
+else:
+    GOOGLE_COLAB = True
+    drive.mount("/content/drive")
 
 @dataclass
 class Parameter:
@@ -50,7 +57,7 @@ OUTPUT_CHANNELS = 1
 OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
 
 # Folders and files.
-FOLDER_ROOT = 'Cantilever'
+FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
 FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'

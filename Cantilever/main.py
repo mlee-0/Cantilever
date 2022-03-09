@@ -134,11 +134,12 @@ def save(model):
 
 # Train and test the model.
 if __name__ == '__main__':
-    device = 'cpu'  #'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = Nie() #FullyCnn()
+    model = Nie(device) #FullyCnn()
+    model.to(device)
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
