@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = FullyCnn()
+    model = Nie() #FullyCnn()
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
         model.load_state_dict(torch.load(FILEPATH_MODEL))
@@ -196,7 +196,7 @@ if __name__ == '__main__':
         label = label[0, :, ...].numpy()
         
         # The maximum stress found in the dataset, a hardcoded value that changes if a new dataset is generated.
-        MAX_STRESS = 26060.0
+        MAX_STRESS = 27400.0
         for channel in range(OUTPUT_CHANNELS):
             channel_name = ('stress', 'displacement')[channel]
             # Write FEA images.

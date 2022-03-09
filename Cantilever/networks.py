@@ -46,17 +46,22 @@ class FullyCnn(nn.Module):
         self.convolution_5 = convolution(
             in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
             )
-        # self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
+        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
         self.linear = nn.Linear(in_features=512, out_features=np.prod(OUTPUT_SIZE))
 
     def forward(self, x):
         x = x.float()
         # Convolution.
         x = self.convolution_1(x)
+        x = self.pooling(x)
         x = self.convolution_2(x)
+        x = self.pooling(x)
         x = self.convolution_3(x)
-        x = self.convolution_4(x)
-        x = self.convolution_5(x)
+        x = self.pooling(x)
+        # x = self.convolution_4(x)
+        # x = self.pooling(x)
+        # x = self.convolution_5(x)
+        # x = self.pooling(x)
         # Fully connected.
         x = x.view(x.size(0), -1)
         x = self.linear(x)
@@ -68,25 +73,70 @@ class Nie(nn.Module):
         super().__init__()
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(INPUT_CHANNELS, 32, kernel_size=9, stride=1, padding='same'),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(INPUT_CHANNELS, 16, kernel_size=9, stride=1, padding=0),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=not True),
         )
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding='same'),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 32, kernel_size=3, stride=(1,2), padding=1, padding_mode='replicate'),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=not True),
         )
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding='same'),
+            nn.Conv2d(32, 64, kernel_size=3, stride=(1,2), padding=1, padding_mode='replicate'),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=not True),
+        )
+        self.se = nn.Sequential(
+            nn.Conv2d(64, 64, kernel_size=3, padding='same'),
+            nn.ReLU(inplace=not True),
+            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 64, kernel_size=3, padding='same'),
+            nn.ReLU(inplace=not True),
+            nn.BatchNorm2d(64),
+            nn.AvgPool2d(kernel_size=(17,11)),
+            nn.Flatten(),
+            nn.Linear(64, 4),
+            nn.ReLU(inplace=not True),
+            nn.Linear(4, 11),
+            nn.Sigmoid(),
+        )
+        self.deconvolution_1 = nn.Sequential(
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(1,2), padding=1, output_padding=(0,0)),
             nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=not True),
+        )
+        self.deconvolution_2 = nn.Sequential(
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(1,2), padding=1, output_padding=(0,1)),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=not True),
+        )
+        self.deconvolution_3 = nn.Sequential(
+            nn.ConvTranspose2d(16, OUTPUT_CHANNELS, kernel_size=9, stride=1, padding=0, output_padding=(0,0)),
+            nn.BatchNorm2d(OUTPUT_CHANNELS),
+            nn.ReLU(inplace=not True),
         )
     
     def forward(self, x):
-        self.convolution_1(x)
-        self.convolution_2(x)
-        self.convolution_3(x)
+        x = x.float()
+        x = self.convolution_1(x)
+        x = self.convolution_2(x)
+        x = self.convolution_3(x)
+        size = x.size()
+        se = self.se(x)
+        x = x * se.reshape((1, 1, 1, se.numel()))
+        se = self.se(x)
+        x = x * se.reshape((1, 1, 1, se.numel()))
+        se = self.se(x)
+        x = x * se.reshape((1, 1, 1, se.numel()))
+        se = self.se(x)
+        x = x * se.reshape((1, 1, 1, se.numel()))
+        se = self.se(x)
+        x = x * se.reshape((1, 1, 1, se.numel()))
+        x = self.deconvolution_1(x)
+        x = self.deconvolution_2(x)
+        x = self.deconvolution_3(x)
+        return x
 
 class UNetCnn(nn.Module):
     def __init__(self):
@@ -142,19 +192,19 @@ class AutoencoderCnn(nn.Module):
         #     in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=1, stride=2, padding=0
         #     )
         self.convolution_2 = convolution(
-            in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=1, stride=2, padding=0
+            in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=3, stride=2, padding=1
             )
         self.convolution_3 = convolution(
-            in_channels=8, out_channels=16, kernel_size=1, stride=2, padding=0
+            in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1
             )
         self.convolution_4 = convolution(
-            in_channels=16, out_channels=32, kernel_size=1, stride=2, padding=0
+            in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1
             )
         self.convolution_5 = convolution(
-            in_channels=32, out_channels=64, kernel_size=1, stride=2, padding=0
+            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1
             )
         self.convolution_6 = convolution(
-            in_channels=64, out_channels=128, kernel_size=1, stride=2, padding=0
+            in_channels=64, out_channels=128, kernel_size=3, stride=2, padding=1
             )
         # self.deconvolution_2 = deconvolution(
         #     in_channels=128, out_channels=64, kernel_size=1, stride=2, padding=0, output_padding=(1,1)
@@ -169,28 +219,25 @@ class AutoencoderCnn(nn.Module):
             in_channels=32, out_channels=16, kernel_size=1, stride=2, padding=0, output_padding=(0,0)
             )
         self.deconvolution_6 = deconvolution(
-            in_channels=16, out_channels=8, kernel_size=1, stride=2, padding=0, output_padding=(0,1)
-            )
-        self.deconvolution_7 = deconvolution(
-            in_channels=8, out_channels=OUTPUT_CHANNELS, kernel_size=1, stride=2, padding=0, output_padding=(1,1)
+            in_channels=16, out_channels=OUTPUT_CHANNELS, kernel_size=1, stride=2, padding=0, output_padding=(0,1)
             )
         # self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
         # self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout(0)
-        self.linear = nn.Linear(in_features=5000, out_features=5000)
+        self.linear = nn.Linear(in_features=1250, out_features=1250)
         
         self.flatten = nn.Flatten()
         self.autoencoder = nn.Sequential(
             # nn.ReLU(),
             nn.Linear(in_features=1024, out_features=64),
-            # nn.Linear(in_features=24, out_features=12),
+            nn.Linear(in_features=64, out_features=3),
             # nn.Linear(in_features=32, out_features=16),
             # nn.Linear(in_features=12, out_features=6),
             # nn.Linear(in_features=6, out_features=3),
             # nn.Linear(in_features=3, out_features=6),
             # nn.Linear(in_features=6, out_features=12),
             # nn.Linear(in_features=16, out_features=32),
-            # nn.Linear(in_features=12, out_features=24),
+            nn.Linear(in_features=3, out_features=64),
             nn.Linear(in_features=64, out_features=1024),
             # nn.ReLU(),
             )
@@ -242,8 +289,6 @@ class AutoencoderCnn(nn.Module):
         x = self.deconvolution_5(x)
         # print(x.size())
         x = self.deconvolution_6(x)
-        # print(x.size())
-        x = self.deconvolution_7(x)
         # print(x.size())
         
         # x = x.view(x.size(0), -1)
