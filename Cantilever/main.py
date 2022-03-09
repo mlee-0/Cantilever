@@ -138,7 +138,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = Nie(device) #FullyCnn()
+    model = Nie() #FullyCnn()
     model.to(device)
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
