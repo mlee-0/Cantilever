@@ -40,8 +40,8 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.00001
-EPOCHS = 100
+LEARNING_RATE = 0.00001  # 0.000001 for Nie
+EPOCHS = 200
 
 
 class CantileverDataset(Dataset):
@@ -88,8 +88,6 @@ def train(dataloader, model, loss_function, optimizer):
         label = label.to(device)
 
         output = model(data)
-        # # Resize the output to the correct size.
-        # output = nn.functional.interpolate(output, size=OUTPUT_SIZE[1:])
         loss = loss_function(output, label.float())
 
         # Reset gradients of model parameters.
@@ -138,11 +136,11 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = Nie() #FullyCnn()
+    model = FullyCnn()
     model.to(device)
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
-        model.load_state_dict(torch.load(FILEPATH_MODEL))
+        model.load_state_dict(torch.load(FILEPATH_MODEL, map_location=torch.device(device)))
         model.eval()
         print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
         if not input('Continue training this model? (y/n) ').lower().startswith('y'):
@@ -190,11 +188,11 @@ if __name__ == '__main__':
     # Test the model on the input images found in the folder.
     evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
     for i, (test_input, label) in enumerate(test_dataloader):
+        test_input = test_input.to(device)
+        label = label.to(device)
         test_output = model(test_input)
-        # # Resize the output to the correct size.
-        # test_output = nn.functional.interpolate(test_output, size=OUTPUT_SIZE[1:])
-        test_output = test_output.detach().numpy()[0, :, ...]
-        label = label[0, :, ...].numpy()
+        test_output = test_output[0, :, ...].cpu().detach().numpy()
+        label = label[0, :, ...].cpu().numpy()
         
         # The maximum stress found in the dataset, a hardcoded value that changes if a new dataset is generated.
         MAX_STRESS = 27400.0
