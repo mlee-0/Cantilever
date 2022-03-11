@@ -50,7 +50,7 @@ key_image_height = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 3
-INPUT_SIZE = (INPUT_CHANNELS, 25, 50)
+INPUT_SIZE = (INPUT_CHANNELS, 500, 1000)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNELS = 1
