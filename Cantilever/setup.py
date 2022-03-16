@@ -53,7 +53,8 @@ INPUT_CHANNELS = 3
 INPUT_SIZE = (INPUT_CHANNELS, 250, 500)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
-OUTPUT_CHANNELS = 1
+OUTPUT_CHANNEL_NAMES = ('stress',)  #('stress', 'displacement')
+OUTPUT_CHANNELS = len(OUTPUT_CHANNEL_NAMES)
 OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
 
 # Folders and files.
@@ -181,11 +182,11 @@ def read_samples(filename) -> dict:
         print(f'Found samples in {filename}.')
         return samples
 
-def generate_input_images(samples) -> List[np.ndarray]:
-    """Return a list of images for each of the specified sample values."""
+def generate_input_images(samples) -> np.ndarray:
+    """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
 
     number_samples = get_sample_size(samples)
-    inputs = [None] * number_samples
+    inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=int)
     for i in range(number_samples):
         pixel_length, pixel_height = int(samples[key_image_length][i]), int(samples[key_image_height][i])
         image = np.zeros(INPUT_SIZE)
@@ -213,7 +214,7 @@ def generate_input_images(samples) -> List[np.ndarray]:
         # # Create a channel with the fixed boundary conditions.
         # image[3, :pixel_height, 0] = 255
         # Append the image to the list.
-        inputs[i] = image
+        inputs[i, ...] = image
     return inputs
 
 def get_sample_size(samples) -> int:
@@ -269,11 +270,10 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def generate_label_images(samples, folder, normalize=False, normalization_values:tuple=(None,None), clip_high_stresses=False) -> Tuple[List[np.ndarray], List[float]]:
+def generate_label_images(samples, folder, clip_high_stresses=False) -> np.ndarray:
     """
-    Return a list of images for each of the FEA text files and a list of maximum values found in each channel.
+    Return a 4D array of images for each of the FEA text files, with dimensions: [samples, channels, height, width].
 
-    `normalization_values`: Divide all quantities in each channel by these values. If not provided, use the maximum values found in the corresponding channels.
     `clip_high_stresses`: Reduce stresses above a threshold to the threshold.
     """
     number_samples = get_sample_size(samples)
@@ -282,13 +282,8 @@ def generate_label_images(samples, folder, normalize=False, normalization_values
     assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
 
     # Store all stress data in a single array, initialized with a specific background value.
-    BACKGROUND_VALUE_INITIAL = 0 #-1
     BACKGROUND_VALUE = 0
-    labels = np.full(
-        (*OUTPUT_SIZE, len(fea_filenames)),
-        BACKGROUND_VALUE_INITIAL,
-        dtype=float,
-        )
+    labels = np.full((number_samples, *OUTPUT_SIZE), BACKGROUND_VALUE, dtype=float)
     for i, fea_filename in enumerate(fea_filenames):
         raw_stress, displacement = parse_label_file(fea_filename)
         for channel, values in enumerate([raw_stress]): #enumerate([raw_stress, displacement]):
@@ -311,27 +306,16 @@ def generate_label_images(samples, folder, normalize=False, normalization_values
             array[0, 1:-1] = values[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
             array[1:-1, 0] = values[2+2*mesh_divisions[0]+mesh_divisions[1]-1:2+2*mesh_divisions[0]+2*mesh_divisions[1]-2]
             # Insert the array.
-            labels[channel, :array.shape[0], :array.shape[1], i] = array
+            labels[i, channel, :array.shape[0], :array.shape[1]] = array
     
     # Reduce stresses above a threshold to the threshold value to prevent a large portion of the dataset having values near zero.
     if clip_high_stresses:
-        stresses = labels[0, ...][labels[0, ...] != BACKGROUND_VALUE_INITIAL]
+        stresses = labels[0, ...][labels[0, ...] != BACKGROUND_VALUE]
         threshold_stress = np.mean(stresses) + 5 * np.std(stresses)
         print(f'Clipping stresses to reduce maximum from {np.max(stresses)} to {threshold_stress}.')
         labels[0, ...] = np.clip(labels[0, ...], None, threshold_stress)
-
-    # Normalize values (<= 1) by dividing by the maximum value found among all samples.
-    maxima = []
-    for channel in range(OUTPUT_CHANNELS):
-        maximum = np.max(labels[channel, ...])
-        maxima.append(maximum)
-        if normalize:
-            normalization_value = maximum if normalization_values[channel] is None else normalization_values[channel]
-            assert normalization_value >= maximum, f'The value by which values in channel {channel} are divided {normalization_value} is less than the maximum value found {maximum}, which will cause normalized values to be > 1.'
-            labels[channel, ...][labels[channel, ...] != BACKGROUND_VALUE_INITIAL] /= normalization_value
-            labels[labels == BACKGROUND_VALUE_INITIAL] = BACKGROUND_VALUE
-
-    return [labels[..., i] for i in range(labels.shape[-1])], tuple(maxima)
+    
+    return labels
 
 def parse_label_file(filename: str) -> Tuple[np.ndarray, np.ndarray]:
     """Return arrays of data stored in the specified label .txt file."""
@@ -366,10 +350,15 @@ def hsv_to_rgb(array) -> np.ndarray:
                 array[i, j, k] = rgb[k] * 255
     return array
 
-def array_to_colormap(array, divide_by) -> np.ndarray:
+def array_to_colormap(array, divide_by=None) -> np.ndarray:
     """Scale a 2D array of values to be inside [0, 1] and convert to a 3D color image."""
+    # Make copy of array so that original array is not modified.
+    array = np.copy(array)
 
-    array /= divide_by
+    if divide_by:
+        array /= divide_by
+    else:
+        array /= np.max(array)
     # Invert the values so that red represents high stresses.
     array = 1 - array
     # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.

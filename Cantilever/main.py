@@ -22,9 +22,9 @@ The output images used as labels during training are stress contours generated b
 
 
 import glob
+import math
 import os
 
-from cycler import cycler
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -47,28 +47,20 @@ Model = FullyCnn
 
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
-
-    maxima = (None, None)
-
     def __init__(self, is_train=False):
         # Create input images and store each in a list.
         samples = read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST)
         self.number_samples = get_sample_size(samples)
         self.inputs = generate_input_images(samples)
-        # self.inputs = [np.zeros(INPUT_SIZE)] * self.number_samples  # Blank arrays to reduce startup time for debugging
+        # self.inputs = np.zeros((self.number_samples, *INPUT_SIZE))  # Blank arrays to reduce startup time for debugging
         
         # Create label images from FEA stress data.
-        self.labels, maxima = generate_label_images(
+        self.labels = generate_label_images(
             samples,
             FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
-            normalize=False,
-            normalization_values=CantileverDataset.maxima,  #(1100000, None),  # Manually selected value,
             clip_high_stresses=False,
             )
-        # self.labels, maxima = [np.zeros(OUTPUT_SIZE)] * self.number_samples, 0  # Blank arrays to reduce startup time for debugging
-        # Store the maximum values found in the training dataset as a class variable to be referenced by the test datset.
-        if is_train:
-            CantileverDataset.maxima = maxima
+        # self.labels = np.zeros((self.number_samples, *OUTPUT_SIZE))  # Blank arrays to reduce startup time for debugging
         # # Write FEA images.
         # for i, label in enumerate(self.labels):
         #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
@@ -79,7 +71,8 @@ class CantileverDataset(Dataset):
         return self.number_samples
     
     def __getitem__(self, index):
-        return self.inputs[index], self.labels[index]
+        # Return copies of arrays so that arrays are not modified.
+        return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
 def train(dataloader, model, loss_function, optimizer):
     """Train the model for one epoch only."""
@@ -117,8 +110,6 @@ def test(dataloader, model, loss_function):
             label = label.to(device)
 
             output = model(data)
-            # # Resize the output to the correct size.
-            # output = nn.functional.interpolate(output, size=OUTPUT_SIZE[1:])
             test_loss += loss_function(output, label.float())
 
     test_loss /= batch_count
@@ -178,7 +169,7 @@ if __name__ == '__main__':
 
     # Set up the testing data.
     test_dataset = CantileverDataset(is_train=False)
-    test_dataloader = DataLoader(test_dataset, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, shuffle=False)
     
     # Remove existing output images in the folder.
     filenames = glob.glob(os.path.join(FOLDER_TEST_OUTPUTS, '*.png'))
@@ -186,51 +177,97 @@ if __name__ == '__main__':
         os.remove(filename)
     print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
     
+    # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
+    max_values = [
+        max([
+            np.max(train_dataset.labels[:, channel, ...]),
+            np.max(test_dataset.labels[:, channel, ...]),
+        ])
+        for channel in range(OUTPUT_CHANNELS)
+    ]
     # Test the model on the input images found in the folder.
-    evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
+    test_labels = []
+    test_outputs = []
+    # evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
     for i, (test_input, label) in enumerate(test_dataloader):
         test_input = test_input.to(device)
         label = label.to(device)
         test_output = model(test_input)
         test_output = test_output[0, :, ...].cpu().detach().numpy()
         label = label[0, :, ...].cpu().numpy()
+        test_labels.append(label)
+        test_outputs.append(test_output)
         
-        # The maximum stress found in the dataset, a hardcoded value that changes if a new dataset is generated.
-        MAX_STRESS = 27620
-        for channel in range(OUTPUT_CHANNELS):
-            channel_name = ('stress', 'displacement')[channel]
-            # Write FEA images.
+        for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
+            # Write the FEA image.
             write_image(
-                array_to_colormap(label[channel, ...], MAX_STRESS),
+                array_to_colormap(label[channel, ...], max_values[channel] if channel_name == "stress" else None),
                 os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_fea_{channel_name}.png'),
                 )
-            # Evaluate outputs with multiple evaluation metrics.
-            evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
-            for name, result in evaluation_result.items():
-                try:
-                    evaluation_results[channel][name].append(result)
-                except KeyError:
-                    evaluation_results[channel][name] = [result]
-            # Save the output image.
+            # Write the output image.
             write_image(
-                array_to_colormap(test_output[channel, ...], MAX_STRESS),
+                array_to_colormap(test_output[channel, ...], max_values[channel]),
                 os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_test_{channel_name}.png'),
                 )
+            # # Evaluate outputs with multiple evaluation metrics.
+            # evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
+            # for name, result in evaluation_result.items():
+            #     try:
+            #         evaluation_results[channel][name].append(result)
+            #     except KeyError:
+            #         evaluation_results[channel][name] = [result]
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
 
-    # Plot evaluation metrics.
-    for channel in range(OUTPUT_CHANNELS):
-        plt.rc('axes', prop_cycle=cycler(color=['#0095ff', '#ff4040']))
-        plt.rc('font', family='Source Code Pro', size=12.0, weight='semibold')
+    # Calculate and plot evaluation metrics.
+    BLUE = '#0095ff'
+    RED = '#ff4040'
+    for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
+        # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
+
+        # Area metric.
         figure = plt.figure()
-        for i, (name, result) in enumerate(evaluation_results[channel].items()):
-            plt.subplot(1, len(evaluation_results[channel]), i+1)
-            plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
-            if isinstance(result[0], tuple):
-                plt.legend()
+        NUMBER_COLUMNS = 4
+        for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
+            plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
+            cdf_network, cdf_label, bins, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
+            plt.plot(bins[1:], cdf_network, '-', color=BLUE, label='CNN')
+            plt.plot(bins[1:], cdf_label, '--', color=RED, label='FEA')
+            plt.legend()
             plt.grid(visible=True, axis='y')
-            plt.xlabel('Sample')
-            plt.xticks(range(len(test_dataset)))
-            # plt.ylim((0, 1))
-            plt.title(name, fontweight='bold')
+            plt.yticks([0, 1])
+            plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
+        plt.suptitle(f"Area Metric ({channel_name.capitalize()})", fontweight='bold')
+        plt.tight_layout()  # Increase spacing between subplots
         plt.show()
+
+        # Mean error.
+        figure = plt.figure()
+        me = []
+        sample_numbers = range(1, len(test_outputs)+1)
+        for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
+            me.append(
+                metrics.mean_error(test_output[channel, ...], test_label[channel, ...])
+            )
+            # plt.legend()
+            # plt.grid(visible=True, axis='y')
+            # plt.yticks([0, 1])
+            # plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
+        plt.plot(sample_numbers, me, '.', markeredgewidth=5, color=BLUE)
+        plt.grid()
+        plt.xlabel("Sample Number")
+        plt.xticks(sample_numbers)
+        plt.ylabel("Mean Error")
+        plt.title(f"Mean Error ({channel_name.capitalize()})", fontweight='bold')
+        plt.show()
+
+        # for i, (name, result) in enumerate(evaluation_results[channel].items()):
+        #     plt.subplot(1, len(evaluation_results[channel]), i+1)
+        #     plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
+        #     if isinstance(result[0], tuple):
+        #         plt.legend()
+        #     plt.grid(visible=True, axis='y')
+        #     plt.xlabel('Sample')
+        #     plt.xticks(range(len(test_dataset)))
+        #     # plt.ylim((0, 1))
+        #     plt.title(name, fontweight='bold')
+        # plt.show()
