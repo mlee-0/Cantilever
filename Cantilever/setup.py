@@ -41,7 +41,7 @@ length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=360, step=1, precision=0, name='Angle', units='Degrees')
+angle = Parameter(low=0, high=360, step=None, precision=0, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
 key_x_load = 'Load X'
 key_y_load = 'Load Y'
@@ -50,7 +50,7 @@ key_image_height = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 3
-INPUT_SIZE = (INPUT_CHANNELS, 500, 1000)
+INPUT_SIZE = (INPUT_CHANNELS, 250, 500)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNELS = 1
@@ -67,18 +67,16 @@ FILENAME_SAMPLES_TEST = 'samples_test.txt'
 NUMBER_DIGITS = 6
 
 
-def generate_samples(number_samples, show_histogram=False) -> dict:
+def generate_samples(number_samples) -> dict:
     """Generate sample values for each parameter and return them as a dictionary."""
 
-    # Generate samples.
+    # Generate sample values for each parameter.
     samples = {}
-    for parameter in [load, angle, length, height, elastic_modulus]:
-        assert isinstance(parameter, Parameter)
-        values = np.arange(parameter.low, parameter.high+parameter.step, parameter.step)
-        samples[parameter.name] = np.round(
-            random.choices(values, k=number_samples,),
-            parameter.precision,
-            )
+    samples[load.name] = generate_logspace_values(number_samples, load, skew_amount=2, skew_high=True)
+    samples[angle.name] = generate_angles(number_samples, angle)
+    samples[length.name] = generate_logspace_values(number_samples, length, skew_amount=2, skew_high=True)
+    samples[height.name] = generate_logspace_values(number_samples, height, skew_amount=2, skew_high=False)
+    samples[elastic_modulus.name] = generate_uniform_values(number_samples, elastic_modulus)
     
     # Calculate the image size corresponding to the geometry.
     image_lengths = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
@@ -97,21 +95,56 @@ def generate_samples(number_samples, show_histogram=False) -> dict:
         )
     samples[key_x_load] = x_loads
     samples[key_y_load] = y_loads
-
-    # Plot histograms for angle samples.
-    if show_histogram:
-        plt.figure()
-        plt.hist(
-            samples[angle.name],
-            bins=round(angle.high-angle.low),
-            rwidth=0.75,
-            color='#0095ff',
-            )
-        plt.xticks(np.linspace(angle.low, angle.high, 5))
-        plt.title(angle.name)
-        plt.show()
     
     return samples
+
+def generate_uniform_values(number_samples: int, parameter: Parameter) -> np.ndarray:
+    """Generate uniformly distributed, evenly spaced samples for the specified parameter."""
+    values = np.arange(parameter.low, parameter.high+parameter.step, parameter.step)
+    values = np.array(random.choices(values, k=number_samples))
+    values = np.round(values, parameter.precision)
+    return values
+
+def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amount, skew_high) -> np.ndarray:
+    """Generate samples that are more concentrated at one end of the range."""
+    values = np.logspace(0, skew_amount, number_samples)
+    values = values - np.min(values)
+    values = values / np.max(values)
+    if skew_high:
+        values = 1 - values
+    values = values * (parameter.high - parameter.low)
+    values = values + parameter.low
+    values = np.round(values, parameter.precision)
+    np.random.shuffle(values)
+    
+    plot_histogram(values, title=parameter.name)
+
+    return values
+
+def generate_angles(number_samples: int, parameter: Parameter) -> np.ndarray:
+    """Generate angle samples using a distribution with two peaks centered at 90 and 180 degrees."""
+    std = 15
+    values = np.append(
+        np.random.normal(90, std, number_samples//2),
+        np.random.normal(180, std, number_samples//2),
+    )
+    assert values.size == number_samples
+    values = np.round(values, parameter.precision)
+    np.random.shuffle(values)
+    # Convert values outside [0, 360] to the equivalent value within that range.
+    values = np.mod(values, 360)
+    assert not np.any((values > parameter.high) | (values < parameter.low)), f"Angle values were generated outside the specified range: {parameter.low} to {parameter.high}."
+
+    # plot_histogram()
+
+    return values
+
+def plot_histogram(values: np.ndarray, title=None) -> None:
+    plt.figure()
+    plt.hist(values, bins=100, rwidth=0.75, color='#0095ff')
+    if title:
+        plt.title(title)
+    plt.show()
 
 def write_samples(samples, filename) -> None:
     """Write the specified sample values to a text file."""
@@ -352,9 +385,9 @@ def write_image(array, filename) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
 
-def show_stress_histogram(read_train_dataset=True) -> None:
+def show_stress_histogram(train_dataset=True) -> None:
     """Read all stress values generated by FEA and show a histogram. Used to show uniformity of magnitudes of values."""
-    fea_filenames = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS if read_train_dataset else FOLDER_TEST_OUTPUTS, '*.txt'))
+    fea_filenames = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS if train_dataset else FOLDER_TEST_OUTPUTS, '*.txt'))
     fea_filenames = sorted(fea_filenames)
 
     stresses = np.zeros(0)
@@ -367,4 +400,5 @@ def show_stress_histogram(read_train_dataset=True) -> None:
     plt.title(f"Maximum value: {np.max(stresses)}")
     plt.show()
 
-# show_stress_histogram(False)
+if __name__ == "__main__":
+    show_stress_histogram(train_dataset=True)

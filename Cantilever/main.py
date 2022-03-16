@@ -40,8 +40,9 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.00001  # 0.000001 for Nie
-EPOCHS = 200
+LEARNING_RATE = 0.0001  # 0.000001 for Nie
+EPOCHS = 10
+Model = FullyCnn
 
 
 class CantileverDataset(Dataset):
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     print(f'Using {device} device.')
 
     # Initialize the model and load its parameters if it has already been trained.
-    model = FullyCnn()
+    model = Model()
     model.to(device)
     train_model = True
     if os.path.exists(FILEPATH_MODEL):
@@ -195,7 +196,7 @@ if __name__ == '__main__':
         label = label[0, :, ...].cpu().numpy()
         
         # The maximum stress found in the dataset, a hardcoded value that changes if a new dataset is generated.
-        MAX_STRESS = 27400.0
+        MAX_STRESS = 27620
         for channel in range(OUTPUT_CHANNELS):
             channel_name = ('stress', 'displacement')[channel]
             # Write FEA images.
@@ -230,6 +231,6 @@ if __name__ == '__main__':
             plt.grid(visible=True, axis='y')
             plt.xlabel('Sample')
             plt.xticks(range(len(test_dataset)))
-            plt.ylim((0, 1))
+            # plt.ylim((0, 1))
             plt.title(name, fontweight='bold')
         plt.show()
