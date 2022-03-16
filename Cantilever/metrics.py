@@ -44,7 +44,9 @@ def area_metric(network: np.ndarray, label: np.ndarray, max_value):
     histogram_label = histogram_label / np.sum(histogram_label)
     cdf_network = np.cumsum(histogram_network)
     cdf_label = np.cumsum(histogram_label)
-    area_difference = np.sum(cdf_network) - np.sum(cdf_label)
+    area_network = np.sum(cdf_network * np.diff(bins))
+    area_label = np.sum(cdf_label * np.diff(bins))
+    area_difference = area_network - area_label
 
     return cdf_network, cdf_label, bins, area_difference
 
