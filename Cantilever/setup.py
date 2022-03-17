@@ -60,6 +60,7 @@ OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
 # Folders and files.
 FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
 FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
+FOLDER_VALIDATION_OUTPUTS = os.path.join(FOLDER_ROOT, 'Validation Outputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
 FILENAME_SAMPLES_VALIDATION = 'samples_validation.txt'

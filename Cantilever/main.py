@@ -40,16 +40,16 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
-LEARNING_RATE = 0.0001  # 0.000001 for Nie
+LEARNING_RATE = 0.00001  # 0.000001 for Nie
 EPOCHS = 10
 Model = FullyCnn
 
 
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
-    def __init__(self, is_train=False):
+    def __init__(self, filename_samples, folder_labels):
         # Create input images and store each in a list.
-        samples = read_samples(FILENAME_SAMPLES_TRAIN if is_train else FILENAME_SAMPLES_TEST)
+        samples = read_samples(filename_samples)
         self.number_samples = get_sample_size(samples)
         self.inputs = generate_input_images(samples)
         # self.inputs = np.zeros((self.number_samples, *INPUT_SIZE))  # Blank arrays to reduce startup time for debugging
@@ -57,7 +57,7 @@ class CantileverDataset(Dataset):
         # Create label images from FEA stress data.
         self.labels = generate_label_images(
             samples,
-            FOLDER_TRAIN_OUTPUTS if is_train else FOLDER_TEST_OUTPUTS,
+            folder_labels,
             clip_high_stresses=False,
             )
         # self.labels = np.zeros((self.number_samples, *OUTPUT_SIZE))  # Blank arrays to reduce startup time for debugging
@@ -154,9 +154,11 @@ if __name__ == '__main__':
         
         model.train(train_model)
     
-    # Set up the training data.
-    train_dataset = CantileverDataset(is_train=True)
+    # Set up the training and validation data.
+    train_dataset = CantileverDataset(FILENAME_SAMPLES_TRAIN, FOLDER_TRAIN_OUTPUTS)
+    validation_dataset = CantileverDataset(FILENAME_SAMPLES_VALIDATION, FOLDER_VALIDATION_OUTPUTS)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     if train_model:
         # Train the model and record the accuracy and loss.
@@ -164,7 +166,7 @@ if __name__ == '__main__':
         for epoch in epochs:
             print(f'Epoch {epoch+1}\n------------------------')
             train(train_dataloader, model, loss_function, optimizer)
-            test_loss = test(train_dataloader, model, loss_function)
+            test_loss = test(validation_dataloader, model, loss_function)
             test_loss_values.append(test_loss)
             # Save the model parameters periodically.
             if (epoch+1) % 5 == 0:
@@ -182,7 +184,7 @@ if __name__ == '__main__':
         plt.show()
 
     # Set up the testing data.
-    test_dataset = CantileverDataset(is_train=False)
+    test_dataset = CantileverDataset(FILENAME_SAMPLES_TEST, FOLDER_TEST_OUTPUTS)
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     
     # Remove existing output images in the folder.
@@ -262,10 +264,6 @@ if __name__ == '__main__':
             me.append(
                 metrics.mean_error(test_output[channel, ...], test_label[channel, ...])
             )
-            # plt.legend()
-            # plt.grid(visible=True, axis='y')
-            # plt.yticks([0, 1])
-            # plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
         plt.plot(sample_numbers, me, '.', markeredgewidth=5, color=BLUE)
         plt.grid()
         plt.xlabel("Sample Number")
