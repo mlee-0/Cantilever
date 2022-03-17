@@ -62,6 +62,7 @@ FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebo
 FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Outputs')
 FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Outputs')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
+FILENAME_SAMPLES_VALIDATION = 'samples_validation.txt'
 FILENAME_SAMPLES_TEST = 'samples_test.txt'
 
 # Number of digits used for numerical file names.
@@ -73,10 +74,10 @@ def generate_samples(number_samples) -> dict:
 
     # Generate sample values for each parameter.
     samples = {}
-    samples[load.name] = generate_logspace_values(number_samples, load, skew_amount=2, skew_high=True)
-    samples[angle.name] = generate_angles(number_samples, angle)
-    samples[length.name] = generate_logspace_values(number_samples, length, skew_amount=2, skew_high=True)
-    samples[height.name] = generate_logspace_values(number_samples, height, skew_amount=2, skew_high=False)
+    samples[load.name] = generate_logspace_values(number_samples, load, skew_amount=1.5, skew_high=True)
+    samples[angle.name] = generate_angles(number_samples, angle, std=30)
+    samples[length.name] = generate_logspace_values(number_samples, length, skew_amount=1.5, skew_high=True)
+    samples[height.name] = generate_logspace_values(number_samples, height, skew_amount=1.5, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, elastic_modulus)
     
     # Calculate the image size corresponding to the geometry.
@@ -122,12 +123,11 @@ def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amo
 
     return values
 
-def generate_angles(number_samples: int, parameter: Parameter) -> np.ndarray:
-    """Generate angle samples using a distribution with two peaks centered at 90 and 180 degrees."""
-    std = 15
+def generate_angles(number_samples: int, parameter: Parameter, std: int) -> np.ndarray:
+    """Generate angle samples using a distribution with two peaks centered at 90 and 270 degrees."""
     values = np.append(
         np.random.normal(90, std, number_samples//2),
-        np.random.normal(180, std, number_samples//2),
+        np.random.normal(270, std, number_samples//2),
     )
     assert values.size == number_samples
     values = np.round(values, parameter.precision)
@@ -136,7 +136,7 @@ def generate_angles(number_samples: int, parameter: Parameter) -> np.ndarray:
     values = np.mod(values, 360)
     assert not np.any((values > parameter.high) | (values < parameter.low)), f"Angle values were generated outside the specified range: {parameter.low} to {parameter.high}."
 
-    # plot_histogram()
+    plot_histogram(values, title=parameter.name)
 
     return values
 
@@ -285,8 +285,10 @@ def generate_label_images(samples, folder, clip_high_stresses=False) -> np.ndarr
     BACKGROUND_VALUE = 0
     labels = np.full((number_samples, *OUTPUT_SIZE), BACKGROUND_VALUE, dtype=float)
     for i, fea_filename in enumerate(fea_filenames):
-        raw_stress, displacement = parse_label_file(fea_filename)
-        for channel, values in enumerate([raw_stress]): #enumerate([raw_stress, displacement]):
+        stress, displacement = parse_label_file(fea_filename)
+        data = {'stress': stress, 'displacement': displacement}
+        for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
+            values = data[channel_name]
             # Initialize a 2D array.
             array = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
             # Determine the number of mesh divisions used in this sample.
