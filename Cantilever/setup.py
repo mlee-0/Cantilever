@@ -43,7 +43,8 @@ height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, step=None, precision=0, name='Angle', units='Degrees')
-# Names of quantities that are not generated but are still stored in the text files.
+# Names of quantities stored in the text files that are not randomly generated.
+KEY_SAMPLE_NUMBER = 'Sample Number'
 KEY_X_LOAD = 'Load X'
 KEY_Y_LOAD = 'Load Y'
 KEY_IMAGE_LENGTH = 'Image Length'
@@ -76,10 +77,11 @@ def generate_samples(number_samples: int) -> dict:
 
     # Generate sample values for each parameter.
     samples = {}
+    samples[KEY_SAMPLE_NUMBER] = range(1, number_samples+1)
     samples[load.name] = generate_logspace_values(number_samples, load, skew_amount=1.5, skew_high=True)
-    samples[angle.name] = generate_angles(number_samples, angle, std=30)
-    samples[length.name] = generate_logspace_values(number_samples, length, skew_amount=1.5, skew_high=True)
-    samples[height.name] = generate_logspace_values(number_samples, height, skew_amount=1.5, skew_high=False)
+    samples[angle.name] = generate_angles(number_samples, angle, std=45)
+    samples[length.name] = generate_uniform_values(number_samples, length)  #generate_logspace_values(number_samples, length, skew_amount=1.0, skew_high=True)
+    samples[height.name] = generate_uniform_values(number_samples, height)  #generate_logspace_values(number_samples, height, skew_amount=1.0, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, elastic_modulus)
     
     # Calculate the image size corresponding to the geometry.
@@ -160,8 +162,8 @@ def write_samples(samples: dict, filename: str) -> None:
     text = [None] * number_samples
     for i in range(number_samples):
         text[i] = ','.join(
-            [f'{str(i+1).zfill(NUMBER_DIGITS)}'] + [f'{key}:{value[i]}' for key, value in samples.items()]
-            ) + '\n'
+            [f'{key}:{value[i]}' for key, value in samples.items()]
+        ) + '\n'
     with open(os.path.join(FOLDER_ROOT, filename), 'w') as file:
         file.writelines(text)
     print(f'Wrote samples in {filename}.')
@@ -174,9 +176,9 @@ def read_samples(filename: str) -> dict:
     try:
         with open(filename, 'r') as file:
             for line in file.readlines():
-                for data in line.split(',')[1:]:
+                for i, data in enumerate(line.split(',')):
                     key, value = data.split(':')
-                    key, value = key.strip(), float(value)
+                    key, value = key.strip(), float(value) if i != 0 else int(value)
                     if key in samples:
                         samples[key].append(value)
                     else:
@@ -250,7 +252,7 @@ def write_ansys_script(samples: dict, filename: str) -> None:
         commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{9},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_IMAGE_LENGTH][i]},{samples[KEY_IMAGE_HEIGHT][i]}\n'
+                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_IMAGE_LENGTH][i]},{samples[KEY_IMAGE_HEIGHT][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.
@@ -279,8 +281,7 @@ def write_ansys_script(samples: dict, filename: str) -> None:
 def generate_label_images(samples: dict, folder: str) -> np.ndarray:
     """Return a 4D array of images for all FEA text files found in the specified folder, with dimensions: [samples, channels, height, width]."""
     number_samples = get_sample_size(samples)
-    stresses, displacements = read_labels(folder)
-    assert len(stresses) == number_samples, f'Found {len(stresses)} samples in {folder}, which does not match {number_samples}.'
+    stresses, displacements = read_labels(folder, samples[KEY_SAMPLE_NUMBER])
 
     # Store all stress data in a single array, initialized with a specific background value. The order of values in the text files is determined by ANSYS.
     BACKGROUND_VALUE = 0
@@ -312,9 +313,15 @@ def generate_label_images(samples: dict, folder: str) -> np.ndarray:
     
     return labels
 
-def read_labels(folder: str) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """Return arrays of data from text files in the specified folder."""
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
+    # Only use the filenames that match the specified sample numbers.
+    if sample_numbers:
+        fea_filenames = [
+            filename for filename in fea_filenames
+            if int(filename.split('.')[0].split('_')[-1]) in sample_numbers
+        ]
     fea_filenames = sorted(fea_filenames)
     sample_size = len(fea_filenames)
 
@@ -378,8 +385,9 @@ def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
 
-def show_stress_histogram(folder: str, bins: int, desired_sample_size: int) -> None:
-    """Show a histogram of the maximum stress values in each FEA label for the specified dataset, and verify that there are enough samples to create a dataset of the desired size."""
+def get_stratified_samples(samples: dict, folder: str, bins: int, desired_sample_size: int) -> dict:
+    """Return a subset of the given samples in which the same number of maximum stress values exists in each bin. Show a histogram of the maximum stress values in each FEA label for the specified dataset, and verify that there are enough samples to create a dataset of the desired size."""
+
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
 
@@ -400,16 +408,19 @@ def show_stress_histogram(folder: str, bins: int, desired_sample_size: int) -> N
     plt.legend([f"{minimum_required_frequency} samples required in each bin"])
     plt.show()
 
-    assert minimum_frequency * bins >= desired_sample_size, f"The current dataset can only provide {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. The dataset size should be larger by at least: {minimum_required_frequency / minimum_frequency}."
+    assert minimum_frequency * bins >= desired_sample_size, f"The current dataset only provides {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. The dataset size should be at least {round(len(fea_filenames) * minimum_required_frequency / minimum_frequency)}."
 
-def get_stratified_samples(folder: str) -> dict:
-    """"""
+    sample_numbers = []
+    for i, bin_edge in enumerate(bin_edges[1:], 1):
+        bin_stresses = [stress for stress in stresses if bin_edges[i-1] < stress <= bin_edge]
+        for bin_stress in bin_stresses:
+            sample_numbers.append(stresses.index(bin_stress))
+            if len(sample_numbers) >= i * minimum_required_frequency:
+                break
 
-    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
-    fea_filenames = sorted(fea_filenames)
-
-    stresses, displacements = read_labels(folder)
+    return samples
 
 
 if __name__ == "__main__":
-    show_stress_histogram(FOLDER_TRAIN_LABELS, 10, 800)
+    samples = read_samples(FILENAME_SAMPLES_VALIDATION)
+    stratified_samples = get_stratified_samples(samples, FOLDER_VALIDATION_LABELS, 20, 800)
