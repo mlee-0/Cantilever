@@ -188,10 +188,10 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     
     # Remove existing output images in the folder.
-    filenames = glob.glob(os.path.join(FOLDER_TEST_OUTPUTS, '*.png'))
-    for filename in filenames:
-        os.remove(filename)
-    print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
+    # filenames = glob.glob(os.path.join(FOLDER_TEST_OUTPUTS, '*.png'))
+    # for filename in filenames:
+    #     os.remove(filename)
+    # print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
     
     # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
     max_values = [
@@ -218,12 +218,12 @@ if __name__ == '__main__':
             # Write the FEA image.
             write_image(
                 array_to_colormap(label[channel, ...], max_values[channel] if channel_name == "stress" else None),
-                os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_fea_{channel_name}.png'),
+                os.path.join(FOLDER_ROOT, f'{i+1}_fea_{channel_name}.png'),
                 )
             # Write the output image.
             write_image(
                 array_to_colormap(test_output[channel, ...], max_values[channel]),
-                os.path.join(FOLDER_TEST_OUTPUTS, f'{i+1}_test_{channel_name}.png'),
+                os.path.join(FOLDER_ROOT, f'{i+1}_test_{channel_name}.png'),
                 )
             # # Evaluate outputs with multiple evaluation metrics.
             # evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
@@ -232,7 +232,7 @@ if __name__ == '__main__':
             #         evaluation_results[channel][name].append(result)
             #     except KeyError:
             #         evaluation_results[channel][name] = [result]
-    print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_TEST_OUTPUTS}.')
+    print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_ROOT}.')
 
     # Calculate and plot evaluation metrics.
     BLUE = '#0095ff'
