@@ -5,6 +5,7 @@ Information about parameters and functions for reading and writing files.
 import colorsys
 from dataclasses import dataclass
 import glob
+import math
 import os
 import random
 from typing import List, Tuple
@@ -43,10 +44,10 @@ elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elasti
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, step=None, precision=0, name='Angle', units='Degrees')
 # Names of quantities that are not generated but are still stored in the text files.
-key_x_load = 'Load X'
-key_y_load = 'Load Y'
-key_image_length = 'Image Length'
-key_image_height = 'Image Height'
+KEY_X_LOAD = 'Load X'
+KEY_Y_LOAD = 'Load Y'
+KEY_IMAGE_LENGTH = 'Image Length'
+KEY_IMAGE_HEIGHT = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 3
@@ -59,9 +60,9 @@ OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
-FOLDER_TRAIN_OUTPUTS = os.path.join(FOLDER_ROOT, 'Train Labels')
-FOLDER_VALIDATION_OUTPUTS = os.path.join(FOLDER_ROOT, 'Validation Labels')
-FOLDER_TEST_OUTPUTS = os.path.join(FOLDER_ROOT, 'Test Labels')
+FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, 'Train Labels')
+FOLDER_VALIDATION_LABELS = os.path.join(FOLDER_ROOT, 'Validation Labels')
+FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, 'Test Labels')
 FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
 FILENAME_SAMPLES_VALIDATION = 'samples_validation.txt'
 FILENAME_SAMPLES_TEST = 'samples_test.txt'
@@ -70,7 +71,7 @@ FILENAME_SAMPLES_TEST = 'samples_test.txt'
 NUMBER_DIGITS = 6
 
 
-def generate_samples(number_samples) -> dict:
+def generate_samples(number_samples: int) -> dict:
     """Generate sample values for each parameter and return them as a dictionary."""
 
     # Generate sample values for each parameter.
@@ -84,8 +85,8 @@ def generate_samples(number_samples) -> dict:
     # Calculate the image size corresponding to the geometry.
     image_lengths = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
     image_heights = np.round(OUTPUT_SIZE[1] * (samples[height.name] / height.high))
-    samples[key_image_length] = image_lengths
-    samples[key_image_height] = image_heights
+    samples[KEY_IMAGE_LENGTH] = image_lengths
+    samples[KEY_IMAGE_HEIGHT] = image_heights
     
     # Calculate the x- and y-components of the loads and corresponding angles.
     x_loads = np.round(
@@ -96,20 +97,23 @@ def generate_samples(number_samples) -> dict:
         np.sin(samples[angle.name] * (np.pi/180)) * samples[load.name] / (image_heights-1),
         load.precision
         )
-    samples[key_x_load] = x_loads
-    samples[key_y_load] = y_loads
+    samples[KEY_X_LOAD] = x_loads
+    samples[KEY_Y_LOAD] = y_loads
     
     return samples
 
 def generate_uniform_values(number_samples: int, parameter: Parameter) -> np.ndarray:
-    """Generate uniformly distributed, evenly spaced samples for the specified parameter."""
+    """Generate uniformly distributed, evenly spaced values."""
+
     values = np.arange(parameter.low, parameter.high+parameter.step, parameter.step)
     values = np.array(random.choices(values, k=number_samples))
     values = np.round(values, parameter.precision)
+
     return values
 
-def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amount, skew_high) -> np.ndarray:
-    """Generate samples that are more concentrated at one end of the range."""
+def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amount: float, skew_high: bool) -> np.ndarray:
+    """Generate values that are more concentrated at one end of a range."""
+
     values = np.logspace(0, skew_amount, number_samples)
     values = values - np.min(values)
     values = values / np.max(values)
@@ -126,6 +130,7 @@ def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amo
 
 def generate_angles(number_samples: int, parameter: Parameter, std: int) -> np.ndarray:
     """Generate angle samples using a distribution with two peaks centered at 90 and 270 degrees."""
+
     values = np.append(
         np.random.normal(90, std, number_samples//2),
         np.random.normal(270, std, number_samples//2),
@@ -148,7 +153,7 @@ def plot_histogram(values: np.ndarray, title=None) -> None:
         plt.title(title)
     plt.show()
 
-def write_samples(samples, filename) -> None:
+def write_samples(samples: dict, filename: str) -> None:
     """Write the specified sample values to a text file."""
 
     number_samples = get_sample_size(samples)
@@ -161,7 +166,7 @@ def write_samples(samples, filename) -> None:
         file.writelines(text)
     print(f'Wrote samples in {filename}.')
 
-def read_samples(filename) -> dict:
+def read_samples(filename: str) -> dict:
     """Return the sample values found in the text file previously generated."""
 
     samples = {}
@@ -183,13 +188,13 @@ def read_samples(filename) -> dict:
         print(f'Found samples in {filename}.')
         return samples
 
-def generate_input_images(samples) -> np.ndarray:
+def generate_input_images(samples: dict) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
 
     number_samples = get_sample_size(samples)
     inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=int)
     for i in range(number_samples):
-        pixel_length, pixel_height = int(samples[key_image_length][i]), int(samples[key_image_height][i])
+        pixel_length, pixel_height = int(samples[KEY_IMAGE_LENGTH][i]), int(samples[KEY_IMAGE_HEIGHT][i])
         image = np.zeros(INPUT_SIZE)
 
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
@@ -218,15 +223,15 @@ def generate_input_images(samples) -> np.ndarray:
         inputs[i, ...] = image
     return inputs
 
-def get_sample_size(samples) -> int:
-    """Get the number of samples found in the specified sample values."""
+def get_sample_size(samples: dict) -> int:
+    """Get the number of samples found in the specified dictionary."""
 
     sample_sizes = [len(_) for _ in samples.values()]
     low, high = min(sample_sizes), max(sample_sizes)
     assert low == high, 'Found different numbers of samples in the provided samples:  min. {low}, max. {high}.'
     return low
     
-def write_ansys_script(samples, filename) -> None:
+def write_ansys_script(samples: dict, filename: str) -> None:
     """Write a text file containing ANSYS commands used to automate FEA and generate stress contour images."""
 
     number_samples = get_sample_size(samples)
@@ -245,7 +250,7 @@ def write_ansys_script(samples, filename) -> None:
         commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{9},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[key_x_load][i]},{samples[key_y_load][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[key_image_length][i]},{samples[key_image_height][i]}\n'
+                f'{samples_variable}(1,{i+1}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_IMAGE_LENGTH][i]},{samples[KEY_IMAGE_HEIGHT][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.
@@ -271,29 +276,23 @@ def write_ansys_script(samples, filename) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def generate_label_images(samples, folder, clip_high_stresses=False) -> np.ndarray:
-    """
-    Return a 4D array of images for each of the FEA text files, with dimensions: [samples, channels, height, width].
-
-    `clip_high_stresses`: Reduce stresses above a threshold to the threshold.
-    """
+def generate_label_images(samples: dict, folder: str) -> np.ndarray:
+    """Return a 4D array of images for all FEA text files found in the specified folder, with dimensions: [samples, channels, height, width]."""
     number_samples = get_sample_size(samples)
-    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
-    fea_filenames = sorted(fea_filenames)
-    assert len(fea_filenames) == number_samples, f'Found {len(fea_filenames)} .txt files in {folder}, but should be {number_samples}.'
+    stresses, displacements = read_labels(folder)
+    assert len(stresses) == number_samples, f'Found {len(stresses)} samples in {folder}, which does not match {number_samples}.'
 
-    # Store all stress data in a single array, initialized with a specific background value.
+    # Store all stress data in a single array, initialized with a specific background value. The order of values in the text files is determined by ANSYS.
     BACKGROUND_VALUE = 0
+    data = {'stress': stresses, 'displacement': displacements}
     labels = np.full((number_samples, *OUTPUT_SIZE), BACKGROUND_VALUE, dtype=float)
-    for i, fea_filename in enumerate(fea_filenames):
-        stress, displacement = parse_label_file(fea_filename)
-        data = {'stress': stress, 'displacement': displacement}
+    for i in range(number_samples):
         for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-            values = data[channel_name]
+            values = data[channel_name][i]
             # Initialize a 2D array.
-            array = np.zeros((int(samples[key_image_height][i]), int(samples[key_image_length][i])))
+            array = np.zeros((int(samples[KEY_IMAGE_HEIGHT][i]), int(samples[KEY_IMAGE_LENGTH][i])))
             # Determine the number of mesh divisions used in this sample.
-            mesh_divisions = (int(samples[key_image_length][i]-1), int(samples[key_image_height][i]-1))
+            mesh_divisions = (int(samples[KEY_IMAGE_LENGTH][i]-1), int(samples[KEY_IMAGE_HEIGHT][i]-1))
             # Values for interior nodes.
             array[1:-1, 1:-1] = np.flipud(
                 np.reshape(values[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
@@ -311,28 +310,30 @@ def generate_label_images(samples, folder, clip_high_stresses=False) -> np.ndarr
             # Insert the array.
             labels[i, channel, :array.shape[0], :array.shape[1]] = array
     
-    # Reduce stresses above a threshold to the threshold value to prevent a large portion of the dataset having values near zero.
-    if clip_high_stresses:
-        stresses = labels[0, ...][labels[0, ...] != BACKGROUND_VALUE]
-        threshold_stress = np.mean(stresses) + 5 * np.std(stresses)
-        print(f'Clipping stresses to reduce maximum from {np.max(stresses)} to {threshold_stress}.')
-        labels[0, ...] = np.clip(labels[0, ...], None, threshold_stress)
-    
     return labels
 
-def parse_label_file(filename: str) -> Tuple[np.ndarray, np.ndarray]:
-    """Return arrays of data stored in the specified label .txt file."""
-    with open(filename, 'r') as file:
-        stress, displacement_x, displacement_y = list(zip(
-            *[[float(value) for value in line.split(',')] for line in file.readlines()]
-            ))
-        stress = np.array(stress)
-        displacement = np.sqrt(
-            np.power(np.array(displacement_x), 2) + np.power(np.array(displacement_y), 2)
-            )
-    return stress, displacement
+def read_labels(folder: str) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    """Return arrays of data from text files in the specified folder."""
+    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
+    fea_filenames = sorted(fea_filenames)
+    sample_size = len(fea_filenames)
 
-def rgb_to_hue(array) -> np.ndarray:
+    stresses = [None] * sample_size
+    displacements = [None] * sample_size
+    for i, fea_filename in enumerate(fea_filenames):
+        with open(fea_filename, 'r') as file:
+            stress, displacement_x, displacement_y = list(zip(
+                *[[float(value) for value in line.split(',')] for line in file.readlines()]
+                ))
+            stress = np.array(stress)
+            displacement = np.sqrt(
+                np.power(np.array(displacement_x), 2) + np.power(np.array(displacement_y), 2)
+                )
+            stresses[i] = stress
+            displacements[i] = displacement
+    return stresses, displacements
+
+def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
 
     array = array / 255
@@ -343,7 +344,7 @@ def rgb_to_hue(array) -> np.ndarray:
             hue_array[i, j] = hsv[0]
     return hue_array
 
-def hsv_to_rgb(array) -> np.ndarray:
+def hsv_to_rgb(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel HSV array into a 3-channel RGB array."""
 
     for i in range(array.shape[0]):
@@ -353,7 +354,7 @@ def hsv_to_rgb(array) -> np.ndarray:
                 array[i, j, k] = rgb[k] * 255
     return array
 
-def array_to_colormap(array, divide_by=None) -> np.ndarray:
+def array_to_colormap(array: np.ndarray, divide_by=None) -> np.ndarray:
     """Scale a 2D array of values to be inside [0, 1] and convert to a 3D color image."""
     # Make copy of array so that original array is not modified.
     array = np.copy(array)
@@ -373,24 +374,42 @@ def array_to_colormap(array, divide_by=None) -> np.ndarray:
     
     return array
 
-def write_image(array, filename) -> None:
+def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
 
-def show_stress_histogram(train_dataset=True) -> None:
-    """Read all stress values generated by FEA and show a histogram. Used to show uniformity of magnitudes of values."""
-    fea_filenames = glob.glob(os.path.join(FOLDER_TRAIN_OUTPUTS if train_dataset else FOLDER_TEST_OUTPUTS, '*.txt'))
+def show_stress_histogram(folder: str, bins: int, desired_sample_size: int) -> None:
+    """Show a histogram of the maximum stress values in each FEA label for the specified dataset, and verify that there are enough samples to create a dataset of the desired size."""
+    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
 
-    stresses = np.zeros(0)
-    for i, fea_filename in enumerate(fea_filenames):
-        stress, displacement = parse_label_file(fea_filename)
-        stresses = np.append(stresses, stress)
-    
+    stresses, displacements = read_labels(folder)
+    stresses = [np.max(stress) for stress in stresses]
+
+    maximum_stress = np.max(stresses)
+    histogram_range = (0, maximum_stress)  # Set minimum to 0 prevent small stresses being excluded
+    histogram, bin_edges = np.histogram(stresses, bins=bins, range=histogram_range)
+    minimum_frequency = np.min(histogram)
+    minimum_required_frequency = math.ceil(desired_sample_size / bins)
+
     plt.figure()
-    plt.hist(stresses, bins=100, rwidth=0.75, color='#0095ff')
-    plt.title(f"Maximum value: {np.max(stresses)}")
+    plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
+    plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
+    plt.xticks(bin_edges, rotation=90, fontsize=8)
+    plt.title(f"{len(fea_filenames)} total samples, {desired_sample_size} required stratified samples")
+    plt.legend([f"{minimum_required_frequency} samples required in each bin"])
     plt.show()
 
+    assert minimum_frequency * bins >= desired_sample_size, f"The current dataset can only provide {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. The dataset size should be larger by at least: {minimum_required_frequency / minimum_frequency}."
+
+def get_stratified_samples(folder: str) -> dict:
+    """"""
+
+    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
+    fea_filenames = sorted(fea_filenames)
+
+    stresses, displacements = read_labels(folder)
+
+
 if __name__ == "__main__":
-    show_stress_histogram(train_dataset=True)
+    show_stress_histogram(FOLDER_TRAIN_LABELS, 10, 800)

@@ -58,13 +58,12 @@ class CantileverDataset(Dataset):
         self.labels = generate_label_images(
             samples,
             folder_labels,
-            clip_high_stresses=False,
             )
         # self.labels = np.zeros((self.number_samples, *OUTPUT_SIZE))  # Blank arrays to reduce startup time for debugging
         # # Write FEA images.
         # for i, label in enumerate(self.labels):
         #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
-        #         filepath = os.path.join(FOLDER_TRAIN_OUTPUTS, f'fea_{i+1}.png')
+        #         filepath = os.path.join(FOLDER_TRAIN_LABELS, f'fea_{i+1}.png')
         #         image.save(filepath)
 
     def __len__(self):
@@ -155,8 +154,8 @@ if __name__ == '__main__':
         model.train(train_model)
     
     # Set up the training and validation data.
-    train_dataset = CantileverDataset(FILENAME_SAMPLES_TRAIN, FOLDER_TRAIN_OUTPUTS)
-    validation_dataset = CantileverDataset(FILENAME_SAMPLES_VALIDATION, FOLDER_VALIDATION_OUTPUTS)
+    train_dataset = CantileverDataset(FILENAME_SAMPLES_TRAIN, FOLDER_TRAIN_LABELS)
+    validation_dataset = CantileverDataset(FILENAME_SAMPLES_VALIDATION, FOLDER_VALIDATION_LABELS)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
@@ -184,14 +183,14 @@ if __name__ == '__main__':
         plt.show()
 
     # Set up the testing data.
-    test_dataset = CantileverDataset(FILENAME_SAMPLES_TEST, FOLDER_TEST_OUTPUTS)
+    test_dataset = CantileverDataset(FILENAME_SAMPLES_TEST, FOLDER_TEST_LABELS)
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     
     # Remove existing output images in the folder.
-    # filenames = glob.glob(os.path.join(FOLDER_TEST_OUTPUTS, '*.png'))
+    # filenames = glob.glob(os.path.join(FOLDER_TEST_LABELS, '*.png'))
     # for filename in filenames:
     #     os.remove(filename)
-    # print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_OUTPUTS}.')
+    # print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_LABELS}.')
     
     # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
     max_values = [
