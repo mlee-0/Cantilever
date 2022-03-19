@@ -3,6 +3,7 @@ aclImdb_v1.tar.gz
 Practice/test.png
 .DS_Store
 *.pyc
+*.pth
 Cantilever/Train Outputs
 Cantilever/Validation Outputs
 Cantilever/Test Outputs
