@@ -78,11 +78,11 @@ def generate_samples(number_samples: int) -> dict:
     # Generate sample values for each parameter.
     samples = {}
     samples[KEY_SAMPLE_NUMBER] = range(1, number_samples+1)
-    samples[load.name] = generate_logspace_values(number_samples, load, skew_amount=1.5, skew_high=True)
+    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=1.5, skew_high=True)
     samples[angle.name] = generate_angles(number_samples, angle, std=45)
-    samples[length.name] = generate_uniform_values(number_samples, length)  #generate_logspace_values(number_samples, length, skew_amount=1.0, skew_high=True)
-    samples[height.name] = generate_uniform_values(number_samples, height)  #generate_logspace_values(number_samples, height, skew_amount=1.0, skew_high=False)
-    samples[elastic_modulus.name] = generate_uniform_values(number_samples, elastic_modulus)
+    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)  #generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
+    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)  #generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
+    samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the image size corresponding to the geometry.
     image_lengths = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
@@ -104,29 +104,43 @@ def generate_samples(number_samples: int) -> dict:
     
     return samples
 
-def generate_uniform_values(number_samples: int, parameter: Parameter) -> np.ndarray:
+def generate_uniform_values(number_samples: int, bounds: Tuple[float, float], step, precision) -> np.ndarray:
     """Generate uniformly distributed, evenly spaced values."""
 
-    values = np.arange(parameter.low, parameter.high+parameter.step, parameter.step)
+    values = np.arange(bounds[0], bounds[1]+step, step)
     values = np.array(random.choices(values, k=number_samples))
-    values = np.round(values, parameter.precision)
+    values = np.round(values, precision)
 
     return values
 
-def generate_logspace_values(number_samples: int, parameter: Parameter, skew_amount: float, skew_high: bool) -> np.ndarray:
+def generate_logspace_values(number_samples: int, bounds: Tuple[float, float], step, precision, skew_amount: float, skew_high: bool) -> np.ndarray:
     """Generate values that are more concentrated at one end of a range."""
 
-    values = np.logspace(0, skew_amount, number_samples)
-    values = values - np.min(values)
-    values = values / np.max(values)
-    if skew_high:
-        values = 1 - values
-    values = values * (parameter.high - parameter.low)
-    values = values + parameter.low
-    values = np.round(values, parameter.precision)
-    np.random.shuffle(values)
+    population = np.arange(bounds[0], bounds[1]+step, step)
+    weights = np.logspace(0, skew_amount, len(population))
+    if not skew_high:
+        weights = 1 - weights
+    print(weights)
+    values = random.choices(population, weights=weights, k=number_samples)
+    values = np.array(values)
+    values = np.round(values / step) * step
+    values = np.round(values, precision)
+    plot_histogram(values)
+
+    return values
+
+    # values = np.logspace(0, skew_amount, number_samples)
+    # values = values - np.min(values)
+    # values = values / np.max(values)
+    # if skew_high:
+    #     values = 1 - values
+    # values = values * (bounds[1] - bounds[0])
+    # values = values + bounds[0]
+    # values = np.round(values / step) * step
+    # values = np.round(values, precision)
+    # np.random.shuffle(values)
     
-    plot_histogram(values, title=parameter.name)
+    # plot_histogram(values)
 
     return values
 
@@ -422,5 +436,6 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_sample
 
 
 if __name__ == "__main__":
+    # a = sorted(generate_logspace_values(1000, (2, 4), 0.1, 2, 1, True))
     samples = read_samples(FILENAME_SAMPLES_VALIDATION)
-    stratified_samples = get_stratified_samples(samples, FOLDER_VALIDATION_LABELS, 20, 800)
+    stratified_samples = get_stratified_samples(samples, 'Cantilever/Labels', 20, 800)
