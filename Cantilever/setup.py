@@ -42,7 +42,7 @@ length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
 load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=360, step=None, precision=0, name='Angle', units='Degrees')
+angle = Parameter(low=0, high=360, step=1, precision=0, name='Angle', units='Degrees')
 # Names of quantities stored in the text files that are not randomly generated.
 KEY_SAMPLE_NUMBER = 'Sample Number'
 KEY_X_LOAD = 'Load X'
@@ -78,10 +78,10 @@ def generate_samples(number_samples: int) -> dict:
     # Generate sample values for each parameter.
     samples = {}
     samples[KEY_SAMPLE_NUMBER] = range(1, number_samples+1)
-    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=1.5, skew_high=True)
-    samples[angle.name] = generate_angles(number_samples, angle, std=45)
-    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)  #generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
-    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)  #generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
+    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=2.0, skew_high=True)
+    samples[angle.name] = generate_angles(number_samples, (angle.low, angle.high), angle.step, angle.precision, std=45)
+    samples[length.name] = generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
+    samples[height.name] = generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the image size corresponding to the geometry.
@@ -108,7 +108,8 @@ def generate_uniform_values(number_samples: int, bounds: Tuple[float, float], st
     """Generate uniformly distributed, evenly spaced values."""
 
     values = np.arange(bounds[0], bounds[1]+step, step)
-    values = np.array(random.choices(values, k=number_samples))
+    values = random.choices(values, k=number_samples)
+    values = np.array(values)
     values = np.round(values, precision)
 
     return values
@@ -119,46 +120,31 @@ def generate_logspace_values(number_samples: int, bounds: Tuple[float, float], s
     population = np.arange(bounds[0], bounds[1]+step, step)
     weights = np.logspace(0, skew_amount, len(population))
     if not skew_high:
-        weights = 1 - weights
-    print(weights)
+        weights = weights[::-1]
     values = random.choices(population, weights=weights, k=number_samples)
     values = np.array(values)
     values = np.round(values / step) * step
     values = np.round(values, precision)
+    
     plot_histogram(values)
 
     return values
 
-    # values = np.logspace(0, skew_amount, number_samples)
-    # values = values - np.min(values)
-    # values = values / np.max(values)
-    # if skew_high:
-    #     values = 1 - values
-    # values = values * (bounds[1] - bounds[0])
-    # values = values + bounds[0]
-    # values = np.round(values / step) * step
-    # values = np.round(values, precision)
-    # np.random.shuffle(values)
-    
-    # plot_histogram(values)
-
-    return values
-
-def generate_angles(number_samples: int, parameter: Parameter, std: int) -> np.ndarray:
+def generate_angles(number_samples: int, bounds: Tuple[float, float], step, precision, std: int) -> np.ndarray:
     """Generate angle samples using a distribution with two peaks centered at 90 and 270 degrees."""
 
     values = np.append(
         np.random.normal(90, std, number_samples//2),
         np.random.normal(270, std, number_samples//2),
     )
-    assert values.size == number_samples
-    values = np.round(values, parameter.precision)
-    np.random.shuffle(values)
+    assert values.size == number_samples, f"The number of samples {number_samples} should be even."
+    values = np.round(values / step) * step
+    values = np.round(values, precision)
     # Convert values outside [0, 360] to the equivalent value within that range.
     values = np.mod(values, 360)
-    assert not np.any((values > parameter.high) | (values < parameter.low)), f"Angle values were generated outside the specified range: {parameter.low} to {parameter.high}."
+    assert not np.any((values > bounds[1]) | (values < bounds[0])), f"Angle values were generated outside the specified range: {bounds[0]} to {bounds[1]}."
 
-    plot_histogram(values, title=parameter.name)
+    plot_histogram(values)
 
     return values
 
@@ -293,7 +279,7 @@ def write_ansys_script(samples: dict, filename: str) -> None:
         print(f'Wrote {filename}.')
 
 def generate_label_images(samples: dict, folder: str) -> np.ndarray:
-    """Return a 4D array of images for all FEA text files found in the specified folder, with dimensions: [samples, channels, height, width]."""
+    """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
     number_samples = get_sample_size(samples)
     stresses, displacements = read_labels(folder, samples[KEY_SAMPLE_NUMBER])
 
@@ -324,19 +310,24 @@ def generate_label_images(samples: dict, folder: str) -> np.ndarray:
             array[1:-1, 0] = values[2+2*mesh_divisions[0]+mesh_divisions[1]-1:2+2*mesh_divisions[0]+2*mesh_divisions[1]-2]
             # Insert the array.
             labels[i, channel, :array.shape[0], :array.shape[1]] = array
-    
+
     return labels
 
 def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """Return arrays of data from text files in the specified folder."""
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
+    fea_filenames = sorted(fea_filenames)
     # Only use the filenames that match the specified sample numbers.
     if sample_numbers:
+        # Get the integer from the filename, assuming format: "xxx_######.png".
+        number_from_filename = lambda filename: int(filename.split('.')[0].split('_')[-1])
+        # Get the index of the given integer in the provided sample numbers.
+        order_in_given_sample_numbers = lambda filename: sample_numbers.index(number_from_filename(filename))
         fea_filenames = [
             filename for filename in fea_filenames
             if int(filename.split('.')[0].split('_')[-1]) in sample_numbers
         ]
-    fea_filenames = sorted(fea_filenames)
+        fea_filenames = sorted(fea_filenames, key=order_in_given_sample_numbers)
     sample_size = len(fea_filenames)
 
     stresses = [None] * sample_size
@@ -400,42 +391,45 @@ def write_image(array: np.ndarray, filename: str) -> None:
         image.save(filename)
 
 def get_stratified_samples(samples: dict, folder: str, bins: int, desired_sample_size: int) -> dict:
-    """Return a subset of the given samples in which the same number of maximum stress values exists in each bin. Show a histogram of the maximum stress values in each FEA label for the specified dataset, and verify that there are enough samples to create a dataset of the desired size."""
+    """Return a subset of the given samples in which the same number of maximum stress values exists in each bin."""
 
-    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
-    fea_filenames = sorted(fea_filenames)
-
+    # Get the maximum stress values in each label.
     stresses, displacements = read_labels(folder)
-    stresses = [np.max(stress) for stress in stresses]
+    stresses = np.array([np.max(stress) for stress in stresses])
 
+    # Show a histogram.
     maximum_stress = np.max(stresses)
     histogram_range = (0, maximum_stress)  # Set minimum to 0 prevent small stresses being excluded
     histogram, bin_edges = np.histogram(stresses, bins=bins, range=histogram_range)
     minimum_frequency = np.min(histogram)
     minimum_required_frequency = math.ceil(desired_sample_size / bins)
 
-    plt.figure()
-    plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
-    plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
-    plt.xticks(bin_edges, rotation=90, fontsize=8)
-    plt.title(f"{len(fea_filenames)} total samples, {desired_sample_size} required stratified samples")
-    plt.legend([f"{minimum_required_frequency} samples required in each bin"])
-    plt.show()
+    # plt.figure()
+    # plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
+    # plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
+    # plt.xticks(bin_edges, rotation=90, fontsize=8)
+    # plt.title(f"{len(stresses)} total samples, {desired_sample_size} required stratified samples")
+    # plt.legend([f"{minimum_required_frequency} samples required in each bin"])
+    # plt.show()
 
-    assert minimum_frequency * bins >= desired_sample_size, f"The current dataset only provides {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. The dataset size should be at least {round(len(fea_filenames) * minimum_required_frequency / minimum_frequency)}."
+    # Verify that there are enough samples to create a dataset of the desired size.
+    assert minimum_frequency * bins >= desired_sample_size, f"The current dataset only provides {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. Increase the dataset size to around {round(len(stresses) * minimum_required_frequency / minimum_frequency)}."
 
-    sample_numbers = []
+    sample_indices = np.empty(0, dtype=int)
     for i, bin_edge in enumerate(bin_edges[1:], 1):
-        bin_stresses = [stress for stress in stresses if bin_edges[i-1] < stress <= bin_edge]
-        for bin_stress in bin_stresses:
-            sample_numbers.append(stresses.index(bin_stress))
-            if len(sample_numbers) >= i * minimum_required_frequency:
-                break
+        # Indices of values that fall inside current bin.
+        indices = np.nonzero((bin_edges[i-1] < stresses) & (stresses <= bin_edge))[0]
+        # Select the first n values only.
+        indices = indices[:minimum_required_frequency]
+        sample_indices = np.append(sample_indices, indices)
+    np.random.shuffle(sample_indices)
+    stratified_samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
 
-    return samples
+    return stratified_samples
 
 
 if __name__ == "__main__":
     # a = sorted(generate_logspace_values(1000, (2, 4), 0.1, 2, 1, True))
-    samples = read_samples(FILENAME_SAMPLES_VALIDATION)
-    stratified_samples = get_stratified_samples(samples, 'Cantilever/Labels', 20, 800)
+
+    samples = read_samples(FILENAME_SAMPLES_TRAIN)
+    stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', bins=10, desired_sample_size=390)

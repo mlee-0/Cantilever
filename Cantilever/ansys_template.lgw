@@ -11,6 +11,9 @@ WPSTYLE,,,,,,,,0
 ! /REPLOT,RESIZE  
 !*  
 
+! Disable "Solution is done" popup window.
+KEYW,pr_sgui,1
+
 ! placeholder_loop_start
 
 ! placeholder_define_samples
@@ -27,6 +30,7 @@ KEYW,MAGHFE,0
 KEYW,MAGELC,0   
 KEYW,PR_MULTI,0 
 /GO 
+
 !*  
 ! /COM,   
 ! /COM,Preferences for GUI filtering have been set to display:
