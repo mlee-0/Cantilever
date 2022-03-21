@@ -12,6 +12,7 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 try:
@@ -62,11 +63,9 @@ OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
 # Folders and files.
 FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
 FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, 'Train Labels')
-FOLDER_VALIDATION_LABELS = os.path.join(FOLDER_ROOT, 'Validation Labels')
 FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, 'Test Labels')
-FILENAME_SAMPLES_TRAIN = 'samples_train.txt'
-FILENAME_SAMPLES_VALIDATION = 'samples_validation.txt'
-FILENAME_SAMPLES_TEST = 'samples_test.txt'
+FILENAME_SAMPLES_TRAIN = 'samples_train.csv'
+FILENAME_SAMPLES_TEST = 'samples_test.csv'
 
 # Number of digits used for numerical file names.
 NUMBER_DIGITS = 6
@@ -158,31 +157,17 @@ def plot_histogram(values: np.ndarray, title=None) -> None:
 def write_samples(samples: dict, filename: str) -> None:
     """Write the specified sample values to a text file."""
 
-    number_samples = get_sample_size(samples)
-    text = [None] * number_samples
-    for i in range(number_samples):
-        text[i] = ','.join(
-            [f'{key}:{value[i]}' for key, value in samples.items()]
-        ) + '\n'
-    with open(os.path.join(FOLDER_ROOT, filename), 'w') as file:
-        file.writelines(text)
+    data = pd.DataFrame.from_dict(samples)
+    data.to_csv(os.path.join(FOLDER_ROOT, filename))
     print(f'Wrote samples in {filename}.')
 
 def read_samples(filename: str) -> dict:
     """Return the sample values found in the text file previously generated."""
-
+    
     samples = {}
     filename = os.path.join(FOLDER_ROOT, filename)
     try:
-        with open(filename, 'r') as file:
-            for line in file.readlines():
-                for i, data in enumerate(line.split(',')):
-                    key, value = data.split(':')
-                    key, value = key.strip(), float(value) if i != 0 else int(value)
-                    if key in samples:
-                        samples[key].append(value)
-                    else:
-                        samples[key] = [value]
+        samples = pd.read_csv(filename).to_dict()
     except FileNotFoundError:
         print(f'"{filename}" not found.')
         return
@@ -404,13 +389,13 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_sample
     minimum_frequency = np.min(histogram)
     minimum_required_frequency = math.ceil(desired_sample_size / bins)
 
-    # plt.figure()
-    # plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
-    # plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
-    # plt.xticks(bin_edges, rotation=90, fontsize=8)
-    # plt.title(f"{len(stresses)} total samples, {desired_sample_size} required stratified samples")
-    # plt.legend([f"{minimum_required_frequency} samples required in each bin"])
-    # plt.show()
+    plt.figure()
+    plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
+    plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
+    plt.xticks(bin_edges, rotation=90, fontsize=8)
+    plt.title(f"{len(stresses)} total samples, {desired_sample_size} required stratified samples")
+    plt.legend([f"{minimum_required_frequency} samples required in each bin"])
+    plt.show()
 
     # Verify that there are enough samples to create a dataset of the desired size.
     assert minimum_frequency * bins >= desired_sample_size, f"The current dataset only provides {minimum_frequency * bins} stratified samples out of the required {desired_sample_size}. Increase the dataset size to around {round(len(stresses) * minimum_required_frequency / minimum_frequency)}."
@@ -432,4 +417,4 @@ if __name__ == "__main__":
     # a = sorted(generate_logspace_values(1000, (2, 4), 0.1, 2, 1, True))
 
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', bins=10, desired_sample_size=390)
+    stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', bins=10, desired_sample_size=1000)

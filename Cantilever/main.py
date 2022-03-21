@@ -23,7 +23,7 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
 BATCH_SIZE = 1
 LEARNING_RATE = 0.00001  # 0.000001 for Nie
-EPOCHS = 50
+EPOCHS = 100
 Model = FullyCnn
 
 
@@ -129,13 +129,13 @@ if __name__ == '__main__':
         loss = checkpoint['loss']
 
         print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
-        if not input('Continue training this model? (y/n) ').lower().startswith('y'):
+        if not input('Continue training this model? [y/n] ').lower().startswith('y'):
             train_model = False
         
         model.train(train_model)
     
     # Set up the training and validation data.
-    DESIRED_SAMPLE_SIZE = 390
+    DESIRED_SAMPLE_SIZE = 760
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=10, 
     desired_sample_size=DESIRED_SAMPLE_SIZE)
