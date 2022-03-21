@@ -19,12 +19,12 @@ from networks import *
 from setup import *
 
 
-# Model parameters file name and path.
+# Model parameters file path.
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 # Training hyperparameters.
-BATCH_SIZE = 1
-LEARNING_RATE = 0.00001  # 0.000001 for Nie
 EPOCHS = 100
+LEARNING_RATE = 0.00001  # 0.000001 for Nie
+BATCH_SIZE = 1
 Model = FullyCnn
 
 
@@ -55,7 +55,7 @@ class CantileverDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
-def train(dataloader, model, loss_function, optimizer):
+def train(dataloader, model, loss_function, optimizer, device):
     """Train the model for one epoch only."""
 
     for batch, (data, label) in enumerate(dataloader):
@@ -79,7 +79,7 @@ def train(dataloader, model, loss_function, optimizer):
             print(f'Batch {batch}...', end='\r')
     print()
 
-def test(dataloader, model, loss_function):
+def test(dataloader, model, loss_function, device):
     """Test the model for one epoch only."""
 
     batch_count = len(dataloader)
@@ -107,9 +107,9 @@ def save(epoch, model, optimizer, loss):
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
+def main(queue=None):
+    """Train and test the model."""
 
-# Train and test the model.
-if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
@@ -155,8 +155,8 @@ if __name__ == '__main__':
         test_loss_values = []
         for epoch in epochs:
             print(f'Epoch {epoch+1}\n------------------------')
-            train(train_dataloader, model, loss_function, optimizer)
-            test_loss = test(validation_dataloader, model, loss_function)
+            train(train_dataloader, model, loss_function, optimizer, device)
+            test_loss = test(validation_dataloader, model, loss_function, device)
             test_loss_values.append(test_loss)
             # Save the model parameters periodically.
             if (epoch+1) % 5 == 0:
@@ -178,12 +178,6 @@ if __name__ == '__main__':
     test_dataset = CantileverDataset(test_samples, FOLDER_TEST_LABELS)
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     
-    # Remove existing output images in the folder.
-    # filenames = glob.glob(os.path.join(FOLDER_TEST_LABELS, '*.png'))
-    # for filename in filenames:
-    #     os.remove(filename)
-    # print(f'Deleted {len(filenames)} existing images in {FOLDER_TEST_LABELS}.')
-    
     # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
     max_values = [
         max([
@@ -195,7 +189,6 @@ if __name__ == '__main__':
     # Test the model on the input images found in the folder.
     test_labels = []
     test_outputs = []
-    # evaluation_results = [{} for channel in range(OUTPUT_CHANNELS)]
     for i, (test_input, label) in enumerate(test_dataloader):
         test_input = test_input.to(device)
         label = label.to(device)
@@ -216,13 +209,6 @@ if __name__ == '__main__':
                 array_to_colormap(test_output[channel, ...], max_values[channel]),
                 os.path.join(FOLDER_ROOT, f'{i+1}_test_{channel_name}.png'),
                 )
-            # # Evaluate outputs with multiple evaluation metrics.
-            # evaluation_result = metrics.evaluate(test_output[channel, ...], label[channel, ...])
-            # for name, result in evaluation_result.items():
-            #     try:
-            #         evaluation_results[channel][name].append(result)
-            #     except KeyError:
-            #         evaluation_results[channel][name] = [result]
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_ROOT}.')
 
     # Calculate and plot evaluation metrics.
@@ -230,7 +216,7 @@ if __name__ == '__main__':
         # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
 
         # Area metric.
-        figure = plt.figure()
+        plt.figure()
         NUMBER_COLUMNS = 4
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
@@ -246,7 +232,7 @@ if __name__ == '__main__':
         plt.show()
 
         # Mean error.
-        figure = plt.figure()
+        plt.figure()
         me = []
         sample_numbers = range(1, len(test_outputs)+1)
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
@@ -261,14 +247,6 @@ if __name__ == '__main__':
         plt.title(f"Mean Error ({channel_name.capitalize()})", fontweight='bold')
         plt.show()
 
-        # for i, (name, result) in enumerate(evaluation_results[channel].items()):
-        #     plt.subplot(1, len(evaluation_results[channel]), i+1)
-        #     plt.plot(result, '.', markeredgewidth=5, label=['CNN', 'FEA'])
-        #     if isinstance(result[0], tuple):
-        #         plt.legend()
-        #     plt.grid(visible=True, axis='y')
-        #     plt.xlabel('Sample')
-        #     plt.xticks(range(len(test_dataset)))
-        #     # plt.ylim((0, 1))
-        #     plt.title(name, fontweight='bold')
-        # plt.show()
+
+if __name__ == '__main__':
+    main()
