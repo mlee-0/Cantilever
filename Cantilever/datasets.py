@@ -169,27 +169,30 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_subset
     # Get the maximum stress values in each label.
     stresses, displacements = read_labels(folder)
     stresses = np.array([np.max(stress) for stress in stresses])
-    raw_dataset_size = len(stresses)
+    actual_raw_size = len(stresses)
 
-    # Show a histogram.
+    # Calculate the histogram.
     maximum_stress = np.max(stresses)
     histogram_range = (0, maximum_stress)  # Set minimum to 0 prevent small stresses being excluded
     frequencies, bin_edges = np.histogram(stresses, bins=bins, range=histogram_range)
     minimum_frequency = np.min(frequencies)
     minimum_required_frequency = math.ceil(desired_subset_size / bins)
     actual_subset_size = minimum_frequency * bins
-    recommended_raw_dataset_size = round(raw_dataset_size * minimum_required_frequency / minimum_frequency)
+    recommended_raw_size = actual_raw_size * minimum_required_frequency / minimum_frequency
+    
     if actual_subset_size < desired_subset_size:
         plt.figure()
         plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color=BLUE)
         plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
         plt.xticks(bin_edges, rotation=90, fontsize=8)
-        plt.title(f"{raw_dataset_size} total samples, {desired_subset_size} desired samples")
+        index = np.nonzero(frequencies == minimum_frequency)[0][0]
+        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[index:index+2]), minimum_frequency), color=RED, fontweight='bold', horizontalalignment='center')
+        plt.title(f"Subset contains {actual_subset_size} out of desired {desired_subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=8)
         plt.legend([f"{minimum_required_frequency} samples required in each bin"])
         plt.show()
 
     # Verify that there are enough samples to create a dataset of the desired size.
-    assert actual_subset_size >= desired_subset_size, f"The current dataset only provides {actual_subset_size} stratified samples out of the required {desired_subset_size}. Increase the dataset size to around {recommended_raw_dataset_size}."
+    assert actual_subset_size >= desired_subset_size, f"The subset only contains {actual_subset_size} out of the desired {desired_subset_size}. The raw dataset of {actual_raw_size} samples should be around {recommended_raw_size:.0f}."
 
     sample_indices = np.empty(0, dtype=int)
     for i, bin_edge in enumerate(bin_edges[1:], 1):
@@ -212,7 +215,7 @@ WRITE_MODE = 'w'
 # if __name__ == "__main__":
 #     # a = sorted(generate_logspace_values(1000, (2, 4), 0.1, 2, 1, True))
 
-#     samples = read_samples(FILENAME_SAMPLES_TRAIN)
+#     samples = read_samples(FILENAME_SAMPLES_TEST)
 #     stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', bins=10, desired_subset_size=1000)
 
 if __name__ == '__main__':
