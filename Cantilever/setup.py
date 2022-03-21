@@ -74,6 +74,8 @@ NUMBER_DIGITS = 6
 def generate_samples(number_samples: int, start: int = 1) -> dict:
     """Generate sample values for each parameter and return them as a dictionary. Specify the starting sample number if generating samples to add to an existing dataset."""
 
+    assert start != 0, f"The starting sample number {start} should be a positive integer."
+
     # Generate sample values for each parameter.
     samples = {}
     samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
@@ -154,15 +156,21 @@ def plot_histogram(values: np.ndarray, title=None) -> None:
         plt.title(title)
     plt.show()
 
-def write_samples(samples: dict, filename: str) -> None:
-    """Write the specified sample values to a text file."""
+def write_samples(samples: dict, filename: str, mode: str = 'w') -> None:
+    """
+    Write the specified sample values to a file.
 
+    `mode`: Write to a file ('w') or append to an existing file ('a').
+    """
+
+    ALLOWED_MODES = ['w', 'a']
+    assert mode in ALLOWED_MODES, f"The specified mode '{mode}' should be one of {ALLOWED_MODES}."
     data = pd.DataFrame.from_dict(samples)
-    data.to_csv(os.path.join(FOLDER_ROOT, filename))
-    print(f'Wrote samples in {filename}.')
+    data.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), mode=mode)
+    print(f"{'Wrote' if mode == 'w' else 'Appended'} samples in {filename}.")
 
 def read_samples(filename: str) -> dict:
-    """Return the sample values found in the text file previously generated."""
+    """Return the sample values found in the file previously generated."""
     
     samples = {}
     filename = os.path.join(FOLDER_ROOT, filename)
@@ -393,7 +401,7 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_sample
     plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color='#0095ff')
     plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
     plt.xticks(bin_edges, rotation=90, fontsize=8)
-    plt.title(f"{len(stresses)} total samples, {desired_sample_size} required stratified samples")
+    plt.title(f"{len(stresses)} total samples, {desired_sample_size} desired samples")
     plt.legend([f"{minimum_required_frequency} samples required in each bin"])
     plt.show()
 
