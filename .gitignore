@@ -3,6 +3,9 @@
 
 *.pth
 *.png
+Cantilever/ansys_script_train.lgw
+Cantilever/ansys_script_validation.lgw
+Cantilever/ansys_script_test.lgw
 Cantilever/Train Labels
 Cantilever/Validation Labels
 Cantilever/Test Labels
