@@ -71,16 +71,16 @@ FILENAME_SAMPLES_TEST = 'samples_test.csv'
 NUMBER_DIGITS = 6
 
 
-def generate_samples(number_samples: int) -> dict:
-    """Generate sample values for each parameter and return them as a dictionary."""
+def generate_samples(number_samples: int, start: int = 1) -> dict:
+    """Generate sample values for each parameter and return them as a dictionary. Specify the starting sample number if generating samples to add to an existing dataset."""
 
     # Generate sample values for each parameter.
     samples = {}
-    samples[KEY_SAMPLE_NUMBER] = range(1, number_samples+1)
-    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=2.0, skew_high=True)
+    samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
+    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=3.0, skew_high=True)
     samples[angle.name] = generate_angles(number_samples, (angle.low, angle.high), angle.step, angle.precision, std=45)
-    samples[length.name] = generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
-    samples[height.name] = generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
+    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)
+    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the image size corresponding to the geometry.
