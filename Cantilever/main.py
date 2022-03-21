@@ -13,6 +13,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
 
+from datasets import *
 import metrics
 from networks import *
 from setup import *
@@ -135,10 +136,10 @@ if __name__ == '__main__':
         model.train(train_model)
     
     # Set up the training and validation data.
-    DESIRED_SAMPLE_SIZE = 760
+    DESIRED_SAMPLE_SIZE = 1000
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=10, 
-    desired_sample_size=DESIRED_SAMPLE_SIZE)
+    desired_subset_size=DESIRED_SAMPLE_SIZE)
 
     sample_size_train = int(0.8 * DESIRED_SAMPLE_SIZE)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
@@ -166,7 +167,7 @@ if __name__ == '__main__':
         
         # Plot the loss history.
         plt.figure()
-        plt.plot(epochs, test_loss_values, '-o', color='#0095ff')
+        plt.plot(epochs, test_loss_values, '-o', color=BLUE)
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.grid(axis='y')
@@ -225,8 +226,6 @@ if __name__ == '__main__':
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_ROOT}.')
 
     # Calculate and plot evaluation metrics.
-    BLUE = '#0095ff'
-    RED = '#ff4040'
     for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
         # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
 
