@@ -94,11 +94,22 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
         keep_training = False
         test_only = False
     
-    # Set up the training and validation data.
+    # Create a subset of the entire dataset, or load the previously created subset.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=bins, 
-    desired_subset_size=desired_sample_size)
+    filename_subset = os.path.join(FOLDER_ROOT, FILENAME_SUBSET)
+    try:
+        with open(filename_subset, 'r') as f:
+            sample_numbers = [int(_) for _ in f.readlines()]
+        sample_indices = np.array(sample_numbers) - 1
+        samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
+        print(f"Using previously created subset from {filename_subset}, with {len(sample_numbers)} samples.")
+    except FileNotFoundError:
+        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=bins, 
+        desired_subset_size=desired_sample_size)
+        with open(filename_subset, 'w') as f:
+            f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
 
+    # Set up the training and validation data.
     sample_size_train = round(training_split * desired_sample_size)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
     validation_samples = {key: value[sample_size_train:] for key, value in samples.items()}
@@ -255,11 +266,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 10 #100
+    EPOCHS = 10
     LEARNING_RATE = 0.00001  # 0.000001 for Nie
     BATCH_SIZE = 1
     Model = FullyCnn
-    DESIRED_SAMPLE_SIZE = 40 #530
+    DESIRED_SAMPLE_SIZE = 730
     BINS = 4 #10
     TRAINING_SPLIT = 0.8
 

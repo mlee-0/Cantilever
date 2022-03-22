@@ -314,7 +314,13 @@ class AutoencoderCnn(nn.Module):
 
 
 # Store all classes defined in this module in a dictionary.
-networks = {}
+networks = []
+start_lines = {}
 for name, obj in inspect.getmembers(sys.modules[__name__]):
     if inspect.isclass(obj):
-        networks[name] = obj
+        # Preserve the order the classes are defined in.
+        _, start_line = inspect.getsourcelines(obj)
+        start_lines[name] = start_line
+        networks.append((name, obj))
+networks = sorted(networks, key=lambda _: start_lines[_[0]])
+networks = dict(networks)

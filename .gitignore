@@ -3,6 +3,7 @@
 
 *.pth
 *.png
+subset.txt
 Cantilever/ansys_script_train.lgw
 Cantilever/ansys_script_test.lgw
 Cantilever/Train Labels
