@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
         self.value_dataset_size.setSingleStep(10)
         self.value_dataset_size.setValue(530)
         self.value_dataset_size.setAlignment(Qt.AlignRight)
+        self.value_dataset_size.valueChanged.connect(self.on_training_split_changed)
         layout = QHBoxLayout()
         layout.addWidget(label_dataset_size)
         layout.addWidget(self.value_dataset_size)
@@ -184,14 +185,16 @@ class MainWindow(QMainWindow):
         """Start training or testing."""
         if self.sender() is self.button_train:
             train_model = self.checkbox_keep_training.isChecked()
+            test_only = False
         elif self.sender() is self.button_test:
             train_model = False
+            test_only = True
 
         self.sidebar.setEnabled(False)
         self.button_stop.setEnabled(True)
         self.thread = threading.Thread(
             target=main.main,
-            args=[self.value_epochs.value(), self.value_learning.value(), self.value_batch.value(), self.value_dataset_size.value(), self.value_bins.value(), self.value_training_split.value()/100, networks.networks[self.value_model.currentText()], train_model, self.queue, self.queue_to_main],
+            args=[self.value_epochs.value(), self.value_learning.value(), self.value_batch.value(), self.value_dataset_size.value(), self.value_bins.value(), self.value_training_split.value()/100, networks.networks[self.value_model.currentText()], train_model, test_only, self.queue, self.queue_to_main],
         )
         self.thread.start()
         self.timer.start()
@@ -244,6 +247,8 @@ class MainWindow(QMainWindow):
             self.sidebar.setEnabled(True)
             self.button_stop.setEnabled(False)
             self.progress_bar.reset()
+            self.checkbox_keep_training.setChecked(True)
+            self.timer.stop()
 
 
 if __name__ == "__main__":

@@ -60,7 +60,7 @@ def save(epoch, model, optimizer, loss_history):
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, training_split: float, Model: nn.Module, train_model=None, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -75,20 +75,24 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
     epochs = range(epoch_count)
     previous_test_loss = []
     if os.path.exists(FILEPATH_MODEL):
-        checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        epoch = checkpoint['epoch'] + 1
-        epochs = range(epoch, epoch+epoch_count)
-        previous_test_loss = checkpoint['loss']
-
-        print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
-        if train_model is None:
-            train_model = input('Continue training this model? [y/n] ') == 'y'
+        if not test_only:
+            if keep_training is None:
+                keep_training = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+        else:
+            keep_training = True
         
-        model.train(train_model)
+        if keep_training:
+            checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            epoch = checkpoint['epoch'] + 1
+            epochs = range(epoch, epoch+epoch_count)
+            previous_test_loss = checkpoint['loss']
+            
+            model.train(not test_only)
     else:
-        train_model = True
+        keep_training = False
+        test_only = False
     
     # Set up the training and validation data.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
@@ -104,7 +108,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
 
-    if train_model:
+    if not test_only:
         # Train the model and record the accuracy and loss.
         test_loss = []
         for epoch in epochs:
@@ -259,4 +263,7 @@ if __name__ == '__main__':
     BINS = 4 #10
     TRAINING_SPLIT = 0.8
 
-    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, TRAINING_SPLIT, Model)
+    main(
+        EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, TRAINING_SPLIT, Model,
+        keep_training=True, test_only=False,
+    )
