@@ -112,6 +112,7 @@ class MainWindow(QMainWindow):
         self.timer.setInterval(10)
     
     def on_start(self):
+        """Start training or testing."""
         if self.sender() is self.button_train:
             train_model = self.checkbox_continue_train.isChecked()
         elif self.sender() is self.button_test:
@@ -127,6 +128,7 @@ class MainWindow(QMainWindow):
         self.timer.start()
     
     def on_stop(self):
+        """Stop training after the current epoch has ended."""
         self.button_stop.setEnabled(False)
         self.queue_to_main.put(True)
     
@@ -134,6 +136,7 @@ class MainWindow(QMainWindow):
         self.figure.clear()
         axis = self.figure.add_subplot(111)
         axis.plot(epochs[:len(loss)], loss, '-o')
+        axis.set_xlim([epochs[0], epochs[-1]])
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
         axis.grid(axis='y')
@@ -144,7 +147,7 @@ class MainWindow(QMainWindow):
             epoch, epochs, losses = self.queue.get()
             self.progress_bar.setValue(epoch)
             self.progress_bar.setMaximum(max(epochs))
-            self.label_progress.setText(f"{epoch}/{max(epochs)}")
+            self.label_progress.setText(f"{epoch+1}/{max(epochs)+1}")
             self.plot_loss(epochs, losses)
         # Thread has stopped.
         if not self.thread.is_alive():

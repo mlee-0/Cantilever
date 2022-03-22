@@ -50,48 +50,6 @@ class CantileverDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
-def train(dataloader, model, loss_function, optimizer, device):
-    """Train the model for one epoch only."""
-
-    for batch, (data, label) in enumerate(dataloader):
-        data = data.to(device)
-        label = label.to(device)
-
-        output = model(data)
-        loss = loss_function(output, label.float())
-
-        # Reset gradients of model parameters.
-        optimizer.zero_grad()
-        # Backpropagate the prediction loss.
-        loss.backward()
-        # Adjust model parameters.
-        optimizer.step()
-
-        # if batch % (BATCH_SIZE * 10) == 0:
-        #     loss, current = loss.item(), batch * len(data)
-        #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
-        if batch % 10 == 0:
-            print(f'Batch {batch}...', end='\r')
-    print()
-
-def test(dataloader, model, loss_function, device):
-    """Test the model for one epoch only."""
-
-    batch_count = len(dataloader)
-    test_loss = 0
-
-    with torch.no_grad():
-        for data, label in dataloader:
-            data = data.to(device)
-            label = label.to(device)
-
-            output = model(data)
-            test_loss += loss_function(output, label.float())
-
-    test_loss /= batch_count
-    print(f'Average loss: {test_loss:>8f}')
-    return test_loss
-
 def save(epoch, model, optimizer, loss):
     """Save model parameters to a file."""
     torch.save({
@@ -133,7 +91,7 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
         train_model = True
     
     # Set up the training and validation data.
-    DESIRED_SAMPLE_SIZE = 380
+    DESIRED_SAMPLE_SIZE = 460
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=10, 
     desired_subset_size=DESIRED_SAMPLE_SIZE)
@@ -168,12 +126,11 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
                 # if batch % (BATCH_SIZE * 10) == 0:
                 #     loss, current = loss.item(), batch * len(data)
                 #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
-                if batch % 10 == 0:
-                    print(f'Batch {batch}...', end='\r')
+                if (batch+1) % 10 == 0:
+                    print(f'Batch {batch+1}...', end='\r')
             print()
 
             # Train on the validation dataset.
-            test_loss = test(validation_dataloader, model, loss_function, device)
             batch_count = len(validation_dataloader)
             test_loss = 0
             with torch.no_grad():
@@ -191,7 +148,7 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
                 save(epoch, model, optimizer, test_loss)
             
             if queue:
-                queue.put([epoch+1, epochs, test_loss_values])
+                queue.put([epoch, epochs, test_loss_values])
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -204,12 +161,13 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
         save(epoch, model, optimizer, test_loss)
         
         # Plot the loss history.
-        plt.figure()
-        plt.plot(epochs, test_loss_values, '-o', color=BLUE)
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.grid(axis='y')
-        plt.show()
+        if not queue:
+            plt.figure()
+            plt.plot(epochs, test_loss_values, '-o', color=BLUE)
+            plt.xlabel('Epochs')
+            plt.ylabel('Loss')
+            plt.grid(axis='y')
+            plt.show()
 
     # Set up the testing data.
     test_samples = read_samples(FILENAME_SAMPLES_TEST)
@@ -251,6 +209,9 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
 
     # Calculate and plot evaluation metrics.
     for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
+        if queue:
+            break
+
         # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
 
         # Area metric.
