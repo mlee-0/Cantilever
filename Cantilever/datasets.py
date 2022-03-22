@@ -100,7 +100,7 @@ def write_samples(samples: dict, filename: str, mode: str = 'w') -> None:
     ALLOWED_MODES = ['w', 'a']
     assert mode in ALLOWED_MODES, f"The specified mode '{mode}' should be one of {ALLOWED_MODES}."
     data = pd.DataFrame.from_dict(samples)
-    data.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), mode=mode)
+    data.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), index=False, mode=mode)
     print(f"{'Wrote' if mode == 'w' else 'Appended'} samples in {filename}.")
 
 def read_samples(filename: str) -> dict:
@@ -109,8 +109,8 @@ def read_samples(filename: str) -> dict:
     samples = {}
     filename = os.path.join(FOLDER_ROOT, filename)
     try:
-        data = pd.read_csv(filename, index_col=0)
-        samples = data.to_dict()
+        data = pd.read_csv(filename)
+        samples = data.to_dict(orient="list")
     except FileNotFoundError:
         print(f'"{filename}" not found.')
         return
