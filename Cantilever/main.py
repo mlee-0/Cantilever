@@ -21,11 +21,6 @@ from setup import *
 
 # Model parameters file path.
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
-# Training hyperparameters.
-EPOCHS = 100
-LEARNING_RATE = 0.00001  # 0.000001 for Nie
-BATCH_SIZE = 1
-Model = FullyCnn
 
 
 class CantileverDataset(Dataset):
@@ -107,7 +102,7 @@ def save(epoch, model, optimizer, loss):
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(queue=None):
+def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=None, queue_to_main=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -116,27 +111,29 @@ def main(queue=None):
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model = Model()
     model.to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss_function = nn.MSELoss()
     
-    train_model = True
-    epochs = range(EPOCHS)
+    epochs = range(epoch_count)
     if os.path.exists(FILEPATH_MODEL):
         checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
-        epochs = range(epoch, epoch+EPOCHS)
+        epochs = range(epoch, epoch+epoch_count)
         loss = checkpoint['loss']
 
         print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
-        if not input('Continue training this model? [y/n] ').lower().startswith('y'):
-            train_model = False
+        if train_model is None:
+            if not input('Continue training this model? [y/n] ').lower().startswith('y'):
+                train_model = False
         
         model.train(train_model)
+    else:
+        train_model = True
     
     # Set up the training and validation data.
-    DESIRED_SAMPLE_SIZE = 1000
+    DESIRED_SAMPLE_SIZE = 380
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=10, 
     desired_subset_size=DESIRED_SAMPLE_SIZE)
@@ -147,20 +144,61 @@ def main(queue=None):
 
     train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
 
     if train_model:
         # Train the model and record the accuracy and loss.
         test_loss_values = []
         for epoch in epochs:
             print(f'Epoch {epoch+1}\n------------------------')
-            train(train_dataloader, model, loss_function, optimizer, device)
+            
+            # Train on the training dataset.
+            for batch, (data, label) in enumerate(train_dataloader):
+                data = data.to(device)
+                label = label.to(device)
+                output = model(data)
+                loss = loss_function(output, label.float())
+                # Reset gradients of model parameters.
+                optimizer.zero_grad()
+                # Backpropagate the prediction loss.
+                loss.backward()
+                # Adjust model parameters.
+                optimizer.step()
+                # if batch % (BATCH_SIZE * 10) == 0:
+                #     loss, current = loss.item(), batch * len(data)
+                #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
+                if batch % 10 == 0:
+                    print(f'Batch {batch}...', end='\r')
+            print()
+
+            # Train on the validation dataset.
             test_loss = test(validation_dataloader, model, loss_function, device)
+            batch_count = len(validation_dataloader)
+            test_loss = 0
+            with torch.no_grad():
+                for data, label in validation_dataloader:
+                    data = data.to(device)
+                    label = label.to(device)
+                    output = model(data)
+                    test_loss += loss_function(output, label.float())
+            test_loss /= batch_count
             test_loss_values.append(test_loss)
+            print(f'Average loss: {test_loss:>8f}')
+
             # Save the model parameters periodically.
             if (epoch+1) % 5 == 0:
                 save(epoch, model, optimizer, test_loss)
+            
+            if queue:
+                queue.put([epoch+1, epochs, test_loss_values])
+            
+            if queue_to_main:
+                if not queue_to_main.empty():
+                    # Stop training.
+                    if queue_to_main.get() == True:
+                        queue_to_main.queue.clear()
+                        break
         
         # Save the model parameters.
         save(epoch, model, optimizer, test_loss)
@@ -249,4 +287,10 @@ def main(queue=None):
 
 
 if __name__ == '__main__':
-    main()
+    # Training hyperparameters.
+    EPOCHS = 100
+    LEARNING_RATE = 0.00001  # 0.000001 for Nie
+    BATCH_SIZE = 1
+    Model = FullyCnn
+
+    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, Model)

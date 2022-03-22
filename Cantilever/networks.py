@@ -2,7 +2,9 @@
 Networks with different architectures.
 '''
 
+import inspect
 import math
+import sys
 
 import numpy as np
 import torch
@@ -309,3 +311,10 @@ class AutoencoderCnn(nn.Module):
         x = x.reshape((1, *OUTPUT_SIZE))
 
         return x
+
+
+# Store all classes defined in this module in a dictionary.
+networks = {}
+for name, obj in inspect.getmembers(sys.modules[__name__]):
+    if inspect.isclass(obj):
+        networks[name] = obj

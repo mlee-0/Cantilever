@@ -175,18 +175,22 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
     sample_size = len(fea_filenames)
 
     stresses = [None] * sample_size
-    displacements = [None] * sample_size
+    displacements_x = [None] * sample_size
+    displacements_y = [None] * sample_size
     for i, fea_filename in enumerate(fea_filenames):
         with open(fea_filename, 'r') as file:
             stress, displacement_x, displacement_y = list(zip(
                 *[[float(value) for value in line.split(',')] for line in file.readlines()]
                 ))
-            stress = np.array(stress)
-            displacement = np.sqrt(
-                np.power(np.array(displacement_x), 2) + np.power(np.array(displacement_y), 2)
-                )
             stresses[i] = stress
-            displacements[i] = displacement
+            displacements_x[i] = displacement_x
+            displacements_y[i] = displacement_y
+        if (i+1) % 1000 == 0:
+            print(f"{i+1}/{sample_size}", end='\r')
+    print()
+    stresses = [np.array(stress) for stress in stresses]
+    displacements = [np.sqrt(np.power(np.array(x), 2) + np.power(np.array(y), 2)) for x, y in zip(displacements_x, displacements_y)]
+
     return stresses, displacements
 
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
