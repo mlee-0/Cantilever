@@ -182,10 +182,10 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_subset
     
     if actual_subset_size < desired_subset_size:
         plt.figure()
-        plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color=BLUE)
+        plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
         plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
         index = np.nonzero(frequencies == minimum_frequency)[0][0]
-        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[index:index+2]), minimum_frequency), color=RED, fontweight='bold', horizontalalignment='center')
+        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[index:index+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
         plt.xticks(bin_edges, rotation=90, fontsize=6)
         plt.xlabel("Stress")
         plt.title(f"Subset contains {actual_subset_size} out of desired {desired_subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)

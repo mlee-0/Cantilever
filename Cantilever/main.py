@@ -50,17 +50,17 @@ class CantileverDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
-def save(epoch, model, optimizer, loss):
+def save(epoch, model, optimizer, loss_history):
     """Save model parameters to a file."""
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss,
+        'loss': loss_history,
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, training_split: float, Model: nn.Module, train_model=None, queue=None, queue_to_main=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -73,30 +73,29 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
     loss_function = nn.MSELoss()
     
     epochs = range(epoch_count)
+    previous_test_loss = []
     if os.path.exists(FILEPATH_MODEL):
         checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
         epochs = range(epoch, epoch+epoch_count)
-        loss = checkpoint['loss']
+        previous_test_loss = checkpoint['loss']
 
         print(f'Loaded previously trained parameters from {FILEPATH_MODEL}.')
         if train_model is None:
-            if not input('Continue training this model? [y/n] ').lower().startswith('y'):
-                train_model = False
+            train_model = input('Continue training this model? [y/n] ') == 'y'
         
         model.train(train_model)
     else:
         train_model = True
     
     # Set up the training and validation data.
-    DESIRED_SAMPLE_SIZE = 460
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=10, 
-    desired_subset_size=DESIRED_SAMPLE_SIZE)
+    samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=bins, 
+    desired_subset_size=desired_sample_size)
 
-    sample_size_train = int(0.8 * DESIRED_SAMPLE_SIZE)
+    sample_size_train = round(training_split * desired_sample_size)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
     validation_samples = {key: value[sample_size_train:] for key, value in samples.items()}
 
@@ -107,7 +106,7 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
 
     if train_model:
         # Train the model and record the accuracy and loss.
-        test_loss_values = []
+        test_loss = []
         for epoch in epochs:
             print(f'Epoch {epoch+1}\n------------------------')
             
@@ -132,23 +131,23 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
 
             # Train on the validation dataset.
             batch_count = len(validation_dataloader)
-            test_loss = 0
+            loss = 0
             with torch.no_grad():
                 for data, label in validation_dataloader:
                     data = data.to(device)
                     label = label.to(device)
                     output = model(data)
-                    test_loss += loss_function(output, label.float())
-            test_loss /= batch_count
-            test_loss_values.append(test_loss)
-            print(f'Average loss: {test_loss:>8f}')
+                    loss += loss_function(output, label.float())
+            loss /= batch_count
+            test_loss.append(loss)
+            print(f'Average loss: {loss:>8f}')
 
             # Save the model parameters periodically.
             if (epoch+1) % 5 == 0:
-                save(epoch, model, optimizer, test_loss)
+                save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
             
             if queue:
-                queue.put([epoch, epochs, test_loss_values])
+                queue.put([epoch, epochs, test_loss, previous_test_loss])
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -158,12 +157,15 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
                         break
         
         # Save the model parameters.
-        save(epoch, model, optimizer, test_loss)
+        save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
         
         # Plot the loss history.
         if not queue:
             plt.figure()
-            plt.plot(epochs, test_loss_values, '-o', color=BLUE)
+            if previous_test_loss:
+                plt.plot(range(epochs[0]), previous_test_loss, 'o', color=Colors.GRAY)
+            plt.plot(epochs, test_loss, '-o', color=Colors.BLUE)
+            plt.ylim(bottom=0)
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
             plt.grid(axis='y')
@@ -220,8 +222,8 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
             cdf_network, cdf_label, bins, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
-            plt.plot(bins[1:], cdf_network, '-', color=BLUE, label='CNN')
-            plt.plot(bins[1:], cdf_label, '--', color=RED, label='FEA')
+            plt.plot(bins[1:], cdf_network, '-', color=Colors.BLUE, label='CNN')
+            plt.plot(bins[1:], cdf_label, '--', color=Colors.RED, label='FEA')
             plt.legend()
             plt.grid(visible=True, axis='y')
             plt.yticks([0, 1])
@@ -238,7 +240,7 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
             me.append(
                 metrics.mean_error(test_output[channel, ...], test_label[channel, ...])
             )
-        plt.plot(sample_numbers, me, '.', markeredgewidth=5, color=BLUE)
+        plt.plot(sample_numbers, me, '.', markeredgewidth=5, color=Colors.BLUE)
         plt.grid()
         plt.xlabel("Sample Number")
         plt.xticks(sample_numbers)
@@ -249,9 +251,12 @@ def main(epoch_count, learning_rate, batch_size, Model, train_model=None, queue=
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 100
+    EPOCHS = 10 #100
     LEARNING_RATE = 0.00001  # 0.000001 for Nie
     BATCH_SIZE = 1
     Model = FullyCnn
+    DESIRED_SAMPLE_SIZE = 40 #530
+    BINS = 4 #10
+    TRAINING_SPLIT = 0.8
 
-    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, Model)
+    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, TRAINING_SPLIT, Model)
