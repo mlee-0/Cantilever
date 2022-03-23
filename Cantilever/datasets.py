@@ -163,8 +163,16 @@ def write_ansys_script(samples: dict, filename: str) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def get_stratified_samples(samples: dict, folder: str, bins: int, desired_subset_size: int) -> dict:
-    """Return a subset of the given samples in which the same number of maximum stress values exists in each bin."""
+def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
+    """
+    Return a subset of the given samples in which the same number of maximum stress values exists in each bin.
+
+    `samples`: Dictionary of samples of entire dataset.
+    `folder`: Folder in which labels are read.
+    `desired_subset_size`: The number of samples to have in the subset. The actual subset size may not exactly match this number.
+    `bins`: The number of bins to use in the histogram of maximum stress values.
+    `nonuniformity`: How much larger than the smallest bin the largest bin is. For example, a value of 1 results in a uniform distribution, in which the largest bin has as many samples as the smallest bin. A value of 2 results in the largest bin having twice as many samples as the smallest bin.
+    """
 
     # Get the maximum stress values in each label.
     stresses, displacements = read_labels(folder)
@@ -176,32 +184,49 @@ def get_stratified_samples(samples: dict, folder: str, bins: int, desired_subset
     histogram_range = (0, maximum_stress)  # Set minimum to 0 prevent small stresses being excluded
     frequencies, bin_edges = np.histogram(stresses, bins=bins, range=histogram_range)
     minimum_frequency = np.min(frequencies)
-    minimum_required_frequency = math.ceil(desired_subset_size / bins)
-    actual_subset_size = minimum_frequency * bins
-    recommended_raw_size = actual_raw_size * minimum_required_frequency / minimum_frequency
+    minimum_bin = np.argmin(frequencies)
+    
+    assert nonuniformity > 0, f"The nonuniformity value {nonuniformity} should be positive."
+    if nonuniformity == 1.0:
+        required_frequencies = np.full(bins, math.ceil(desired_subset_size / bins))
+    else:
+        required_frequencies = frequencies / np.min(frequencies)
+        required_frequencies = np.power(
+            required_frequencies,
+            np.log(nonuniformity) / np.log(np.max(required_frequencies))
+        )
+        required_frequencies *= desired_subset_size / np.sum(required_frequencies)
+        required_frequencies = np.round(required_frequencies).astype(int)
+    actual_subset_size = np.sum(required_frequencies) if minimum_frequency >= required_frequencies[minimum_bin] else np.sum(required_frequencies) * (minimum_frequency / required_frequencies[minimum_bin])
+    recommended_raw_size = actual_raw_size * required_frequencies[minimum_bin] / minimum_frequency
     
     if actual_subset_size < desired_subset_size:
         plt.figure()
         plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
-        plt.plot((0, maximum_stress), (minimum_required_frequency,)*2, 'k--')
+        plt.plot(
+            [bin_edges[:-1], bin_edges[1:]],
+            [required_frequencies, required_frequencies],
+            'k--'
+        )
         index = np.nonzero(frequencies == minimum_frequency)[0][0]
         plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[index:index+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
         plt.xticks(bin_edges, rotation=90, fontsize=6)
         plt.xlabel("Stress")
         plt.title(f"Subset contains {actual_subset_size} out of desired {desired_subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
-        plt.legend([f"{minimum_required_frequency} samples required in each bin"])
+        plt.legend([f"Samples required in each bin"])
         plt.show()
 
     # Verify that there are enough samples to create a dataset of the desired size.
-    assert actual_subset_size >= desired_subset_size, f"The subset only contains {actual_subset_size} out of the desired {desired_subset_size}. The raw dataset of {actual_raw_size} samples should be around {recommended_raw_size:.0f}."
+    print(f"The subset contains {actual_subset_size} out of the desired {desired_subset_size}.")
+    assert actual_subset_size >= desired_subset_size, f"The raw dataset of {actual_raw_size} samples should be around {recommended_raw_size:.0f}."
 
     # Create the subset.
     sample_indices = np.empty(0, dtype=int)
-    for i, bin_edge in enumerate(bin_edges[:-1]):
+    for i, f in enumerate(required_frequencies):# i, bin_edge in enumerate(bin_edges[:-1]):
         # Indices of values that fall inside current bin.
-        indices = np.nonzero((bin_edge < stresses) & (stresses <= bin_edges[i+1]))[0]
-        # Select the first n values only.
-        indices = indices[:minimum_required_frequency]
+        indices = np.nonzero((bin_edges[i] < stresses) & (stresses <= bin_edges[i+1]))[0]
+        # Select the first f values only.
+        indices = indices[:f]
         sample_indices = np.append(sample_indices, indices)
     np.random.shuffle(sample_indices)
     stratified_samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}

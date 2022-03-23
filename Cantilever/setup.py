@@ -182,12 +182,13 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
     displacements_y = [None] * sample_size
     for i, fea_filename in enumerate(fea_filenames):
         with open(fea_filename, 'r') as file:
-            stress, displacement_x, displacement_y = list(zip(
-                *[[float(value) for value in line.split(',')] for line in file.readlines()]
-                ))
-            stresses[i] = stress
-            displacements_x[i] = displacement_x
-            displacements_y[i] = displacement_y
+            lines = file.readlines()
+        stress, displacement_x, displacement_y = list(zip(
+            *[[float(value) for value in line.split(',')] for line in lines]
+            ))
+        stresses[i] = stress
+        displacements_x[i] = displacement_x
+        displacements_y[i] = displacement_y
         if (i+1) % 1000 == 0:
             print(f"{i+1}/{sample_size}", end='\r')
     print()

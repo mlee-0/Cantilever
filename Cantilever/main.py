@@ -60,7 +60,7 @@ def save(epoch, model, optimizer, loss_history):
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -102,13 +102,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
             sample_numbers = [int(_) for _ in f.readlines()]
         sample_indices = np.array(sample_numbers) - 1
         samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-        print(f"Using previously created subset from {filename_subset}, with {len(sample_numbers)} samples.")
+        print(f"Using previously created subset with {len(sample_numbers)} samples from {filename_subset}.")
     except FileNotFoundError:
-        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, bins=bins, 
-        desired_subset_size=desired_sample_size)
+        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
+        desired_subset_size=desired_sample_size, bins=bins, nonuniformity=nonuniformity)
         with open(filename_subset, 'w') as f:
             f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-
+        print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filename_subset}.")
+    
     # Set up the training and validation data.
     sample_size_train = round(training_split * desired_sample_size)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
@@ -118,6 +119,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
+    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {len(train_dataset)} / {len(validation_dataset)} (training / validation).")
 
     if not test_only:
         # Train the model and record the accuracy and loss.
@@ -271,10 +273,11 @@ if __name__ == '__main__':
     BATCH_SIZE = 1
     Model = FullyCnn
     DESIRED_SAMPLE_SIZE = 730
-    BINS = 4 #10
+    BINS = 10
+    NON_UNIFORMITY = 1.0
     TRAINING_SPLIT = 0.8
 
     main(
-        EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, TRAINING_SPLIT, Model,
+        EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, NON_UNIFORMITY, TRAINING_SPLIT, Model,
         keep_training=True, test_only=False,
     )
