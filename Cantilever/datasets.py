@@ -79,6 +79,7 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
         np.random.normal(90, std, number_samples//2),
         np.random.normal(270, std, number_samples//2),
     )
+    np.random.shuffle(values)
     assert values.size == number_samples, f"The number of samples {number_samples} should be even."
     values = np.round(values / step) * step
     values = np.round(values, precision)
@@ -165,7 +166,7 @@ def write_ansys_script(samples: dict, filename: str) -> None:
 
 def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
     """
-    Return a subset of the given samples in which the same number of maximum stress values exists in each bin.
+    Return a subset of the given samples in which the same number of maximum stress values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
 
     `samples`: Dictionary of samples of entire dataset.
     `folder`: Folder in which labels are read.
