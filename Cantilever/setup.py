@@ -39,7 +39,7 @@ class Parameter:
 length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m')
 height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
-load = Parameter(low=500, high=1000, step=10, precision=0, name='Load', units='N')
+load = Parameter(low=500, high=1000, step=5, precision=0, name='Load', units='N')
 angle = Parameter(low=0, high=360, step=1, precision=0, name='Angle', units='Degrees')
 # Names of quantities that are saved but are not randomly generated.
 KEY_SAMPLE_NUMBER = 'Sample Number'
@@ -50,12 +50,12 @@ KEY_IMAGE_HEIGHT = 'Image Height'
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 3
-INPUT_SIZE = (INPUT_CHANNELS, 250, 500)
+INPUT_SIZE = (INPUT_CHANNELS, 200, 400)
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
 # Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
 OUTPUT_CHANNEL_NAMES = ('stress',)  #('stress', 'displacement')
 OUTPUT_CHANNELS = len(OUTPUT_CHANNEL_NAMES)
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 25, 50)
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 20, 40)
 
 # Folders and files.
 FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'

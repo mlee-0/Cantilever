@@ -1,5 +1,5 @@
 '''
-Run this script to run the main script from a GUI.
+Run this script to run the main script as a GUI.
 '''
 
 
@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
         self.value_dataset_size.setMinimum(1)
         self.value_dataset_size.setMaximum(999_999)
         self.value_dataset_size.setSingleStep(10)
-        self.value_dataset_size.setValue(730)
+        self.value_dataset_size.setValue(900)
         self.value_dataset_size.setAlignment(Qt.AlignRight)
         self.value_dataset_size.valueChanged.connect(self.on_training_split_changed)
         layout = QHBoxLayout()
@@ -207,7 +207,7 @@ class MainWindow(QMainWindow):
         self.button_stop.setEnabled(True)
         self.thread = threading.Thread(
             target=main.main,
-            args=[self.value_epochs.value(), self.value_learning.value(), self.value_batch.value(), self.value_dataset_size.value(), self.value_bins.value(), self.value_training_split.value()/100, networks.networks[self.value_model.currentText()], train_model, test_only, self.queue, self.queue_to_main],
+            args=[self.value_epochs.value(), self.value_learning.value(), self.value_batch.value(), self.value_dataset_size.value(), self.value_bins.value(), self.value_nonuniformity.value(), self.value_training_split.value()/100, networks.networks[self.value_model.currentText()], train_model, test_only, self.queue, self.queue_to_main],
         )
         self.thread.start()
         self.timer.start()

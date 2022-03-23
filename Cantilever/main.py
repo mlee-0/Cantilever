@@ -29,19 +29,12 @@ class CantileverDataset(Dataset):
         # Create input images.
         self.number_samples = get_sample_size(samples)
         self.inputs = generate_input_images(samples)
-        # self.inputs = np.zeros((self.number_samples, *INPUT_SIZE))  # Blank arrays to reduce startup time for debugging
         
         # Create label images.
         self.labels = generate_label_images(
             samples,
             folder_labels,
             )
-        # self.labels = np.zeros((self.number_samples, *OUTPUT_SIZE))  # Blank arrays to reduce startup time for debugging
-        # # Write FEA images.
-        # for i, label in enumerate(self.labels):
-        #     with Image.fromarray((array_to_colormap(label[0, :, :])).astype(np.uint8)) as image:
-        #         filepath = os.path.join(FOLDER_TRAIN_LABELS, f'fea_{i+1}.png')
-        #         image.save(filepath)
 
     def __len__(self):
         return self.number_samples
@@ -50,7 +43,7 @@ class CantileverDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
-def save(epoch, model, optimizer, loss_history):
+def save(epoch, model, optimizer, loss_history) -> None:
     """Save model parameters to a file."""
     torch.save({
         'epoch': epoch,
@@ -272,7 +265,7 @@ if __name__ == '__main__':
     LEARNING_RATE = 0.00001  # 0.000001 for Nie
     BATCH_SIZE = 1
     Model = FullyCnn
-    DESIRED_SAMPLE_SIZE = 730
+    DESIRED_SAMPLE_SIZE = 900
     BINS = 10
     NON_UNIFORMITY = 1.0
     TRAINING_SPLIT = 0.8

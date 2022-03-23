@@ -20,10 +20,10 @@ def generate_samples(number_samples: int, start: int = 1) -> dict:
     # Generate sample values for each parameter.
     samples = {}
     samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
-    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=3.0, skew_high=True)
+    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=2.0, skew_high=True)
     samples[angle.name] = generate_angles(number_samples, (angle.low, angle.high), angle.step, angle.precision, std=45)
-    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)
-    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)
+    samples[length.name] = generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
+    samples[height.name] = generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the image size corresponding to the geometry.
@@ -209,8 +209,7 @@ def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int,
             [required_frequencies, required_frequencies],
             'k--'
         )
-        index = np.nonzero(frequencies == minimum_frequency)[0][0]
-        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[index:index+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
+        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
         plt.xticks(bin_edges, rotation=90, fontsize=6)
         plt.xlabel("Stress")
         plt.title(f"Subset contains {actual_subset_size} out of desired {desired_subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
@@ -242,7 +241,7 @@ WRITE_MODE = 'w'
 
 # if __name__ == "__main__":
 #     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-#     stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', bins=10, desired_subset_size=1000)
+#     stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', desired_subset_size=1000, bins=15, nonuniformity=1)
 
 if __name__ == '__main__':
     DATASET_TYPES = ['train', 'test']
