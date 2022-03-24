@@ -174,7 +174,8 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
     fea_filenames = sorted(fea_filenames)
     # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
     if sample_numbers:
-        fea_filenames = [filename for number, filename in enumerate(fea_filenames, 1) if number in sample_numbers]
+        assert len(sample_numbers) <= len(fea_filenames), f"The requested number of samples {len(sample_numbers)} exceeds the number of available files {len(fea_filenames)}."
+        fea_filenames = [fea_filenames[number-1] for number in sample_numbers]
     sample_size = len(fea_filenames)
 
     stresses = [None] * sample_size
