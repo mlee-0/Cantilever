@@ -223,10 +223,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         test_outputs.append(test_output)
         
         for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-            # Write the FEA image.
+            # Write the combined FEA and model output image.
+            image = np.vstack((
+                label[channel, ...],  # FEA
+                test_output[channel, ...],  # Model output
+            ))
             write_image(
-                array_to_colormap(label[channel, ...], max_values[channel] if channel_name == "stress" else None),
-                os.path.join(FOLDER_ROOT, f'{i+1}_fea_{channel_name}.png'),
+                array_to_colormap(image, max_values[channel] if channel_name == "stress" else None),
+                os.path.join(FOLDER_ROOT, f'{i+1}_fea_model_{channel_name}.png'),
                 )
         
         if queue:
