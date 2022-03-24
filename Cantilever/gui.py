@@ -206,6 +206,8 @@ class MainWindow(QMainWindow):
             test_only = True
 
         self.sidebar.setEnabled(False)
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(0)
         self.button_stop.setEnabled(True)
         self.thread = threading.Thread(
             target=main.main,
@@ -264,11 +266,12 @@ class MainWindow(QMainWindow):
     
     def check_queue(self):
         while not self.queue.empty():
-            epoch, epochs, loss, previous_loss = self.queue.get()
-            self.progress_bar.setValue(epoch)
-            self.progress_bar.setMaximum(max(epochs))
-            self.label_progress.setText(f"{epoch+1}/{max(epochs)+1}")
-            self.plot_loss(epochs[:len(loss)], loss, previous_loss)
+            progress, epochs, loss, previous_loss = self.queue.get()
+            self.progress_bar.setValue(progress[0])
+            self.progress_bar.setMaximum(progress[1])
+            self.label_progress.setText(f"{progress[0]}/{progress[1]}")
+            if epochs is not None and loss is not None:
+                self.plot_loss(epochs[:len(loss)], loss, previous_loss)
         # Thread has stopped.
         if not self.thread.is_alive():
             self.sidebar.setEnabled(True)

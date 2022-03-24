@@ -174,7 +174,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
             
             if queue:
-                queue.put([epoch, epochs, test_loss, previous_test_loss])
+                queue.put([(epoch+1, epochs[-1]+1), epochs, test_loss, previous_test_loss])
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -229,11 +229,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 array_to_colormap(label[channel, ...], max_values[channel] if channel_name == "stress" else None),
                 os.path.join(FOLDER_ROOT, f'{i+1}_fea_{channel_name}.png'),
                 )
-            # Write the output image.
-            write_image(
-                array_to_colormap(test_output[channel, ...], max_values[channel]),
-                os.path.join(FOLDER_ROOT, f'{i+1}_test_{channel_name}.png'),
-                )
+        
+        if queue:
+            queue.put([(i+1, len(test_dataloader)), None, None, None])
+    
     print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_ROOT}.')
 
     # Calculate and plot evaluation metrics.

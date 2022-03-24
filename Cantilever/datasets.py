@@ -222,7 +222,7 @@ def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int,
 
     # Create the subset.
     sample_indices = np.empty(0, dtype=int)
-    for i, f in enumerate(required_frequencies):# i, bin_edge in enumerate(bin_edges[:-1]):
+    for i, f in enumerate(required_frequencies):
         # Indices of values that fall inside current bin.
         indices = np.nonzero((bin_edges[i] < stresses) & (stresses <= bin_edges[i+1]))[0]
         # Select the first f values only.
