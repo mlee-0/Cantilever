@@ -258,6 +258,7 @@ class MainWindow(QMainWindow):
         if previous_loss and not self.action_toggle_loss.isChecked():
             axis.plot(range(epochs[0]), previous_loss, 'o', color=Colors.GRAY)
         axis.plot(epochs, loss, '-o', color=Colors.BLUE)
+        axis.annotate(str(loss[-1].item()), (epochs[-1], loss[-1]), color=Colors.BLUE)
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")

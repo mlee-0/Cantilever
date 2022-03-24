@@ -32,8 +32,10 @@ class CantileverDataset(Dataset):
             samples,
             folder_labels,
             )
+        print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
         # Create input images.
         self.inputs = generate_input_images(samples)
+        print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
 
     def __len__(self):
         return self.number_samples
@@ -131,12 +133,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {len(train_dataset)} training / {len(validation_dataset)} validation.")
 
     if not test_only:
-        # Train the model and record the accuracy and loss.
+        if queue:
+            queue.put([(epoch, epochs[-1]+1), None, None, None])
+
         test_loss = []
         for epoch in epochs:
             print(f'Epoch {epoch+1}\n------------------------')
             
             # Train on the training dataset.
+            batch_count = len(train_dataloader)
             for batch, (data, label) in enumerate(train_dataloader):
                 data = data.to(device)
                 label = label.to(device)
@@ -148,25 +153,25 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 loss.backward()
                 # Adjust model parameters.
                 optimizer.step()
-                # if batch % (BATCH_SIZE * 10) == 0:
-                #     loss, current = loss.item(), batch * len(data)
-                #     print(f'Loss: {loss:>7f}  (batch {current} of {len(dataloader.dataset)})')
-                if (batch+1) % 10 == 0:
-                    print(f'Batch {batch+1}...', end='\r')
+                if (batch+1) % 100 == 0:
+                    print(f"Training batch {batch+1}/{batch_count} with loss {loss:,.0f}...", end="\r")
             print()
 
             # Train on the validation dataset.
             batch_count = len(validation_dataloader)
             loss = 0
             with torch.no_grad():
-                for data, label in validation_dataloader:
+                for batch, (data, label) in enumerate(validation_dataloader):
                     data = data.to(device)
                     label = label.to(device)
                     output = model(data)
                     loss += loss_function(output, label.float())
+                    if (batch+1) % 10 == 0:
+                        print(f"Validating batch {batch+1}/{batch_count}", end="\r")
+            print()
             loss /= batch_count
             test_loss.append(loss)
-            print(f'Average loss: {loss:>8f}')
+            print(f"Average loss: {loss:,.0f}")
 
             # Save the model parameters periodically.
             if (epoch+1) % 5 == 0:

@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 try:
-    from google.colab import drive
+    from google.colab import drive  # type: ignore
 except ModuleNotFoundError:
     GOOGLE_COLAB = False
 else:
