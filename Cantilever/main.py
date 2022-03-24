@@ -26,15 +26,14 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
     def __init__(self, samples: dict, folder_labels):
-        # Create input images.
         self.number_samples = get_sample_size(samples)
-        self.inputs = generate_input_images(samples)
-        
         # Create label images.
         self.labels = generate_label_images(
             samples,
             folder_labels,
             )
+        # Create input images.
+        self.inputs = generate_input_images(samples)
 
     def __len__(self):
         return self.number_samples

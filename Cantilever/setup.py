@@ -100,12 +100,13 @@ def split_training_validation(number_samples: int, training_split: float) -> Tup
 
 def generate_input_images(samples: dict) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
+    DATA_TYPE = np.uint8
 
     number_samples = get_sample_size(samples)
-    inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=int)
+    inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=DATA_TYPE)
     for i in range(number_samples):
         pixel_length, pixel_height = int(samples[KEY_IMAGE_LENGTH][i]), int(samples[KEY_IMAGE_HEIGHT][i])
-        image = np.zeros(INPUT_SIZE)
+        image = np.zeros(INPUT_SIZE, dtype=DATA_TYPE)
 
         # Create a channel with a white rectangle representing the dimensions of the cantilever.
         image[0, :pixel_height, :pixel_length] = 255
