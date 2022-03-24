@@ -90,6 +90,14 @@ def get_sample_size(samples: dict) -> int:
     assert low == high, 'Found different numbers of samples in the provided samples:  min. {low}, max. {high}.'
     return low
 
+def split_training_validation(number_samples: int, training_split: float) -> Tuple[int, int]:
+    """Return the number of samples in the training and validation datasets for the given ratio."""
+    assert 0 < training_split < 1, f"Invalid training split: {training_split}."
+    training_size = round(training_split * number_samples)
+    validation_size = round((1 - training_split) * number_samples)
+    assert training_size + validation_size == number_samples
+    return training_size, validation_size
+
 def generate_input_images(samples: dict) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
 
@@ -164,17 +172,9 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
     """Return arrays of data from text files in the specified folder."""
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
-    # Only use the filenames that match the specified sample numbers.
+    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
     if sample_numbers:
-        # Get the integer from the filename, assuming format: "xxx_######.png".
-        number_from_filename = lambda filename: int(filename.split('.')[0].split('_')[-1])
-        # Get the index of the given integer in the provided sample numbers.
-        order_in_given_sample_numbers = lambda filename: sample_numbers.index(number_from_filename(filename))
-        fea_filenames = [
-            filename for filename in fea_filenames
-            if int(filename.split('.')[0].split('_')[-1]) in sample_numbers
-        ]
-        fea_filenames = sorted(fea_filenames, key=order_in_given_sample_numbers)
+        fea_filenames = [filename for number, filename in enumerate(fea_filenames, 1) if number in sample_numbers]
     sample_size = len(fea_filenames)
 
     stresses = [None] * sample_size

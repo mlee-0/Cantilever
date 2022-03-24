@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QGridLayout,
 
 import main
 import networks
-from setup import Colors
+from setup import split_training_validation, Colors
 
 
 class MainWindow(QMainWindow):
@@ -33,7 +33,10 @@ class MainWindow(QMainWindow):
         # Menu bar.
         menu_bar = self.menuBar()
         menu_bar.setNativeMenuBar(False)
+        menu_view = menu_bar.addMenu("View")
         menu_help = menu_bar.addMenu("Help")
+        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
+        self.action_toggle_loss.setCheckable(True)
         menu_help.addAction("About...", self.on_about)
 
         # Central widget.
@@ -65,7 +68,6 @@ class MainWindow(QMainWindow):
         layout_sidebar.addWidget(self.checkbox_keep_training)
 
         # Settings.
-        label = QLabel("Epochs:")
         self.value_epochs = QSpinBox()
         self.value_epochs.setMinimum(1)
         self.value_epochs.setMaximum(1_000_000)
@@ -73,38 +75,41 @@ class MainWindow(QMainWindow):
         self.value_epochs.setValue(100)
         self.value_epochs.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Epochs:"))
         layout.addWidget(self.value_epochs)
         layout_sidebar.addLayout(layout)
         
-        label = QLabel("Learning Rate:")
-        self.value_learning = QDoubleSpinBox()
-        self.value_learning.setMinimum(1e-10)
-        self.value_learning.setMaximum(1.0)
-        self.value_learning.setDecimals(6)
-        self.value_learning.setSingleStep(1e-4)
-        self.value_learning.setValue(0.00001)
-        self.value_learning.setAlignment(Qt.AlignRight)
+        self.value_learning_digit = QSpinBox()
+        self.value_learning_digit.setMinimum(1)
+        self.value_learning_digit.setMaximum(9)
+        self.value_learning_digit.setAlignment(Qt.AlignRight)
+        self.value_learning_exponent = QSpinBox()
+        self.value_learning_exponent.setMaximum(-1)
+        self.value_learning_exponent.setMinimum(-10)
+        self.value_learning_exponent.setValue(-7)
+        self.value_learning_exponent.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
-        layout.addWidget(label)
-        layout.addWidget(self.value_learning)
+        layout.setSpacing(0)
+        layout.addWidget(QLabel("Learning Rate:"))
+        layout.addStretch(1)
+        layout.addWidget(self.value_learning_digit)
+        layout.addWidget(QLabel("e"))
+        layout.addWidget(self.value_learning_exponent)
         layout_sidebar.addLayout(layout)
 
-        label = QLabel("Batch Size:")
         self.value_batch = QSpinBox()
         self.value_batch.setMinimum(1)
         self.value_batch.setValue(1)
         self.value_batch.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Batch Size:"))
         layout.addWidget(self.value_batch)
         layout_sidebar.addLayout(layout)
 
-        label = QLabel("Model:")
         self.value_model = QComboBox()
         self.value_model.addItems(networks.networks.keys())
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Model:"))
         layout.addWidget(self.value_model)
         layout_sidebar.addLayout(layout)
 
@@ -112,20 +117,18 @@ class MainWindow(QMainWindow):
         divider.setFrameShape(QFrame.HLine)
         layout_sidebar.addWidget(divider)
 
-        label = QLabel("Dataset Size:")
         self.value_dataset_size = QSpinBox()
         self.value_dataset_size.setMinimum(1)
         self.value_dataset_size.setMaximum(999_999)
         self.value_dataset_size.setSingleStep(10)
-        self.value_dataset_size.setValue(900)
+        self.value_dataset_size.setValue(1000)
         self.value_dataset_size.setAlignment(Qt.AlignRight)
         self.value_dataset_size.valueChanged.connect(self.on_training_split_changed)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Dataset Size:"))
         layout.addWidget(self.value_dataset_size)
         layout_sidebar.addLayout(layout)
         
-        label = QLabel("Bins:")
         self.value_bins = QSpinBox()
         self.value_bins.setMinimum(1)
         self.value_bins.setMaximum(1000)
@@ -133,11 +136,10 @@ class MainWindow(QMainWindow):
         self.value_bins.setValue(10)
         self.value_bins.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Bins:"))
         layout.addWidget(self.value_bins)
         layout_sidebar.addLayout(layout)
 
-        label = QLabel("Nonuniformity:")
         self.value_nonuniformity = QDoubleSpinBox()
         self.value_nonuniformity.setMinimum(0.1)
         self.value_nonuniformity.setMaximum(100_000)
@@ -146,11 +148,10 @@ class MainWindow(QMainWindow):
         self.value_nonuniformity.setValue(1.0)
         self.value_nonuniformity.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Nonuniformity:"))
         layout.addWidget(self.value_nonuniformity)
         layout_sidebar.addLayout(layout)
 
-        label = QLabel("Training Split:")
         self.value_training_split = QSpinBox()
         self.value_training_split.setMinimum(1)
         self.value_training_split.setMaximum(99)
@@ -160,7 +161,7 @@ class MainWindow(QMainWindow):
         self.value_training_split.setAlignment(Qt.AlignRight)
         self.value_training_split.valueChanged.connect(self.on_training_split_changed)
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel("Training Split:"))
         layout.addWidget(self.value_training_split)
         layout_sidebar.addLayout(layout)
 
@@ -207,7 +208,17 @@ class MainWindow(QMainWindow):
         self.button_stop.setEnabled(True)
         self.thread = threading.Thread(
             target=main.main,
-            args=[self.value_epochs.value(), self.value_learning.value(), self.value_batch.value(), self.value_dataset_size.value(), self.value_bins.value(), self.value_nonuniformity.value(), self.value_training_split.value()/100, networks.networks[self.value_model.currentText()], train_model, test_only, self.queue, self.queue_to_main],
+            args=[
+                self.value_epochs.value(),
+                self.value_learning_digit.value() * 10 ** self.value_learning_exponent.value(),
+                self.value_batch.value(),
+                self.value_dataset_size.value(),
+                self.value_bins.value(),
+                self.value_nonuniformity.value(),
+                self.value_training_split.value()/100,
+                networks.networks[self.value_model.currentText()],
+                train_model, test_only, self.queue, self.queue_to_main
+            ],
         )
         self.thread.start()
         self.timer.start()
@@ -219,8 +230,9 @@ class MainWindow(QMainWindow):
     
     def on_training_split_changed(self):
         """Show a label displaying how many samples will be in the training dataset after splitting."""
+        training_size, validation_size = split_training_validation(self.value_dataset_size.value(), self.value_training_split.value()/100)
         self.label_training_dataset_size.setText(
-            f"{round((self.value_training_split.value()/100) * self.value_dataset_size.value())} in training dataset"
+            f"{training_size} training / {validation_size} validation"
         )
     
     def on_about(self):
@@ -239,7 +251,7 @@ class MainWindow(QMainWindow):
     def plot_loss(self, epochs, loss, previous_loss):
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        if previous_loss:
+        if previous_loss and not self.action_toggle_loss.isChecked():
             axis.plot(range(epochs[0]), previous_loss, 'o', color=Colors.GRAY)
         axis.plot(epochs, loss, '-o', color=Colors.BLUE)
         axis.set_ylim(bottom=0)

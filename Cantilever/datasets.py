@@ -235,7 +235,7 @@ def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int,
 
 
 DATASET = 'test'
-NUMBER_SAMPLES = 10
+NUMBER_SAMPLES = 20
 START_SAMPLE_NUMBER = 1
 WRITE_MODE = 'w'
 

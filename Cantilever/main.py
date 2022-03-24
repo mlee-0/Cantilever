@@ -104,15 +104,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
         print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filename_subset}.")
     
     # Set up the training and validation data.
-    sample_size_train = round(training_split * desired_sample_size)
+    sample_size_train, sample_size_validation = split_training_validation(desired_sample_size, training_split)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
-    validation_samples = {key: value[sample_size_train:] for key, value in samples.items()}
+    validation_samples = {key: value[sample_size_train:sample_size_train+sample_size_validation:] for key, value in samples.items()}
 
     train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
-    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {len(train_dataset)} / {len(validation_dataset)} (training / validation).")
+    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {len(train_dataset)} training / {len(validation_dataset)} validation.")
 
     if not test_only:
         # Train the model and record the accuracy and loss.
