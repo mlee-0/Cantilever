@@ -53,8 +53,12 @@ def save(epoch, model, optimizer, loss_history) -> None:
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
-    """Train and test the model."""
+def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
+    """
+    Train and test the model.
+
+    `desired_subset_size`: Number of samples to include in the subset. Enter 0 to use all samples found instead of creating a subset.
+    """
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
@@ -89,24 +93,37 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
     
     # Create a subset of the entire dataset, or load the previously created subset.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    filename_subset = os.path.join(FOLDER_ROOT, FILENAME_SUBSET)
-    try:
-        with open(filename_subset, 'r') as f:
-            sample_numbers = [int(_) for _ in f.readlines()]
-        sample_indices = np.array(sample_numbers) - 1
-        samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-        print(f"Using previously created subset with {len(sample_numbers)} samples from {filename_subset}.")
-    except FileNotFoundError:
-        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
-        desired_subset_size=desired_sample_size, bins=bins, nonuniformity=nonuniformity)
-        with open(filename_subset, 'w') as f:
-            f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-        print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filename_subset}.")
-    
+    if desired_subset_size > 0:
+        filename_subset = os.path.join(FOLDER_ROOT, FILENAME_SUBSET)
+        try:
+            with open(filename_subset, 'r') as f:
+                sample_numbers = [int(_) for _ in f.readlines()]
+            sample_indices = np.array(sample_numbers) - 1
+            samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
+            print(f"Using previously created subset with {len(sample_numbers)} samples from {filename_subset}.")
+        except FileNotFoundError:
+            samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
+            desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
+            with open(filename_subset, 'w') as f:
+                f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
+            print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filename_subset}.")
+    sample_size = get_sample_size(samples)
+
     # Set up the training and validation data.
-    sample_size_train, sample_size_validation = split_training_validation(desired_sample_size, training_split)
+    sample_size_train, sample_size_validation = split_training_validation(sample_size, training_split)
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
     validation_samples = {key: value[sample_size_train:sample_size_train+sample_size_validation:] for key, value in samples.items()}
+    
+    # plt.figure()
+    # plt.subplot(1, 4, 1)
+    # plt.hist(validation_samples["Load"], 20)
+    # plt.subplot(1, 4, 2)
+    # plt.hist(validation_samples["Angle"], 20, (0, 360))
+    # plt.subplot(1, 4, 3)
+    # plt.hist(validation_samples["Length"], 20, (2, 4))
+    # plt.subplot(1, 4, 4)
+    # plt.hist(validation_samples["Height"], 20, (1, 2))
+    # plt.show()
 
     train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
@@ -262,10 +279,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_sample
 if __name__ == '__main__':
     # Training hyperparameters.
     EPOCHS = 10
-    LEARNING_RATE = 0.00001  # 0.000001 for Nie
+    LEARNING_RATE = 1e-7  #0.00001  # 0.000001 for Nie
     BATCH_SIZE = 1
     Model = FullyCnn
-    DESIRED_SAMPLE_SIZE = 900
+    DESIRED_SAMPLE_SIZE = 10000
     BINS = 10
     NON_UNIFORMITY = 1.0
     TRAINING_SPLIT = 0.8

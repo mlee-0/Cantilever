@@ -84,9 +84,10 @@ class MainWindow(QMainWindow):
         self.value_learning_digit.setMaximum(9)
         self.value_learning_digit.setAlignment(Qt.AlignRight)
         self.value_learning_exponent = QSpinBox()
-        self.value_learning_exponent.setMaximum(-1)
-        self.value_learning_exponent.setMinimum(-10)
-        self.value_learning_exponent.setValue(-7)
+        self.value_learning_exponent.setMinimum(1)
+        self.value_learning_exponent.setMaximum(10)
+        self.value_learning_exponent.setValue(7)
+        self.value_learning_exponent.setPrefix("-")
         self.value_learning_exponent.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
         layout.setSpacing(0)
@@ -118,7 +119,7 @@ class MainWindow(QMainWindow):
         layout_sidebar.addWidget(divider)
 
         self.value_dataset_size = QSpinBox()
-        self.value_dataset_size.setMinimum(1)
+        self.value_dataset_size.setMinimum(0)
         self.value_dataset_size.setMaximum(999_999)
         self.value_dataset_size.setSingleStep(10)
         self.value_dataset_size.setValue(1000)
@@ -210,7 +211,7 @@ class MainWindow(QMainWindow):
             target=main.main,
             args=[
                 self.value_epochs.value(),
-                self.value_learning_digit.value() * 10 ** self.value_learning_exponent.value(),
+                self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
                 self.value_batch.value(),
                 self.value_dataset_size.value(),
                 self.value_bins.value(),
@@ -230,9 +231,10 @@ class MainWindow(QMainWindow):
     
     def on_training_split_changed(self):
         """Show a label displaying how many samples will be in the training dataset after splitting."""
-        training_size, validation_size = split_training_validation(self.value_dataset_size.value(), self.value_training_split.value()/100)
+        dataset_size = self.value_dataset_size.value()
+        training_size, validation_size = split_training_validation(dataset_size, self.value_training_split.value()/100)
         self.label_training_dataset_size.setText(
-            f"{training_size} training / {validation_size} validation"
+            f"{training_size} training / {validation_size} validation" if dataset_size > 0 else "Using all samples found"
         )
     
     def on_about(self):
