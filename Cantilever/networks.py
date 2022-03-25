@@ -97,20 +97,20 @@ class Nie(nn.Module):
             nn.BatchNorm2d(64),
         )
         self.se_2 = nn.Sequential(
-            nn.AvgPool2d(kernel_size=(7,13)),
+            nn.AvgPool2d(kernel_size=(5,10)),
             nn.Flatten(),
             nn.Linear(64, 4),
             nn.ReLU(inplace=True),
-            nn.Linear(4, 13),
+            nn.Linear(4, 10),
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=1, output_padding=(0,0)),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(32),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=1, output_padding=(0,1)),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(16),
         )
