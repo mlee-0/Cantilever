@@ -27,6 +27,11 @@ class MainWindow(QMainWindow):
         self.queue = Queue()
         self.queue_to_main = Queue()
 
+        # Plot values.
+        self.epochs = None
+        self.loss = None
+        self.previous_loss = None
+
         # Font objects.
         font_small = QFont()
         font_small.setPointSize(10)
@@ -40,7 +45,7 @@ class MainWindow(QMainWindow):
         self.action_toggle_status_bar.setCheckable(True)
         self.action_toggle_status_bar.setChecked(True)
         menu_view.addSeparator()
-        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
+        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only", self.plot_loss)
         self.action_toggle_loss.setCheckable(True)
         menu_help.addAction("About...", self.show_about)
 
@@ -277,13 +282,16 @@ class MainWindow(QMainWindow):
         window.setCentralWidget(text_edit)
         window.show()
 
-    def plot_loss(self, epochs, loss, previous_loss):
+    def plot_loss(self):
+        if self.epochs is None or self.loss is None:
+            return
+        
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        if previous_loss and not self.action_toggle_loss.isChecked():
-            axis.plot(range(epochs[0]), previous_loss, 'o', color=Colors.GRAY)
-        axis.plot(epochs, loss, '-o', color=Colors.BLUE)
-        axis.annotate(f"{loss[-1].item():,.0f}", (epochs[-1], loss[-1]), color=Colors.BLUE, fontsize=10)
+        if self.previous_loss and not self.action_toggle_loss.isChecked():
+            axis.plot(range(1, self.epochs[0]), self.previous_loss, 'o', color=Colors.GRAY)
+        axis.plot(self.epochs[:len(self.loss)], self.loss, '-o', color=Colors.BLUE)
+        axis.annotate(f"{self.loss[-1].item():,.0f}", (self.epochs[-1], self.loss[-1]), color=Colors.BLUE, fontsize=10)
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -292,12 +300,11 @@ class MainWindow(QMainWindow):
     
     def check_queue(self):
         while not self.queue.empty():
-            progress, epochs, loss, previous_loss = self.queue.get()
+            progress, self.epochs, self.loss, self.previous_loss = self.queue.get()
             self.progress_bar.setValue(progress[0])
             self.progress_bar.setMaximum(progress[1])
             self.label_progress.setText(f"{progress[0]}/{progress[1]}")
-            if epochs is not None and loss is not None:
-                self.plot_loss(epochs[:len(loss)], loss, previous_loss)
+            self.plot_loss()
         # Thread has stopped.
         if not self.thread.is_alive():
             self.sidebar.setEnabled(True)

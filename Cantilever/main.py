@@ -70,7 +70,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss_function = nn.MSELoss()
     
-    epochs = range(epoch_count)
+    epochs = range(1, epoch_count+1)
     previous_test_loss = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
@@ -134,11 +134,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
 
     if not test_only:
         if queue:
-            queue.put([(epochs[0], epochs[-1]+1), None, None, None])
+            queue.put([(epochs[0]-1, epochs[-1]), None, None, None])
 
         test_loss = []
         for epoch in epochs:
-            print(f'Epoch {epoch+1}\n------------------------')
+            print(f'Epoch {epoch}\n------------------------')
             
             # Train on the training dataset.
             batch_count = len(train_dataloader)
@@ -174,11 +174,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             print(f"Average loss: {loss:,.0f}")
 
             # Save the model parameters periodically.
-            if (epoch+1) % 5 == 0:
+            if (epoch) % 5 == 0:
                 save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
             
             if queue:
-                queue.put([(epoch+1, epochs[-1]+1), epochs, test_loss, previous_test_loss])
+                queue.put([(epoch, epochs[-1]), epochs, test_loss, previous_test_loss])
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -194,7 +194,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         if not queue:
             plt.figure()
             if previous_test_loss:
-                plt.plot(range(epochs[0]), previous_test_loss, 'o', color=Colors.GRAY)
+                plt.plot(range(1, epochs[0]), previous_test_loss, 'o', color=Colors.GRAY)
             plt.plot(epochs, test_loss, '-o', color=Colors.BLUE)
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
