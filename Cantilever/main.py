@@ -308,5 +308,5 @@ if __name__ == '__main__':
 
     main(
         EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, NON_UNIFORMITY, TRAINING_SPLIT, Model,
-        keep_training=True, test_only=not False,
+        keep_training=True, test_only=False,
     )

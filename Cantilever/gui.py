@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         if self.previous_loss and not self.action_toggle_loss.isChecked():
             axis.plot(range(1, self.epochs[0]), self.previous_loss, 'o', color=Colors.GRAY)
         axis.plot(self.epochs[:len(self.loss)], self.loss, '-o', color=Colors.BLUE)
-        axis.annotate(f"{self.loss[-1].item():,.0f}", (self.epochs[-1], self.loss[-1]), color=Colors.BLUE, fontsize=10)
+        axis.annotate(f"{self.loss[-1].item():,.0f}", (self.epochs[len(self.loss)-1], self.loss[-1]), color=Colors.BLUE, fontsize=10)
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -300,7 +300,10 @@ class MainWindow(QMainWindow):
     
     def check_queue(self):
         while not self.queue.empty():
-            progress, self.epochs, self.loss, self.previous_loss = self.queue.get()
+            progress, epochs, loss, previous_loss = self.queue.get()
+            # Prevent replacing previously received data with None.
+            if not (epochs is None or loss is None or previous_loss is None):
+                self.epochs, self.loss, self.previous_loss = epochs, loss, previous_loss
             self.progress_bar.setValue(progress[0])
             self.progress_bar.setMaximum(progress[1])
             self.label_progress.setText(f"{progress[0]}/{progress[1]}")
