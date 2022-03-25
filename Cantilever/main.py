@@ -134,7 +134,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
 
     if not test_only:
         if queue:
-            queue.put([(epoch, epochs[-1]+1), None, None, None])
+            queue.put([(epochs[0], epochs[-1]+1), None, None, None])
 
         test_loss = []
         for epoch in epochs:
@@ -166,7 +166,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                     label = label.to(device)
                     output = model(data)
                     loss += loss_function(output, label.float())
-                    if (batch+1) % 10 == 0:
+                    if (batch+1) % 100 == 0:
                         print(f"Validating batch {batch+1}/{batch_count}", end="\r")
             print()
             loss /= batch_count
@@ -241,7 +241,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         if queue:
             queue.put([(i+1, len(test_dataloader)), None, None, None])
     
-    print(f'Wrote {len(test_dataloader)} output images and {len(test_dataloader)} corresponding labels in {FOLDER_ROOT}.')
+    print(f"Wrote {len(test_dataloader)} test images in {FOLDER_ROOT}.")
 
     # Calculate and plot evaluation metrics.
     for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):

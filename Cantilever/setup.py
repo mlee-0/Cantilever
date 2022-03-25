@@ -192,7 +192,7 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
         displacements_x[i] = displacement_x
         displacements_y[i] = displacement_y
         if (i+1) % 1000 == 0:
-            print(f"{i+1}/{sample_size}", end='\r')
+            print(f"Reading {i+1}/{sample_size} labels...", end='\r')
     print()
     stresses = [np.array(stress) for stress in stresses]
     displacements = [np.sqrt(np.power(np.array(x), 2) + np.power(np.array(y), 2)) for x, y in zip(displacements_x, displacements_y)]

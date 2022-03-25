@@ -9,6 +9,7 @@ import threading
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QGridLayout, QHBoxLayout, QWidget, QPushButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
@@ -35,9 +36,24 @@ class MainWindow(QMainWindow):
         menu_bar.setNativeMenuBar(False)
         menu_view = menu_bar.addMenu("View")
         menu_help = menu_bar.addMenu("Help")
+        self.action_toggle_status_bar = menu_view.addAction("Show Status Bar", self.toggle_status_bar)
+        self.action_toggle_status_bar.setCheckable(True)
+        self.action_toggle_status_bar.setChecked(True)
+        menu_view.addSeparator()
         self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
         self.action_toggle_loss.setCheckable(True)
-        menu_help.addAction("About...", self.on_about)
+        menu_help.addAction("About...", self.show_about)
+
+        # Status bar.
+        self.status_bar = self.statusBar()
+
+        # Automatically send console messages to the status bar.
+        # https://stackoverflow.com/questions/44432276/print-out-python-console-output-to-qtextedit
+        class Stream(QtCore.QObject):
+            newText = QtCore.pyqtSignal(str)
+            def write(self, text):
+                self.newText.emit(str(text))
+        sys.stdout = Stream(newText=self.update_status_bar)
 
         # Central widget.
         main_widget = QWidget()
@@ -231,6 +247,11 @@ class MainWindow(QMainWindow):
         self.button_stop.setEnabled(False)
         self.queue_to_main.put(True)
     
+    def update_status_bar(self, text):
+        """Display text in the status bar."""
+        if text.isprintable():
+            self.status_bar.showMessage(text)
+
     def on_training_split_changed(self):
         """Show a label displaying how many samples will be in the training dataset after splitting."""
         dataset_size = self.value_dataset_size.value()
@@ -239,7 +260,11 @@ class MainWindow(QMainWindow):
             f"{training_size} training / {validation_size} validation" if dataset_size > 0 else "Using all samples found"
         )
     
-    def on_about(self):
+    def toggle_status_bar(self):
+        """Toggle visibility of status bar."""
+        self.status_bar.setVisible(self.action_toggle_status_bar.isChecked())
+    
+    def show_about(self):
         """Show a window displaying the README file."""
         with open("README.md", 'r') as f:
             text = f.read()
@@ -258,7 +283,7 @@ class MainWindow(QMainWindow):
         if previous_loss and not self.action_toggle_loss.isChecked():
             axis.plot(range(epochs[0]), previous_loss, 'o', color=Colors.GRAY)
         axis.plot(epochs, loss, '-o', color=Colors.BLUE)
-        axis.annotate(str(loss[-1].item()), (epochs[-1], loss[-1]), color=Colors.BLUE)
+        axis.annotate(f"{loss[-1].item():,.0f}", (epochs[-1], loss[-1]), color=Colors.BLUE, fontsize=10)
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -280,6 +305,12 @@ class MainWindow(QMainWindow):
             self.progress_bar.reset()
             self.checkbox_keep_training.setChecked(True)
             self.timer.stop()
+    
+    def closeEvent(self, event):
+        """Base class method that closes the application."""
+        # Return to default.
+        sys.stdout = sys.__stdout__
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
