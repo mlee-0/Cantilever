@@ -167,7 +167,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                     output = model(data)
                     loss += loss_function(output, label.float())
                     if (batch+1) % 100 == 0:
-                        print(f"Validating batch {batch+1}/{batch_count}", end="\r")
+                        print(f"Validating batch {batch+1}/{batch_count}...", end="\r")
             print()
             loss /= batch_count
             test_loss.append(loss)
@@ -255,9 +255,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         NUMBER_COLUMNS = 4
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
-            cdf_network, cdf_label, bins, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
-            plt.plot(bins[1:], cdf_network, '-', color=Colors.BLUE, label='CNN')
-            plt.plot(bins[1:], cdf_label, '--', color=Colors.RED, label='FEA')
+            cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
+            plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE, label='CNN')
+            plt.plot(bin_edges[1:], cdf_label, '--', color=Colors.RED, label='FEA')
             plt.legend()
             plt.grid(visible=True, axis='y')
             plt.yticks([0, 1])
@@ -266,35 +266,47 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         plt.tight_layout()  # Increase spacing between subplots
         plt.show()
 
-        # Mean error.
-        plt.figure()
-        me = []
+        # Single-value error metrics.
+        mv, me, mae, mse, mre = [], [], [], [], []
+        results = {"Maximum Value": mv, "Mean Error": me, "Mean Absolute Error": mae, "Mean Squared Error": mse, "Mean Relative Error": mre}
+        for test_output, test_label in zip(test_outputs, test_labels):
+            test_output, test_label = test_output[channel, ...], test_label[channel, ...]
+            mv.append(metrics.maximum_value(test_output, test_label))
+            me.append(metrics.mean_error(test_output, test_label))
+            mae.append(metrics.mean_absolute_error(test_output, test_label))
+            mse.append(metrics.mean_squared_error(test_output, test_label))
+            mre.append(metrics.mean_relative_error(test_output, test_label))
+        
         sample_numbers = range(1, len(test_outputs)+1)
-        for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
-            me.append(
-                metrics.mean_error(test_output[channel, ...], test_label[channel, ...])
-            )
-        plt.plot(sample_numbers, me, '.', markeredgewidth=5, color=Colors.BLUE)
-        plt.grid()
-        plt.xlabel("Sample Number")
-        plt.xticks(sample_numbers)
-        plt.ylabel("Mean Error")
-        plt.title(f"Mean Error ({channel_name.capitalize()})", fontweight='bold')
+        plt.figure()
+        for i, (metric, result) in enumerate(results.items()):
+            plt.subplot(3, 2, i+1)
+            plt.grid()
+            if isinstance(result[0], tuple):
+                plt.plot(sample_numbers, [_[1] for _ in result], 'o', color=Colors.RED, label="FEA")
+                plt.plot(sample_numbers, [_[0] for _ in result], '.', color=Colors.BLUE, label="CNN")
+                plt.legend()
+            else:
+                plt.plot(sample_numbers, result, '.', markeredgewidth=5, color=Colors.BLUE)
+            plt.xlabel("Sample Number")
+            plt.xticks(sample_numbers)
+            plt.title(metric)
+        plt.suptitle(f"{channel_name.capitalize()}", fontweight='bold')
         plt.show()
 
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 10
+    EPOCHS = 1
     LEARNING_RATE = 1e-7  #0.00001  # 0.000001 for Nie
     BATCH_SIZE = 1
-    Model = FullyCnn
+    Model = Nie
     DESIRED_SAMPLE_SIZE = 10000
-    BINS = 10
+    BINS = 1
     NON_UNIFORMITY = 1.0
     TRAINING_SPLIT = 0.8
 
     main(
         EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, NON_UNIFORMITY, TRAINING_SPLIT, Model,
-        keep_training=True, test_only=False,
+        keep_training=True, test_only=not False,
     )
