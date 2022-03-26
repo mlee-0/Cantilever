@@ -134,15 +134,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
 
     if not test_only:
         if queue:
-            queue.put([(epochs[0]-1, epochs[-1]), None, None, None])
+            queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
 
-        test_loss = []
+        validation_loss = []
         for epoch in epochs:
             print(f'Epoch {epoch}\n------------------------')
             
             # Train on the training dataset.
             batch_count = len(train_dataloader)
-            for batch, (data, label) in enumerate(train_dataloader):
+            for batch, (data, label) in enumerate(train_dataloader, 1):
                 data = data.to(device)
                 label = label.to(device)
                 output = model(data)
@@ -153,32 +153,37 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 loss.backward()
                 # Adjust model parameters.
                 optimizer.step()
-                if (batch+1) % 100 == 0:
-                    print(f"Training batch {batch+1}/{batch_count} with loss {loss:,.0f}...", end="\r")
+
+                if (batch) % 100 == 0:
+                    print(f"Training batch {batch}/{batch_count} with loss {loss:,.0f}...", end="\r")
+                    if queue:
+                        queue.put([None, (batch, sample_size), None, None, None])
             print()
 
             # Train on the validation dataset.
             batch_count = len(validation_dataloader)
             loss = 0
             with torch.no_grad():
-                for batch, (data, label) in enumerate(validation_dataloader):
+                for batch, (data, label) in enumerate(validation_dataloader, 1):
                     data = data.to(device)
                     label = label.to(device)
                     output = model(data)
                     loss += loss_function(output, label.float())
-                    if (batch+1) % 100 == 0:
-                        print(f"Validating batch {batch+1}/{batch_count}...", end="\r")
+                    if (batch) % 100 == 0:
+                        print(f"Validating batch {batch}/{batch_count}...", end="\r")
+                        if queue:
+                            queue.put([None, (len(train_dataloader)+batch, sample_size), None, None, None])
             print()
             loss /= batch_count
-            test_loss.append(loss)
+            validation_loss.append(loss)
             print(f"Average loss: {loss:,.0f}")
 
             # Save the model parameters periodically.
             if (epoch) % 5 == 0:
-                save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
+                save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
             
             if queue:
-                queue.put([(epoch, epochs[-1]), epochs, test_loss, previous_test_loss])
+                queue.put([(epoch, epochs[-1]), None, epochs, validation_loss, previous_test_loss])
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -188,14 +193,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                         break
         
         # Save the model parameters.
-        save(epoch, model, optimizer, [*previous_test_loss, *test_loss])
+        save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
         
         # Plot the loss history.
         if not queue:
             plt.figure()
             if previous_test_loss:
-                plt.plot(range(1, epochs[0]), previous_test_loss, 'o', color=Colors.GRAY)
-            plt.plot(epochs, test_loss, '-o', color=Colors.BLUE)
+                plt.plot(range(1, epochs[0]), previous_test_loss, 'o', color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, validation_loss, '-o', color=Colors.BLUE)
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
@@ -218,7 +223,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     # Test the model on the input images found in the folder.
     test_labels = []
     test_outputs = []
-    for i, (test_input, label) in enumerate(test_dataloader):
+    for batch, (test_input, label) in enumerate(test_dataloader, 1):
         test_input = test_input.to(device)
         label = label.to(device)
         test_output = model(test_input)
@@ -235,11 +240,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             ))
             write_image(
                 array_to_colormap(image, max_values[channel] if channel_name == "stress" else None),
-                os.path.join(FOLDER_ROOT, f'{i+1}_fea_model_{channel_name}.png'),
+                os.path.join(FOLDER_ROOT, f'{batch}_fea_model_{channel_name}.png'),
                 )
         
         if queue:
-            queue.put([(i+1, len(test_dataloader)), None, None, None])
+            queue.put([None, (batch, len(test_dataloader)), None, None, None])
     
     print(f"Wrote {len(test_dataloader)} test images in {FOLDER_ROOT}.")
 

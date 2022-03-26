@@ -70,9 +70,15 @@ NUMBER_DIGITS = 6
 
 # Colors for plots.
 class Colors:
-    RED = '#ff4040'
-    BLUE = '#0095ff'
-    GRAY = '#bfbfbf'
+    RED = "#ff4040"
+    RED_DARK = "#9e2828"
+    RED_LIGHT = "#ffb6b6"
+    BLUE = "#0095ff"
+    BLUE_DARK = "#005c9e"
+    BLUE_LIGHT = "#9ed7ff"
+    GRAY = "#808080"
+    GRAY_DARK = "#404040"
+    GRAY_LIGHT = "#bfbfbf"
 
 
 def plot_histogram(values: np.ndarray, title=None) -> None:

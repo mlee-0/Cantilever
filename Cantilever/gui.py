@@ -51,6 +51,8 @@ class MainWindow(QMainWindow):
 
         # Status bar.
         self.status_bar = self.statusBar()
+        self.label_status = QLabel()
+        self.status_bar.addWidget(self.label_status)
 
         # Automatically send console messages to the status bar.
         # https://stackoverflow.com/questions/44432276/print-out-python-console-output-to-qtextedit
@@ -195,16 +197,21 @@ class MainWindow(QMainWindow):
 
         # Progress bar and stop button.
         self.label_progress = QLabel()
+        self.label_progress_secondary = QLabel()
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
+        self.progress_bar_secondary = QProgressBar()
+        self.progress_bar_secondary.setTextVisible(False)
         self.button_stop = QPushButton("Stop")
         self.button_stop.clicked.connect(self.on_stop)
         self.button_stop.setEnabled(False)
-        layout = QHBoxLayout()
+        layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.label_progress)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.button_stop)
+        layout.addWidget(self.label_progress, 0, 0)
+        layout.addWidget(self.progress_bar, 0, 1)
+        layout.addWidget(self.label_progress_secondary, 1, 0)
+        layout.addWidget(self.progress_bar_secondary, 1, 1)
+        layout.addWidget(self.button_stop, 0, 2, 2, 1)
         layout_results.addLayout(layout)
 
         # Plot area.
@@ -255,7 +262,7 @@ class MainWindow(QMainWindow):
     def update_status_bar(self, text):
         """Display text in the status bar."""
         if text.isprintable():
-            self.status_bar.showMessage(text)
+            self.label_status.setText(text)
 
     def on_training_split_changed(self):
         """Show a label displaying how many samples will be in the training dataset after splitting."""
@@ -289,7 +296,7 @@ class MainWindow(QMainWindow):
         self.figure.clear()
         axis = self.figure.add_subplot(111)
         if self.previous_loss and not self.action_toggle_loss.isChecked():
-            axis.plot(range(1, self.epochs[0]), self.previous_loss, 'o', color=Colors.GRAY)
+            axis.plot(range(1, self.epochs[0]), self.previous_loss, 'o', color=Colors.GRAY_LIGHT)
         axis.plot(self.epochs[:len(self.loss)], self.loss, '-o', color=Colors.BLUE)
         axis.annotate(f"{self.loss[-1].item():,.0f}", (self.epochs[len(self.loss)-1], self.loss[-1]), color=Colors.BLUE, fontsize=10)
         axis.set_ylim(bottom=0)
@@ -300,13 +307,18 @@ class MainWindow(QMainWindow):
     
     def check_queue(self):
         while not self.queue.empty():
-            progress, epochs, loss, previous_loss = self.queue.get()
+            progress, progress_secondary, epochs, loss, previous_loss = self.queue.get()
+            if progress:
+                self.progress_bar.setValue(progress[0])
+                self.progress_bar.setMaximum(progress[1])
+                self.label_progress.setText(f"Epoch {progress[0]}/{progress[1]}")
+            if progress_secondary:
+                self.progress_bar_secondary.setValue(progress_secondary[0])
+                self.progress_bar_secondary.setMaximum(progress_secondary[1])
+                self.label_progress_secondary.setText(f"Batch {progress_secondary[0]}/{progress_secondary[1]}")
             # Prevent replacing previously received data with None.
             if not (epochs is None or loss is None or previous_loss is None):
                 self.epochs, self.loss, self.previous_loss = epochs, loss, previous_loss
-            self.progress_bar.setValue(progress[0])
-            self.progress_bar.setMaximum(progress[1])
-            self.label_progress.setText(f"{progress[0]}/{progress[1]}")
             self.plot_loss()
         # Thread has stopped.
         if not self.thread.is_alive():

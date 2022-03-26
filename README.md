@@ -48,7 +48,7 @@ To run a script in ANSYS:
 To run a script in ANSYS from Command Prompt, which provides better performance:
 * `cd <path to desired folder>`
     * This changes the current folder.
-* `"C:\Program Files\ANSYS Inc\v211\ansys\bin\winx64\MAPDL.exe" -b -i "<name of .lgw file>" -o "out.txt"`
+* `"C:\Program Files\ANSYS Inc\v211\ansys\bin\winx64\MAPDL.exe" -b -i "ansys_script_train.lgw" -o "out.txt"`
     * `-i` specifies the input file to read from.
     * `-o` specifies the output file in which information is written, which can be ignored.
 
