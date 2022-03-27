@@ -222,7 +222,7 @@ class MainWindow(QMainWindow):
         # Timer that checkes the queue for information from main thread.
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_queue)
-        self.timer.setInterval(10)
+        self.timer.setInterval(100)
     
     def on_start(self):
         """Start training or testing."""

@@ -86,8 +86,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             epoch = checkpoint['epoch'] + 1
             epochs = range(epoch, epoch+epoch_count)
             previous_test_loss = checkpoint['loss']
-            
-            model.train(not test_only)
     else:
         keep_training = False
         test_only = False
@@ -141,6 +139,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             print(f'Epoch {epoch}\n------------------------')
             
             # Train on the training dataset.
+            model.train(True)
             batch_count = len(train_dataloader)
             for batch, (data, label) in enumerate(train_dataloader, 1):
                 data = data.to(device)
@@ -160,7 +159,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                         queue.put([None, (batch, sample_size), None, None, None])
             print()
 
-            # Train on the validation dataset.
+            # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
+            model.train(False)
             batch_count = len(validation_dataloader)
             loss = 0
             with torch.no_grad():
@@ -220,9 +220,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         ])
         for channel in range(OUTPUT_CHANNELS)
     ]
-    # Test the model on the input images found in the folder.
+    # Test on the testing dataset.
+    model.train(False)
     test_labels = []
     test_outputs = []
+    with torch.no_grad():
     for batch, (test_input, label) in enumerate(test_dataloader, 1):
         test_input = test_input.to(device)
         label = label.to(device)
