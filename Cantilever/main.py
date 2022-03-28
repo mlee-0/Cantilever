@@ -128,7 +128,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
-    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {len(train_dataset)} training / {len(validation_dataset)} validation.")
+    size_train_dataset = len(train_dataloader)
+    size_validation_dataset = len(validation_dataloader)
+    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {size_train_dataset} training / {size_validation_dataset} validation.")
 
     if not test_only:
         if queue:
@@ -140,7 +142,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             
             # Train on the training dataset.
             model.train(True)
-            batch_count = len(train_dataloader)
             for batch, (data, label) in enumerate(train_dataloader, 1):
                 data = data.to(device)
                 label = label.to(device)
@@ -154,14 +155,13 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 optimizer.step()
 
                 if (batch) % 100 == 0:
-                    print(f"Training batch {batch}/{batch_count} with loss {loss:,.0f}...", end="\r")
+                    print(f"Training batch {batch}/{size_train_dataset} with loss {loss:,.0f}...", end="\r")
                     if queue:
-                        queue.put([None, (batch, sample_size), None, None, None])
+                        queue.put([None, (batch, size_train_dataset+size_validation_dataset), None, None, None])
             print()
 
             # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
             model.train(False)
-            batch_count = len(validation_dataloader)
             loss = 0
             with torch.no_grad():
                 for batch, (data, label) in enumerate(validation_dataloader, 1):
@@ -170,11 +170,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                     output = model(data)
                     loss += loss_function(output, label.float())
                     if (batch) % 100 == 0:
-                        print(f"Validating batch {batch}/{batch_count}...", end="\r")
+                        print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
                         if queue:
-                            queue.put([None, (len(train_dataloader)+batch, sample_size), None, None, None])
+                            queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validation_dataset), None, None, None])
             print()
-            loss /= batch_count
+            loss /= size_validation_dataset
             validation_loss.append(loss)
             print(f"Average loss: {loss:,.0f}")
 
@@ -211,6 +211,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     test_samples = read_samples(FILENAME_SAMPLES_TEST)
     test_dataset = CantileverDataset(test_samples, FOLDER_TEST_LABELS)
     test_dataloader = DataLoader(test_dataset, shuffle=False)
+    size_test_dataset = len(test_dataloader)
     
     # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
     max_values = [
@@ -246,9 +247,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
                 )
         
         if queue:
-            queue.put([None, (batch, len(test_dataloader)), None, None, None])
+                queue.put([None, (batch, size_test_dataset), None, None, None])
     
-    print(f"Wrote {len(test_dataloader)} test images in {FOLDER_ROOT}.")
+    print(f"Wrote {size_test_dataset} test images in {FOLDER_ROOT}.")
 
     # Calculate and plot evaluation metrics.
     for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):

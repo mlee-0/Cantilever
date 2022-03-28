@@ -74,27 +74,30 @@ class Nie(nn.Module):
     def __init__(self):
         super().__init__()
 
+        TRACK_RUNNING_STATS = False
+        MOMENTUM = 0.1
+
         self.convolution_1 = nn.Sequential(
             nn.Conv2d(INPUT_CHANNELS, 16, kernel_size=9, stride=1, padding=4),
-            nn.BatchNorm2d(16),
+            nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         self.convolution_2 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
-            nn.BatchNorm2d(32),
+            nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         self.convolution_3 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
-            nn.BatchNorm2d(64),
+            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         self.se_1 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(64),
+            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
-            nn.BatchNorm2d(64),
+            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.se_2 = nn.Sequential(
             nn.AvgPool2d(kernel_size=(5,10)),
@@ -107,20 +110,21 @@ class Nie(nn.Module):
         self.deconvolution_1 = nn.Sequential(
             nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(32),
+            nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
             nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(16),
+            nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
             nn.Conv2d(16, OUTPUT_CHANNELS, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
-            # nn.BatchNorm2d(OUTPUT_CHANNELS),
+            # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
     
     def forward(self, x):
+        batch_size = x.size()[0]
         x = x.float()
         # print(x.size())
         x = self.convolution_1(x)
@@ -131,19 +135,19 @@ class Nie(nn.Module):
         # print(x.size())
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((1, 1, 1, se_2.numel()))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((1, 1, 1, se_2.numel()))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((1, 1, 1, se_2.numel()))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((1, 1, 1, se_2.numel()))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((1, 1, 1, se_2.numel()))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
         # print(x.size())
         x = self.deconvolution_1(x)
         # print(x.size())
