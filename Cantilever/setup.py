@@ -143,11 +143,11 @@ def generate_input_images(samples: dict) -> np.ndarray:
 def generate_label_images(samples: dict, folder: str) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
     number_samples = get_sample_size(samples)
-    stresses, displacements = read_labels(folder, samples[KEY_SAMPLE_NUMBER])
+    stresses = read_labels(folder, samples[KEY_SAMPLE_NUMBER])
 
     # Store all stress data in a single array, initialized with a specific background value. The order of values in the text files is determined by ANSYS.
     BACKGROUND_VALUE = 0
-    data = {'stress': stresses, 'displacement': displacements}
+    data = {'stress': stresses, 'displacement': None}
     labels = np.full((number_samples, *OUTPUT_SIZE), BACKGROUND_VALUE, dtype=float)
     for i in range(number_samples):
         for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
@@ -175,7 +175,7 @@ def generate_label_images(samples: dict, folder: str) -> np.ndarray:
 
     return labels
 
-def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+def read_labels(folder: str, sample_numbers: list = None) -> List[np.ndarray]:
     """Return arrays of data from text files in the specified folder."""
     fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
     fea_filenames = sorted(fea_filenames)
@@ -186,24 +186,30 @@ def read_labels(folder: str, sample_numbers: list = None) -> Tuple[List[np.ndarr
     sample_size = len(fea_filenames)
 
     stresses = [None] * sample_size
-    displacements_x = [None] * sample_size
-    displacements_y = [None] * sample_size
+    # displacements_x = [None] * sample_size
+    # displacements_y = [None] * sample_size
     for i, fea_filename in enumerate(fea_filenames):
         with open(fea_filename, 'r') as file:
             lines = file.readlines()
-        stress, displacement_x, displacement_y = list(zip(
-            *[[float(value) for value in line.split(',')] for line in lines]
-            ))
-        stresses[i] = stress
-        displacements_x[i] = displacement_x
-        displacements_y[i] = displacement_y
+        # File contains multiple results.
+        if ',' in lines[0]:
+            stresses[i] = [float(line.split(',')[0]) for line in lines]
+            # stress, displacement_x, displacement_y = list(zip(
+            #     *[[float(value) for value in line.split(',')] for line in lines]
+            #     ))
+            # stresses[i] = stress
+            # displacements_x[i] = displacement_x
+            # displacements_y[i] = displacement_y
+        # File only contains one result.
+        else:
+            stresses[i] = [float(value) for value in lines]
         if (i+1) % 1000 == 0:
             print(f"Reading {i+1}/{sample_size} labels...", end='\r')
     print()
     stresses = [np.array(stress) for stress in stresses]
-    displacements = [np.sqrt(np.power(np.array(x), 2) + np.power(np.array(y), 2)) for x, y in zip(displacements_x, displacements_y)]
+    # displacements = [np.sqrt(np.power(np.array(x), 2) + np.power(np.array(y), 2)) for x, y in zip(displacements_x, displacements_y)]
 
-    return stresses, displacements
+    return stresses
 
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""

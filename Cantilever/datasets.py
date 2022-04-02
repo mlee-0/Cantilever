@@ -176,7 +176,7 @@ def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int,
     """
 
     # Get the maximum stress values in each label.
-    stresses, displacements = read_labels(folder)
+    stresses = read_labels(folder)
     stresses = np.array([np.max(stress) for stress in stresses])
     actual_raw_size = len(stresses)
 
