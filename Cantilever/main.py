@@ -264,9 +264,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
             cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
-            plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE, label='CNN')
-            plt.plot(bin_edges[1:], cdf_label, '--', color=Colors.RED, label='FEA')
-            plt.legend()
+            plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE)
+            plt.plot(bin_edges[1:], cdf_label, '--', color=Colors.RED)
+            if i == 0:
+                plt.legend(["CNN", "FEA"])
             plt.grid(visible=True, axis='y')
             plt.xticks([0, max_values[channel]])
             plt.yticks([0, 1])
