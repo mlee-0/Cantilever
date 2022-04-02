@@ -268,6 +268,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             plt.plot(bin_edges[1:], cdf_label, '--', color=Colors.RED, label='FEA')
             plt.legend()
             plt.grid(visible=True, axis='y')
+            plt.xticks([0, max_values[channel]])
             plt.yticks([0, 1])
             plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
         plt.suptitle(f"Area Metric ({channel_name.capitalize()})", fontweight='bold')
@@ -293,9 +294,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             if isinstance(result[0], tuple):
                 plt.plot(sample_numbers, [_[1] for _ in result], 'o', color=Colors.RED, label="FEA")
                 plt.plot(sample_numbers, [_[0] for _ in result], '.', color=Colors.BLUE, label="CNN")
-                plt.legend()
             else:
                 plt.plot(sample_numbers, result, '.', markeredgewidth=5, color=Colors.BLUE)
+                average = np.mean(result)
+                plt.axhline(average, color=Colors.BLUE_LIGHT, label=f"{average:.2f} average")
+            plt.legend()
             plt.xlabel("Sample Number")
             plt.xticks(sample_numbers)
             plt.title(metric)
