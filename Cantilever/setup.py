@@ -63,7 +63,6 @@ FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, 'Train Labels')
 FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, 'Test Labels')
 FILENAME_SAMPLES_TRAIN = 'samples_train.csv'
 FILENAME_SAMPLES_TEST = 'samples_test.csv'
-FILENAME_SUBSET = 'subset.txt'
 
 # Number of digits used for numerical file names.
 NUMBER_DIGITS = 6

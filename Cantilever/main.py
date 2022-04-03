@@ -54,7 +54,7 @@ def save(epoch, model, optimizer, loss_history) -> None:
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, keep_training=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, filename_subset: str="subset.txt", filename_new_subset: str="subset.txt", keep_training=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
 
@@ -92,20 +92,22 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     
     # Create a subset of the entire dataset, or load the previously created subset.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    if desired_subset_size > 0:
-        filename_subset = os.path.join(FOLDER_ROOT, FILENAME_SUBSET)
         try:
-            with open(filename_subset, 'r') as f:
+        if not filename_subset:
+            raise FileNotFoundError
+        filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
+        with open(filepath_subset, 'r') as f:
                 sample_numbers = [int(_) for _ in f.readlines()]
             sample_indices = np.array(sample_numbers) - 1
             samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-            print(f"Using previously created subset with {len(sample_numbers)} samples from {filename_subset}.")
+        print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
         except FileNotFoundError:
+        filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
             samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
             desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
-            with open(filename_subset, 'w') as f:
+        with open(filepath_subset, 'w') as f:
                 f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-            print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filename_subset}.")
+        print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
     sample_size = get_sample_size(samples)
 
     # Set up the training and validation data.
