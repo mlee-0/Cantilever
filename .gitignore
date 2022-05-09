@@ -3,11 +3,13 @@
 
 *.pth
 *.png
-subset.txt
+subset*.txt
 Cantilever/ansys_script_train.lgw
 Cantilever/ansys_script_test.lgw
 Cantilever/Train Labels
 Cantilever/Test Labels
+DED/Exp#1_(sheet#1)
+DED/Exp#2_(sheet#2)
 
 aclImdb
 aclImdb_v1.tar.gz

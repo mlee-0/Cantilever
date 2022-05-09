@@ -3,7 +3,6 @@ Train and test the model.
 '''
 
 
-import glob
 import math
 import os
 
@@ -85,28 +84,28 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch'] + 1
             epochs = range(epoch, epoch+epoch_count)
-            previous_test_loss = checkpoint['loss']
+            previous_test_loss = checkpoint['loss']   
     else:
         keep_training = False
         test_only = False
     
     # Create a subset of the entire dataset, or load the previously created subset.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-        try:
+    try:
         if not filename_subset:
             raise FileNotFoundError
         filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
         with open(filepath_subset, 'r') as f:
-                sample_numbers = [int(_) for _ in f.readlines()]
-            sample_indices = np.array(sample_numbers) - 1
-            samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
+            sample_numbers = [int(_) for _ in f.readlines()]
+        sample_indices = np.array(sample_numbers) - 1
+        samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
         print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
-        except FileNotFoundError:
+    except FileNotFoundError:
         filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-            samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
-            desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
+        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
+        desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
         with open(filepath_subset, 'w') as f:
-                f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
+            f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
         print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
     sample_size = get_sample_size(samples)
 
@@ -228,27 +227,27 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     test_labels = []
     test_outputs = []
     with torch.no_grad():
-    for batch, (test_input, label) in enumerate(test_dataloader, 1):
-        test_input = test_input.to(device)
-        label = label.to(device)
-        test_output = model(test_input)
-        test_output = test_output[0, :, ...].cpu().detach().numpy()
-        label = label[0, :, ...].cpu().numpy()
-        test_labels.append(label)
-        test_outputs.append(test_output)
-        
-        for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-            # Write the combined FEA and model output image.
-            image = np.vstack((
-                label[channel, ...],  # FEA
-                test_output[channel, ...],  # Model output
-            ))
-            write_image(
-                array_to_colormap(image, max_values[channel] if channel_name == "stress" else None),
-                os.path.join(FOLDER_ROOT, f'{batch}_fea_model_{channel_name}.png'),
-                )
-        
-        if queue:
+        for batch, (test_input, label) in enumerate(test_dataloader, 1):
+            test_input = test_input.to(device)
+            label = label.to(device)
+            test_output = model(test_input)
+            test_output = test_output[0, :, ...].cpu().detach().numpy()
+            label = label[0, :, ...].cpu().numpy()
+            test_labels.append(label)
+            test_outputs.append(test_output)
+            
+            for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
+                # Write the combined FEA and model output image.
+                image = np.vstack((
+                    label[channel, ...],  # FEA
+                    test_output[channel, ...],  # Model output
+                ))
+                write_image(
+                    array_to_colormap(image, max_values[channel] if channel_name == "stress" else None),
+                    os.path.join(FOLDER_ROOT, f'{batch}_fea_model_{channel_name}.png'),
+                    )
+            
+            if queue:
                 queue.put([None, (batch, size_test_dataset), None, None, None])
     
     print(f"Wrote {size_test_dataset} test images in {FOLDER_ROOT}.")
@@ -267,7 +266,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
             cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
             plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE)
-            plt.plot(bin_edges[1:], cdf_label, '--', color=Colors.RED)
+            plt.plot(bin_edges[1:], cdf_label, ':', color=Colors.RED)
             if i == 0:
                 plt.legend(["CNN", "FEA"])
             plt.grid(visible=True, axis='y')
@@ -312,8 +311,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
 if __name__ == '__main__':
     # Training hyperparameters.
     EPOCHS = 1
-    LEARNING_RATE = 1e-7  #0.00001  # 0.000001 for Nie
-    BATCH_SIZE = 1
+    LEARNING_RATE = 1e-7  # 0.000001 for Nie
+    BATCH_SIZE = 20
     Model = Nie
     DESIRED_SAMPLE_SIZE = 10000
     BINS = 1
@@ -322,5 +321,5 @@ if __name__ == '__main__':
 
     main(
         EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, NON_UNIFORMITY, TRAINING_SPLIT, Model,
-        keep_training=True, test_only=False,
+        filename_subset='subset (2000, 1 bin).txt', keep_training=True, test_only=True,
     )
