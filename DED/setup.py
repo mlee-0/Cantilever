@@ -55,12 +55,18 @@ else:
 
 # Colors for plots.
 class Colors:
-    RED = "#ff4040"
-    RED_DARK = "#9e2828"
-    RED_LIGHT = "#ffb6b6"
     BLUE = "#0095ff"
     BLUE_DARK = "#005c9e"
     BLUE_LIGHT = "#9ed7ff"
+    
+    RED = "#ff4040"
+    RED_DARK = "#9e2828"
+    RED_LIGHT = "#ffb6b6"
+
+    ORANGE = "#FF8000"
+    ORANGE_DARK = "#9E4F00"
+    ORANGE_LIGHT = "#FFCE9E"
+    
     GRAY = "#808080"
     GRAY_DARK = "#404040"
     GRAY_LIGHT = "#bfbfbf"
@@ -156,6 +162,9 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
             # array = sp.ndimage.binary_closing(array)
 
             # array = array * 255
+
+            # Scale values to [-1, 1]. Required for use with GAN, where the generator outputs images in [-1, 1].
+            array = array / 255 * 2 - 1
 
             labels.append(array.reshape(OUTPUT_SIZE))
 

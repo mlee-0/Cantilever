@@ -86,9 +86,9 @@ class MainWindow(QMainWindow):
         layout_sidebar.addLayout(layout)
 
         # Checkbox for toggling continuing training a previously saved model.
-        self.checkbox_keep_training = QCheckBox("Keep Training Previous")
-        self.checkbox_keep_training.setChecked(True)
-        layout_sidebar.addWidget(self.checkbox_keep_training)
+        self.checkbox_train_existing = QCheckBox("Train Existing")
+        self.checkbox_train_existing.setChecked(True)
+        layout_sidebar.addWidget(self.checkbox_train_existing)
 
         # Settings.
         self.value_epochs = QSpinBox()
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
     def on_start(self):
         """Start training or testing."""
         if self.sender() is self.button_train:
-            train_model = self.checkbox_keep_training.isChecked()
+            train_model = self.checkbox_train_existing.isChecked()
             test_only = False
         elif self.sender() is self.button_test:
             train_model = False
@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
                 self.value_training_split.value(),
             ],
             kwargs={
-                "keep_training": train_model,
+                "train_existing": train_model,
                 "test_only": test_only,
                 "queue": self.queue,
                 "queue_to_main": self.queue_to_main,
@@ -358,7 +358,7 @@ class MainWindow(QMainWindow):
             self.sidebar.setEnabled(True)
             self.button_stop.setEnabled(False)
             self.progress_bar.reset()
-            self.checkbox_keep_training.setChecked(True)
+            self.checkbox_train_existing.setChecked(True)
             self.timer.stop()
     
     def closeEvent(self, event):
