@@ -23,7 +23,7 @@ else:
 
 # Size of output images (channel-height-width) produced by the network.
 OUTPUT_CHANNELS = 1
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 60, 80)  # Make dimensions divisible by 4 for convenience in the se_2 layer
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 64, 64)  # Make dimensions divisible by 4 for convenience in the se_2 layer
 # Size of input images (channel-height-width).
 INPUT_CHANNELS = 3
 INPUT_SIZE = (INPUT_CHANNELS, *OUTPUT_SIZE[1:])
@@ -91,9 +91,9 @@ def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None
     if not sample_indices:
         sample_indices = range(len(data))
 
-    # Average the shape of the label images.
-    average_labels = np.array(read_labels(FOLDER_LABELS))
-    average_labels = np.round(np.mean(average_labels, axis=0) / 255) * 255
+    # # Average the shape of the label images.
+    # average_labels = np.array(read_labels(FOLDER_LABELS))
+    # average_labels = np.round(np.mean(average_labels, axis=0) / 255) * 255
 
     images = []
     for index in sample_indices:
@@ -101,19 +101,19 @@ def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None
         for channel in range(INPUT_CHANNELS):
             image[channel, ...] = data.loc[index][channel] / value_ranges[channel][-1] * 255
 
-        # First channel contains the average shape of label image with brightness representing powder value.
-        image[0, ...] = average_labels * (data.loc[index][1] / POWDER_VALUE_RANGE[-1])
+        # # First channel contains the average shape of label image with brightness representing powder value.
+        # image[0, ...] = average_labels * (data.loc[index][1] / POWDER_VALUE_RANGE[-1])
 
-        # Second channel contains an ellipse whose height represents laser power and whose length represents feed rate.
-        max_radius_y = (INPUT_SIZE[1] // 2)
-        max_radius_x = (INPUT_SIZE[2] // 2)
-        y, x = np.indices(INPUT_SIZE[1:])
-        y = y - max_radius_y
-        x = x - max_radius_x
-        radius_y = (data.loc[index][0] / LASER_POWER_RANGE[-1]) * max_radius_y
-        radius_x = (data.loc[index][2] / FEED_RATE_RANGE[-1]) * max_radius_x
-        image[1, ...] = (x ** 2 / radius_x ** 2 + y ** 2 / radius_y ** 2) <= 1
-        image[1, ...] *= 255.0
+        # # Second channel contains an ellipse whose height represents laser power and whose length represents feed rate.
+        # max_radius_y = (INPUT_SIZE[1] // 2)
+        # max_radius_x = (INPUT_SIZE[2] // 2)
+        # y, x = np.indices(INPUT_SIZE[1:])
+        # y = y - max_radius_y
+        # x = x - max_radius_x
+        # radius_y = (data.loc[index][0] / LASER_POWER_RANGE[-1]) * max_radius_y
+        # radius_x = (data.loc[index][2] / FEED_RATE_RANGE[-1]) * max_radius_x
+        # image[1, ...] = (x ** 2 / radius_x ** 2 + y ** 2 / radius_y ** 2) <= 1
+        # image[1, ...] *= 255.0
         
         images.append(image.astype(np.uint8))
     return images

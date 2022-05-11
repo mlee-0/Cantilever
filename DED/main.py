@@ -62,34 +62,109 @@ class DedDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index]), np.copy(self.labels[index])
 
-def save(epoch, model, optimizer, loss_history) -> None:
-    """Save model parameters to a file."""
+def save(filepath: str, epoch: int, models: list, optimizers: list, loss_histories: list) -> None:
+    """Save parameters to the given file."""
     torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss_history,
-    }, FILEPATH_MODEL)
-    print(f'Saved model parameters to {FILEPATH_MODEL}.')
+        "epoch": epoch,
+        **{f"model_{i}": model.state_dict() for i, model in enumerate(models)},
+        **{f"optimizer_{i}": optimizer.state_dict() for i, optimizer in enumerate(optimizers)},
+        **{f"loss_{i}": loss for i, loss in enumerate(loss_histories)},
+    }, filepath)
+    print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, keep_training=None, test_only=False, queue=None, queue_to_main=None):
-    """
-    Train and test the model.
+def load(filepath: str, device: str, models: list, optimizers: list, loss_histories: list) -> tuple:
+    """Load the parameters stored in the given file. Return the epoch number, but load the parameters in-place."""
+    checkpoint = torch.load(filepath, map_location=torch.device(device))
 
-    `desired_subset_size`: Number of samples to include in the subset. Enter 0 to use all samples found instead of creating a subset.
-    """
+    for model, key in zip(models, sorted([key for key in checkpoint if key.startswith("model")])):
+        model.load_state_dict(checkpoint[key])
+    for optimizer, key in zip(optimizers, sorted([key for key in checkpoint if key.startswith("optimizer")])):
+        optimizer.load_state_dict(checkpoint[key])
+    for loss, key in zip(loss_histories, sorted([key for key in checkpoint if key.startswith("loss")])):
+        loss.extend(checkpoint[key])
+    
+    epoch = checkpoint["epoch"] + 1
+    
+    return epoch
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Using {device} device.')
+def create_dataloaders(batch_size: int) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    """Create and return the DataLoader objects for the training, validation, and testing datasets."""
 
-    # Initialize the model and optimizer and load their parameters if they have been saved previously.
-    model = Model()
-    model.to(device)
+    train_dataset = DedDataset(dataset="train")
+    validate_dataset = DedDataset(dataset="validate")
+    test_dataset = DedDataset(dataset="test")
+
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, shuffle=False)
+    
+    return train_dataloader, validate_dataloader, test_dataloader
+
+def train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_generator, optimizer_discriminator, loss_function):
+    """Train the GAN for one epoch, and return the loss for the generator and discriminator."""
+
+    data = data.to(device)
+    label = label.to(device)
+    label = label.float()
+
+    # Values used to represent real and fake images for the GAN.
+    LABEL_REAL = 1
+    LABEL_FAKE = 0
+
+    # Train the discriminator with an all-real batch.
+    model_discriminator.zero_grad()
+    # Create a tensor of labels for each image in the batch.
+    label_discriminator = torch.full((label.size(0),), LABEL_REAL, dtype=torch.float, device=device)
+    # Forward pass real images through the discriminator.
+    output_discriminator = model_discriminator(label).view(-1)
+    # Calculate the loss of the discriminator.
+    loss_real = loss_function(output_discriminator, label_discriminator)
+    # Calculate gradients.
+    loss_real.backward()
+
+    # Train the discriminator with an all-fake batch.
+    latent = model_cnn(data)  # latent = torch.randn((label.size(0),), latent.size, )
+    output_generator = model_generator(latent)
+    # Forward pass fake images through the discriminator.
+    output_discriminator = model_discriminator(output_generator.detach()).view(-1)
+    # Calculate the loss of the discriminator.
+    label_discriminator[:] = LABEL_FAKE
+    loss_fake = loss_function(output_discriminator, label_discriminator)
+    # Calculate gradients.
+    loss_fake.backward()
+
+    # Calculate total loss of discriminator by summing real and fake losses.
+    loss_discriminator = loss_real + loss_fake
+    # Update discriminator.
+    optimizer_discriminator.step()
+
+    # Train the generator.
+    model_generator.zero_grad()
+    # Forward pass fake images through the discriminator.
+    output_discriminator = model_discriminator(output_generator).view(-1)
+    # Calculate the loss of the generator, assuming images are real in order to calculate loss correctly.
+    label_discriminator[:] = LABEL_REAL
+    loss_generator = loss_function(output_discriminator, label_discriminator)
+    # Calculate gradients.
+    loss_generator.backward()
+    # Update generator.
+    optimizer_generator.step()
+
+    return loss_generator, loss_discriminator
+
+def train(device, model, learning_rate, epoch_count, train_dataloader, validate_dataloader, keep_training: bool, test_only: bool, queue=None, queue_from_gui=None) -> None:
+    """Train a single model on the given training and validation datasets."""
+
+    size_train_dataset = len(train_dataloader)
+    size_validate_dataset = len(validate_dataloader)
+
+    # Initialize the optimizer and loss function.
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss_function = nn.MSELoss()
-    
-    epochs = range(1, epoch_count+1)
-    previous_test_loss = []
+
+    # Load their parameters if they have been saved previously.
+    epoch = 1
+    previous_validation_losses = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
             if keep_training is None:
@@ -98,118 +173,262 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             keep_training = True
         
         if keep_training:
-            checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch'] + 1
+            epoch = load(FILEPATH_MODEL, device, [model], [optimizer], [previous_validation_losses])
             epochs = range(epoch, epoch+epoch_count)
-            previous_test_loss = checkpoint['loss']
     else:
         keep_training = False
         test_only = False
     
-    train_dataset = DedDataset(dataset="train")
-    validate_dataset = DedDataset(dataset="validate")
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
-    size_train_dataset = len(train_dataloader)
-    size_validate_dataset = len(validate_dataloader)
+    epochs = range(epoch, epoch+epoch_count)
+    if queue:
+        queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
+    
+    validation_losses = []
+    for epoch in epochs:
+        print(f'Epoch {epoch}\n------------------------')
+        
+        model.train(True)
 
-    if not test_only:
-        if queue:
-            queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
+        # Train on the training dataset.
+        for batch, (data, label) in enumerate(train_dataloader, 1):
+            data = data.to(device)
+            label = label.to(device)
+            output = model(data)
+            loss = loss_function(output, label.float())
+            # Reset gradients of model parameters.
+            optimizer.zero_grad()
+            # Backpropagate the prediction loss.
+            loss.backward()
+            # Adjust model parameters.
+            optimizer.step()
 
-        validation_loss = []
-        for epoch in epochs:
-            print(f'Epoch {epoch}\n------------------------')
-            
-            # Train on the training dataset.
-            model.train(True)
-            for batch, (data, label) in enumerate(train_dataloader, 1):
+            if (batch) % 10 == 0:
+                print(f"Training batch {batch}/{size_train_dataset} with loss {loss:,.0f}...", end="\r")
+                if queue:
+                    queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
+        print()
+
+        # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
+        model.train(False)
+        loss = 0
+        with torch.no_grad():
+            for batch, (data, label) in enumerate(validate_dataloader, 1):
                 data = data.to(device)
                 label = label.to(device)
                 output = model(data)
-                loss = loss_function(output, label.float())
-                # Reset gradients of model parameters.
-                optimizer.zero_grad()
-                # Backpropagate the prediction loss.
-                loss.backward()
-                # Adjust model parameters.
-                optimizer.step()
-
-                if (batch) % 10 == 0:
-                    print(f"Training batch {batch}/{size_train_dataset} with loss {loss:,.0f}...", end="\r")
+                loss += loss_function(output, label.float())
+                if (batch) % 100 == 0:
+                    print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
                     if queue:
-                        queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
-            print()
+                        queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
+        print()
+        loss /= size_validate_dataset
+        validation_losses.append(loss)
+        print(f"Average loss: {loss:,.0f}")
 
-            # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
-            model.train(False)
-            loss = 0
-            with torch.no_grad():
-                for batch, (data, label) in enumerate(validate_dataloader, 1):
-                    data = data.to(device)
-                    label = label.to(device)
-                    output = model(data)
-                    loss += loss_function(output, label.float())
-                    if (batch) % 100 == 0:
-                        print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
-                        if queue:
-                            queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
-            print()
-            loss /= size_validate_dataset
-            validation_loss.append(loss)
-            print(f"Average loss: {loss:,.0f}")
-
-            # Save the model parameters periodically.
-            if (epoch) % 1 == 0:
-                save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
-            
-            if queue:
-                queue.put([(epoch, epochs[-1]), None, epochs, validation_loss, previous_test_loss])
-            
-            if queue_to_main:
-                if not queue_to_main.empty():
-                    # Stop training.
-                    if queue_to_main.get() == True:
-                        queue_to_main.queue.clear()
-                        break
+        # Save the model parameters periodically.
+        if (epoch) % 1 == 0:
+            save(FILEPATH_MODEL, epoch, model, optimizer, [*previous_validation_losses, *validation_losses])
         
-        # Save the model parameters.
-        save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
+        if queue:
+            queue.put([(epoch, epochs[-1]), None, epochs, validation_losses, previous_validation_losses])
         
-        # Plot the loss history.
-        if not queue:
-            plt.figure()
-            if previous_test_loss:
-                plt.plot(range(1, epochs[0]), previous_test_loss, 'o', color=Colors.GRAY_LIGHT)
-            plt.plot(epochs, validation_loss, '-o', color=Colors.BLUE)
-            plt.ylim(bottom=0)
-            plt.xlabel('Epochs')
-            plt.ylabel('Loss')
-            plt.grid(axis='y')
-            plt.show()
-
-    # Set up the testing data.
-    test_dataset = DedDataset(dataset="test")
-    test_dataloader = DataLoader(test_dataset, shuffle=False)
-    size_test_dataset = len(test_dataloader)
+        if queue_from_gui:
+            if not queue_from_gui.empty():
+                # Stop training.
+                if queue_from_gui.get() == True:
+                    queue_from_gui.queue.clear()
+                    break
     
+    # Save the model parameters.
+    save(FILEPATH_MODEL, epoch, model, optimizer, [*previous_validation_losses, *validation_losses])
+    
+    # Plot the loss history.
+    if not queue:
+        plt.figure()
+        if previous_validation_losses:
+            plt.plot(range(1, epochs[0]), previous_validation_losses, 'o', color=Colors.GRAY_LIGHT)
+        plt.plot(epochs, validation_losses, '-o', color=Colors.BLUE)
+        plt.ylim(bottom=0)
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.grid(axis='y')
+        plt.show()
+
+def train_gan(device, model_cnn: nn.Module, model_generator: nn.Module, model_discriminator: nn.Module, learning_rate: float, epoch_count, train_dataloader, validate_dataloader, keep_training, test_only: bool, queue = None, queue_from_gui = None) -> None:
+    """Train a network consisting of a CNN and a GAN on the given training and validation datasets."""
+
+    size_train_dataset = len(train_dataloader)
+    size_validate_dataset = len(validate_dataloader)
+
+    # Initialize the optimizers and loss function.
+    optimizer_generator = torch.optim.Adam(params=model_generator.parameters(), lr=learning_rate)
+    optimizer_discriminator = torch.optim.Adam(params=model_discriminator.parameters(), lr=learning_rate)
+    loss_function = nn.BCELoss()
+
+    # Load their parameters if they have been saved previously.
+    epoch = 1
+    previous_validation_losses_generator = []
+    previous_validation_losses_discriminator = []
+    if os.path.exists(FILEPATH_MODEL):
+        if not test_only:
+            if keep_training is None:
+                keep_training = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+        else:
+            keep_training = True
+        
+        if keep_training:
+            print(model_cnn.state_dict())
+            epoch = load(
+                FILEPATH_MODEL,
+                device,
+                (model_cnn, model_generator, model_discriminator),
+                (optimizer_generator, optimizer_discriminator),
+                (previous_validation_losses_generator, previous_validation_losses_discriminator),
+            )
+            print(model_cnn.state_dict())
+    else:
+        keep_training = False
+        test_only = False
+    
+    epochs = range(epoch, epoch_count+1)
+    if queue:
+        queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
+    
+    # Initialize the validation losses.
+    validation_losses_generator = []
+    validation_losses_discriminator = []
+
+    # Main training-validation loop.
+    for epoch in epochs:
+        print(f'Epoch {epoch}\n------------------------')
+
+        model_cnn.train(True)
+        model_generator.train(True)
+        model_discriminator.train(True)
+
+        # Train on the training dataset.
+        for batch, (data, label) in enumerate(train_dataloader, 1):
+            loss_generator, loss_discriminator = train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_generator, optimizer_discriminator, loss_function)
+
+            # Periodically display progress.
+            if (batch) % 10 == 0:
+                print(f"Training batch {batch}/{size_train_dataset}...", end="\r")
+                if queue:
+                    queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
+        
+        model_cnn.train(False)
+        model_generator.train(False)
+        model_discriminator.train(False)
+        
+        # Train on the validation dataset.
+        cumulative_loss_generator = 0
+        cumulative_loss_discriminator = 0
+        with torch.no_grad():
+            for batch, (data, label) in enumerate(validate_dataloader, 1):
+                loss_generator, loss_discriminator = train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_generator, optimizer_discriminator, loss_function)
+
+                cumulative_loss_generator += loss_generator
+                cumulative_loss_discriminator += loss_discriminator
+
+                if (batch) % 5 == 0:
+                    print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
+                    if queue:
+                        queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
+        print()
+
+        validation_losses_generator.append(cumulative_loss_generator / size_validate_dataset)
+        validation_losses_discriminator.append(cumulative_loss_discriminator / size_validate_dataset)
+        print(f"Average loss: {cumulative_loss_generator / size_validate_dataset:,.0f} (generator), {cumulative_loss_discriminator / size_validate_dataset} (discriminator)")
+
+        # Save the model parameters periodically.
+        if (epoch) % 1 == 0:
+            save(
+                FILEPATH_MODEL,
+                epoch,
+                [model_cnn, model_generator, model_discriminator],
+                [optimizer_generator, optimizer_discriminator],
+                [[*previous_validation_losses_generator, *validation_losses_generator], [*previous_validation_losses_discriminator, *validation_losses_discriminator]],
+            )
+        
+        # if queue:
+        #     queue.put([(epoch, epochs[-1]), None, epochs, validation_losses, previous_validation_losses])
+        
+        # if queue_from_gui:
+        #     if not queue_from_gui.empty():
+        #         # Stop training.
+        #         if queue_from_gui.get() == True:
+        #             queue_from_gui.queue.clear()
+        #             break
+    
+    # Save the model parameters.
+    save(
+        FILEPATH_MODEL,
+        epoch,
+        [model_cnn, model_generator, model_discriminator],
+        [optimizer_generator, optimizer_discriminator],
+        [[*previous_validation_losses_generator, *validation_losses_generator], [*previous_validation_losses_discriminator, *validation_losses_discriminator]],
+    )
+    
+    # Plot the loss history.
+    if not queue:
+        plt.figure()
+        if previous_validation_losses_generator and previous_validation_losses_discriminator:
+            plt.plot(range(1, epochs[0]), previous_validation_losses_generator, 'o', color=Colors.GRAY_LIGHT)
+            plt.plot(range(1, epochs[0]), previous_validation_losses_discriminator, '*', color=Colors.GRAY_LIGHT)
+        plt.plot(epochs, validation_losses_generator, '-o', color=Colors.BLUE)
+        plt.plot(epochs, validation_losses_discriminator, '-*', color=Colors.BLUE)
+        plt.ylim(bottom=0)
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.grid(axis='y')
+        plt.show()
+
+
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, keep_training=None, test_only=False, queue=None, queue_from_gui=None):
+    """Train and test the model."""
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'Using {device} device.')
+
+    # Create the datasets.
+    train_dataloader, validate_dataloader, test_dataloader = create_dataloaders(batch_size)
+    size_test_dataset = len(test_dataloader)
+
+    # Initialize the models.
+    LATENT_SIZE = 100
+    GENERATOR_FEATURES = 64
+    DISCRIMINATOR_FEATURES = 64
+
+    # model = Model()
+    # model.to(device)
+    model_cnn = FullyCnn(input_channels=INPUT_CHANNELS, output_size=LATENT_SIZE)
+    model_generator = GanGenerator(input_channels=LATENT_SIZE, number_features=GENERATOR_FEATURES, output_channels=OUTPUT_CHANNELS)
+    model_discriminator = GanDiscriminator(number_features=DISCRIMINATOR_FEATURES, output_channels=OUTPUT_CHANNELS)
+
+    # Train on the training and validation datasets.
+    if not test_only:
+        train_gan(device, model_cnn, model_generator, model_discriminator, learning_rate, epoch_count, train_dataloader, validate_dataloader, keep_training, test_only, queue, queue_from_gui)
+
+    model_cnn.train(False)
+    model_generator.train(False)
+    model_discriminator.train(False)
+
     # Test on the testing dataset.
-    model.train(False)
     test_labels = []
     test_outputs = []
     with torch.no_grad():
         for batch, (test_input, label) in enumerate(test_dataloader, 1):
             test_input = test_input.to(device)
             label = label.to(device)
-            test_output = model(test_input)
+
+            test_output = model_generator(model_cnn(test_input))
             test_output = test_output[0, :, ...].cpu().detach().numpy()
             label = label[0, :, ...].cpu().numpy()
             test_labels.append(label)
             test_outputs.append(test_output)
             
-            # Write the combined label and model output image.
+            # Vertically concatenate the label image and model output and write the combined image to a file.
             image = np.vstack((label.transpose((1, 2, 0)), test_output.transpose((1, 2, 0))))
             if OUTPUT_CHANNELS == 1:
                 image = np.dstack((image,)*3)
