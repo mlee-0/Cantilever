@@ -44,19 +44,19 @@ class DedDataset(Dataset):
         self.inputs = read_inputs(FILENAME_DATASET, SHEET_INDEX, sample_indices=sample_indices)
         self.labels = read_labels(FOLDER_LABELS, sample_indices=sample_indices)
         
-        # # Perform data augmentation.
-        # augmented_labels = []
-        # for label in self.labels:
-        #     flipped_label = label.copy()
-        #     flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
-        #     augmented_labels.append(flipped_label)
-        # # Insert the augmented labels and corresponding input images.
-        # index = 1
-        # for input_image, augmented_label in zip(self.inputs, augmented_labels):
-        #     # Insert after its corresponding image.
-        #     self.inputs.insert(index, input_image)
-        #     self.labels.insert(index, augmented_label)
-        #     index += 2
+        # Perform data augmentation.
+        augmented_labels = []
+        for label in self.labels:
+            flipped_label = label.copy()
+            flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
+            augmented_labels.append(flipped_label)
+        # Insert the augmented labels and corresponding input images.
+        index = 1
+        for input_image, augmented_label in zip(self.inputs, augmented_labels):
+            # Insert after its corresponding image.
+            self.inputs.insert(index, input_image)
+            self.labels.insert(index, augmented_label)
+            index += 2
         
         assert len(self.inputs) == len(self.labels), f"Number of inputs {len(self.inputs)} does not match number of labels {len(self.labels)}"
         self.number_samples = len(self.inputs)
@@ -171,6 +171,13 @@ def train_gan(device: str, model_cnn: nn.Module, model_generator: nn.Module, mod
 
         # Train on the training dataset.
         for batch, (data, label) in enumerate(train_dataloader, 1):
+            # Add random noise to label images for the first # epochs to improve stability of GAN training.
+            EPOCHS_RANDOM_NOISE = 50
+            if epoch <= EPOCHS_RANDOM_NOISE:
+                std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
+                mean = 0.0
+                label = label + torch.randn(label.size(), device=device) * std + mean
+            
             train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_cnn, optimizer_generator, optimizer_discriminator, loss_function_cnn, loss_function_gan)
 
             # Periodically display progress.
@@ -562,7 +569,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 if __name__ == '__main__':
     # Training hyperparameters.
     EPOCHS = 10
-    LEARNING_RATE = 1e-6
+    LEARNING_RATE = 1e-7
     BATCH_SIZE = 1
     Model = Nie
 

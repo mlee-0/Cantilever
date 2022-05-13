@@ -48,8 +48,8 @@ elif experiment_number == 2:
     FOLDER_LABELS = os.path.join(FOLDER_ROOT, 'Exp#2_(sheet#2)')
     SHEET_INDEX = 1
     TOTAL_SAMPLES = 192
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 4)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 4)
+    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 4*5)
+    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 4*5)
 else:
     print(f"Invalid experiment number: {experiment_number}")
 
