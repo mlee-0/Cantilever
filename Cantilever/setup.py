@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 try:
-    from google.colab import drive  # type: ignore
+    from google.colab import drive  # type: ignore (forces Pylance in VS Code to ignore the missing import error)
 except ModuleNotFoundError:
     GOOGLE_COLAB = False
 else:
@@ -31,53 +31,43 @@ class Parameter:
     # Spacing between adjacent values.
     step: int
     # Units for the parameter.
-    units: str = ''
+    units: str = ""
     # Number of decimal places to which sample values are rounded.
     precision: int = 0
 
 # Settings for each parameter.
-length = Parameter(low=2, high=4, step=0.1, precision=1, name='Length', units='m')
-height = Parameter(low=1, high=2, step=0.1, precision=1, name='Height', units='m')
-elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name='Elastic Modulus', units='GPa')
-load = Parameter(low=500, high=1000, step=5, precision=0, name='Load', units='N')
-angle = Parameter(low=0, high=360, step=1, precision=0, name='Angle', units='Degrees')
+length = Parameter(low=2, high=4, step=0.1, precision=1, name="Length", units="m")
+height = Parameter(low=1, high=2, step=0.1, precision=1, name="Height", units="m")
+width = Parameter(low=1, high=2, step=0.1, precision=1, name="Width", units="m")
+elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name="Elastic Modulus", units="GPa")
+load = Parameter(low=500, high=1000, step=5, precision=0, name="Load", units="N")
+angle = Parameter(low=0, high=360, step=1, precision=0, name="Angle", units="Degrees")
 # Names of quantities that are saved but are not randomly generated.
-KEY_SAMPLE_NUMBER = 'Sample Number'
-KEY_X_LOAD = 'Load X'
-KEY_Y_LOAD = 'Load Y'
-KEY_IMAGE_LENGTH = 'Image Length'
-KEY_IMAGE_HEIGHT = 'Image Height'
-
-# Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 3
-INPUT_SIZE = (INPUT_CHANNELS, 20, 40)
-assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), 'Input image size must match aspect ratio of cantilever: {height.high}:{length.high}.'
-# Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
-OUTPUT_CHANNEL_NAMES = ('stress',)  #('stress', 'displacement')
-OUTPUT_CHANNELS = len(OUTPUT_CHANNEL_NAMES)
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 20, 40)
+KEY_SAMPLE_NUMBER = "Sample Number"
+KEY_X_LOAD = "Load X"
+KEY_Y_LOAD = "Load Y"
+KEY_NODES_LENGTH = "Nodes Length"
+KEY_NODES_HEIGHT = "Nodes Height"
+KEY_NODES_WIDTH = "Nodes Width"
 
 # Folders and files.
-FOLDER_ROOT = 'Cantilever' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
-FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, 'Train Labels')
-FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, 'Test Labels')
-FILENAME_SAMPLES_TRAIN = 'samples_train.csv'
-FILENAME_SAMPLES_TEST = 'samples_test.csv'
+FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
+FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels 3D")
+FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels 3D")
+FOLDER_RESULTS = os.path.join(FOLDER_ROOT, "Results")
+FILENAME_SAMPLES_TRAIN = "samples_train.csv"
+FILENAME_SAMPLES_TEST = "samples_test.csv"
 
 # Number of digits used for numerical file names.
 NUMBER_DIGITS = 6
 
-# Colors for plots.
-class Colors:
-    RED = "#ff4040"
-    RED_DARK = "#9e2828"
-    RED_LIGHT = "#ffb6b6"
-    BLUE = "#0095ff"
-    BLUE_DARK = "#005c9e"
-    BLUE_LIGHT = "#9ed7ff"
-    GRAY = "#808080"
-    GRAY_DARK = "#404040"
-    GRAY_LIGHT = "#bfbfbf"
+# Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
+INPUT_CHANNELS = 4
+INPUT_SIZE = (INPUT_CHANNELS, 20, 40)
+assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), "Input image size must match aspect ratio of cantilever: {height.high}:{length.high}."
+# Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
+OUTPUT_CHANNELS = 20
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 20, 40)
 
 
 def plot_histogram(values: np.ndarray, title=None) -> None:
@@ -110,11 +100,16 @@ def generate_input_images(samples: dict) -> np.ndarray:
     number_samples = get_sample_size(samples)
     inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=DATA_TYPE)
     for i in range(number_samples):
-        pixel_length, pixel_height = int(samples[KEY_IMAGE_LENGTH][i]), int(samples[KEY_IMAGE_HEIGHT][i])
+        pixel_length = int(samples[KEY_NODES_LENGTH][i])
+        pixel_height = int(samples[KEY_NODES_HEIGHT][i])
+        pixel_width = int(samples[KEY_NODES_WIDTH][i])
         image = np.zeros(INPUT_SIZE, dtype=DATA_TYPE)
 
-        # Create a channel with a white rectangle representing the dimensions of the cantilever.
+        # Create a channel with a white rectangle representing the length and height of the cantilever.
         image[0, :pixel_height, :pixel_length] = 255
+
+        # Create a channel with a white rectangle representing the height and width of the cantilever.
+        image[1, :pixel_height, :pixel_width] = 255
 
         # Create a channel with a gray line of pixels representing the load magnitude and direction.
         r = np.arange(max(image.shape[1:]))
@@ -123,18 +118,19 @@ def generate_input_images(samples: dict) -> np.ndarray:
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
-        image[1, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        image[1, :, :] = np.flipud(image[1, :, :])
+        image[2, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
+        image[2, :, :] = np.flipud(image[1, :, :])
 
         # # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
         # # image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
         # image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
         
         # Create a channel with the elastic modulus distribution.
-        image[2, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        image[3, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
         
         # # Create a channel with the fixed boundary conditions.
         # image[3, :pixel_height, 0] = 255
+
         # Append the image to the list.
         inputs[i, ...] = image
     return inputs
@@ -142,73 +138,55 @@ def generate_input_images(samples: dict) -> np.ndarray:
 def generate_label_images(samples: dict, folder: str) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
     number_samples = get_sample_size(samples)
-    stresses = read_labels(folder, samples[KEY_SAMPLE_NUMBER])
+    
+    # Get and sort all FEA filenames.
+    filenames = glob.glob(os.path.join(folder, '*.txt'))
+    filenames = sorted(filenames)
 
-    # Store all stress data in a single array, initialized with a specific background value. The order of values in the text files is determined by ANSYS.
-    BACKGROUND_VALUE = 0
-    data = {'stress': stresses, 'displacement': None}
-    labels = np.full((number_samples, *OUTPUT_SIZE), BACKGROUND_VALUE, dtype=float)
-    for i in range(number_samples):
-        for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-            values = data[channel_name][i]
-            # Initialize a 2D array.
-            array = np.zeros((int(samples[KEY_IMAGE_HEIGHT][i]), int(samples[KEY_IMAGE_LENGTH][i])))
-            # Determine the number of mesh divisions used in this sample.
-            mesh_divisions = (int(samples[KEY_IMAGE_LENGTH][i]-1), int(samples[KEY_IMAGE_HEIGHT][i]-1))
-            # Values for interior nodes.
-            array[1:-1, 1:-1] = np.flipud(
-                np.reshape(values[2*sum(mesh_divisions):], [_-1 for _ in mesh_divisions[::-1]], 'F')
-                )
-            # Values for corner nodes.
-            array[-1, 0] = values[0]
-            array[-1, -1] = values[1]
-            array[0, -1] = values[1+mesh_divisions[0]]
-            array[0, 0] = values[1+mesh_divisions[0]+mesh_divisions[1]]
-            # Values for edge nodes.
-            array[-1, 1:-1] = values[2:2+mesh_divisions[0]-1]
-            array[1:-1, -1] = values[2+mesh_divisions[0]:2+mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-            array[0, 1:-1] = values[2+mesh_divisions[0]+mesh_divisions[1]:2+2*mesh_divisions[0]+mesh_divisions[1]-1][::-1]
-            array[1:-1, 0] = values[2+2*mesh_divisions[0]+mesh_divisions[1]-1:2+2*mesh_divisions[0]+2*mesh_divisions[1]-2]
-            # Insert the array.
-            labels[i, channel, :array.shape[0], :array.shape[1]] = array
+    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
+    assert len(samples[KEY_SAMPLE_NUMBER]) <= len(filenames), f"The requested number of samples {len(samples[KEY_SAMPLE_NUMBER])} exceeds the number of available files {len(filenames)}."
+    filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
+
+    # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
+    DEFAULT_VALUE = 0
+    labels = np.full((number_samples, *OUTPUT_SIZE), DEFAULT_VALUE, dtype=float)
+    for i, filename in enumerate(filenames):
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+        
+        # Assume each line contains the result followed by the corresopnding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
+        node_values = [
+            [float(value) if i == 0 else round(float(value), 2) for i, value in enumerate(line.split(','))]
+            for line in lines
+        ]
+        # Sort the values using the coordinates.
+        node_values.sort(key=lambda _: (_[3], _[2], _[1]))
+
+        image_channels = int(samples[KEY_NODES_WIDTH][i])
+        image_height = int(samples[KEY_NODES_HEIGHT][i])
+        image_length = int(samples[KEY_NODES_LENGTH][i])
+
+        # Determine if this is a 2D or 3D problem.
+        x = set([_[1] for _ in node_values])
+        y = set([_[2] for _ in node_values])
+        z = set([_[3] for _ in node_values])
+        is_3d = len(z) > 1
+        
+        # Check for rounding errors (for example, 0.32 and 0.33 should likely be the same value).
+        assert len(y) == image_height and len(x) == image_length and len(z) == image_channels, f"Rounding error in the X, Y, Z coordinates in {filename}."
+
+        # Insert the values into the combined array, aligned top-left.
+        labels[i, :image_channels, :image_height, :image_length] = np.reshape(
+            [_[0] for _ in node_values],
+            (image_channels, image_height, image_length if is_3d else 1),
+        )
+        
+        if (i+1) % 100 == 0:
+            print(f"Reading label {i+1} / {number_samples}...", end='\r')
+    print()
+
 
     return labels
-
-def read_labels(folder: str, sample_numbers: list = None) -> List[np.ndarray]:
-    """Return arrays of data from text files in the specified folder."""
-    fea_filenames = glob.glob(os.path.join(folder, '*.txt'))
-    fea_filenames = sorted(fea_filenames)
-    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
-    if sample_numbers:
-        assert len(sample_numbers) <= len(fea_filenames), f"The requested number of samples {len(sample_numbers)} exceeds the number of available files {len(fea_filenames)}."
-        fea_filenames = [fea_filenames[number-1] for number in sample_numbers]
-    sample_size = len(fea_filenames)
-
-    stresses = [None] * sample_size
-    # displacements_x = [None] * sample_size
-    # displacements_y = [None] * sample_size
-    for i, fea_filename in enumerate(fea_filenames):
-        with open(fea_filename, 'r') as file:
-            lines = file.readlines()
-        # File contains multiple results.
-        if ',' in lines[0]:
-            stresses[i] = [float(line.split(',')[0]) for line in lines]
-            # stress, displacement_x, displacement_y = list(zip(
-            #     *[[float(value) for value in line.split(',')] for line in lines]
-            #     ))
-            # stresses[i] = stress
-            # displacements_x[i] = displacement_x
-            # displacements_y[i] = displacement_y
-        # File only contains one result.
-        else:
-            stresses[i] = [float(value) for value in lines]
-        if (i+1) % 1000 == 0:
-            print(f"Reading {i+1}/{sample_size} labels...", end='\r')
-    print()
-    stresses = [np.array(stress) for stress in stresses]
-    # displacements = [np.sqrt(np.power(np.array(x), 2) + np.power(np.array(y), 2)) for x, y in zip(displacements_x, displacements_y)]
-
-    return stresses
 
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
@@ -254,3 +232,16 @@ def array_to_colormap(array: np.ndarray, divide_by=None) -> np.ndarray:
 def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
+
+
+# Colors for plots.
+class Colors:
+    RED = "#ff4040"
+    RED_DARK = "#9e2828"
+    RED_LIGHT = "#ffb6b6"
+    BLUE = "#0095ff"
+    BLUE_DARK = "#005c9e"
+    BLUE_LIGHT = "#9ed7ff"
+    GRAY = "#808080"
+    GRAY_DARK = "#404040"
+    GRAY_LIGHT = "#bfbfbf"

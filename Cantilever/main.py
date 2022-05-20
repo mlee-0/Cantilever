@@ -53,7 +53,7 @@ def save(epoch, model, optimizer, loss_history) -> None:
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, Model: nn.Module, filename_subset: str="subset.txt", filename_new_subset: str="subset.txt", keep_training=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
 
@@ -69,44 +69,47 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss_function = nn.MSELoss()
     
-    epochs = range(1, epoch_count+1)
+    epoch = 1
     previous_test_loss = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
-            if keep_training is None:
-                keep_training = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+            if train_existing is None:
+                train_existing = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
         else:
-            keep_training = True
+            train_existing = True
         
-        if keep_training:
+        if train_existing:
             checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch'] + 1
-            epochs = range(epoch, epoch+epoch_count)
             previous_test_loss = checkpoint['loss']   
     else:
-        keep_training = False
+        train_existing = False
         test_only = False
-    
-    # Create a subset of the entire dataset, or load the previously created subset.
+    epochs = range(epoch, epoch+epoch_count)
+
+    # Load the samples.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    try:
-        if not filename_subset:
-            raise FileNotFoundError
-        filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
-        with open(filepath_subset, 'r') as f:
-            sample_numbers = [int(_) for _ in f.readlines()]
-        sample_indices = np.array(sample_numbers) - 1
-        samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-        print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
-    except FileNotFoundError:
-        filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-        samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
-        desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
-        with open(filepath_subset, 'w') as f:
-            f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-        print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
+
+    # Create a subset of the entire dataset, or load the previously created subset.
+    # try:
+    #     if not filename_subset:
+    #         raise FileNotFoundError
+    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
+    #     with open(filepath_subset, 'r') as f:
+    #         sample_numbers = [int(_) for _ in f.readlines()]
+    #     sample_indices = np.array(sample_numbers) - 1
+    #     samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
+    #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
+    # except FileNotFoundError:
+    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
+    #     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
+    #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
+    #     with open(filepath_subset, 'w') as f:
+    #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
+    #     print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
+    
     sample_size = get_sample_size(samples)
 
     # Set up the training and validation data.
@@ -114,17 +117,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
     validation_samples = {key: value[sample_size_train:sample_size_train+sample_size_validation:] for key, value in samples.items()}
     
-    # plt.figure()
-    # plt.subplot(1, 4, 1)
-    # plt.hist(validation_samples["Load"], 20)
-    # plt.subplot(1, 4, 2)
-    # plt.hist(validation_samples["Angle"], 20, (0, 360))
-    # plt.subplot(1, 4, 3)
-    # plt.hist(validation_samples["Length"], 20, (2, 4))
-    # plt.subplot(1, 4, 4)
-    # plt.hist(validation_samples["Height"], 20, (1, 2))
-    # plt.show()
-
     train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -214,14 +206,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     size_test_dataset = len(test_dataloader)
     
-    # The maximum values found among the training and testing datasets for each channel. Used to normalize values for images.
-    max_values = [
-        max([
-            np.max(train_dataset.labels[:, channel, ...]),
-            np.max(test_dataset.labels[:, channel, ...]),
-        ])
-        for channel in range(OUTPUT_CHANNELS)
-    ]
+    # The maximum value found among the training and testing datasets, used to normalize values for images.
+    max_value = max([
+        np.max(train_dataset.labels),
+        np.max(test_dataset.labels),
+    ])
     # Test on the testing dataset.
     model.train(False)
     test_labels = []
@@ -236,27 +225,24 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             test_labels.append(label)
             test_outputs.append(test_output)
             
-            for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-                # Write the combined FEA and model output image.
-                image = np.vstack((
-                    label[channel, ...],  # FEA
-                    test_output[channel, ...],  # Model output
-                ))
-                write_image(
-                    array_to_colormap(image, max_values[channel] if channel_name == "stress" else None),
-                    os.path.join(FOLDER_ROOT, f'{batch}_fea_model_{channel_name}.png'),
-                    )
+            # Write the combined FEA and model output image.
+            # channel = random.randint(0, label.shape[0]-1)
+            image = np.vstack((
+                np.hstack([label[channel, ...] for channel in range(label.shape[0])]),  # FEA
+                np.hstack([test_output[channel, ...] for channel in range(test_output.shape[0])]),  # Model output
+            ))
+            write_image(
+                array_to_colormap(image, max_value),
+                os.path.join(FOLDER_RESULTS, f'{batch}_fea_model.png'),
+                )
             
             if queue:
                 queue.put([None, (batch, size_test_dataset), None, None, None])
     
-    print(f"Wrote {size_test_dataset} test images in {FOLDER_ROOT}.")
+    print(f"Wrote {size_test_dataset} test images in {FOLDER_RESULTS}.")
 
     # Calculate and plot evaluation metrics.
-    for channel, channel_name in enumerate(OUTPUT_CHANNEL_NAMES):
-        if queue:
-            break
-
+    if False:  #not queue:
         # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
 
         # Area metric.
@@ -264,16 +250,16 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
         NUMBER_COLUMNS = 4
         for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
             plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
-            cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_values[channel])
+            cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_value)
             plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE)
             plt.plot(bin_edges[1:], cdf_label, ':', color=Colors.RED)
             if i == 0:
                 plt.legend(["CNN", "FEA"])
             plt.grid(visible=True, axis='y')
-            plt.xticks([0, max_values[channel]])
+            plt.xticks([0, max_value])
             plt.yticks([0, 1])
             plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
-        plt.suptitle(f"Area Metric ({channel_name.capitalize()})", fontweight='bold')
+        plt.suptitle(f"Area Metric", fontweight='bold')
         plt.tight_layout()  # Increase spacing between subplots
         plt.show()
 
@@ -304,22 +290,25 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, desired_subset
             plt.xlabel("Sample Number")
             plt.xticks(sample_numbers)
             plt.title(metric)
-        plt.suptitle(f"{channel_name.capitalize()}", fontweight='bold')
         plt.show()
 
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 1
+    EPOCHS = 20
     LEARNING_RATE = 1e-7  # 0.000001 for Nie
-    BATCH_SIZE = 20
+    BATCH_SIZE = 1
     Model = Nie
-    DESIRED_SAMPLE_SIZE = 10000
-    BINS = 1
-    NON_UNIFORMITY = 1.0
-    TRAINING_SPLIT = 0.8
+
+    kwargs = {
+        "desired_subset_size": 10_000,
+        "bins": 1,
+        "nonuniformity": 1.0,
+        "training_split": 0.8,
+        "train_existing": False,
+        "test_only": False,
+    }
 
     main(
-        EPOCHS, LEARNING_RATE, BATCH_SIZE, DESIRED_SAMPLE_SIZE, BINS, NON_UNIFORMITY, TRAINING_SPLIT, Model,
-        filename_subset='subset (2000, 1 bin).txt', keep_training=True, test_only=True,
+        EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, **kwargs,
     )

@@ -13,63 +13,6 @@ from torch import nn
 from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE
 
 
-# Return a sequence of layers related to convolution.
-def convolution(in_channels, out_channels, **kwargs):
-    return nn.Sequential(
-        nn.Conv2d(in_channels=in_channels, out_channels=out_channels, **kwargs, padding_mode='replicate'),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(inplace=True),
-        )
-
-# Return a sequence of layers related to deconvolution.
-def deconvolution(in_channels, out_channels, **kwargs):
-    return nn.Sequential(
-        nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, **kwargs),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(inplace=True),
-        )
-
-
-class FullyCnn(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.convolution_1 = convolution(
-            in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_2 = convolution(
-            in_channels=4, out_channels=8, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_3 = convolution(
-            in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_4 = convolution(
-            in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_5 = convolution(
-            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
-            )
-        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
-        self.linear = nn.Linear(in_features=288, out_features=np.prod(OUTPUT_SIZE))
-
-    def forward(self, x):
-        x = x.float()
-        # Convolution.
-        x = self.convolution_1(x)
-        x = self.pooling(x)
-        x = self.convolution_2(x)
-        x = self.pooling(x)
-        x = self.convolution_3(x)
-        x = self.pooling(x)
-        # x = self.convolution_4(x)
-        # x = self.pooling(x)
-        # x = self.convolution_5(x)
-        # x = self.pooling(x)
-        # Fully connected.
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
-        x = x.reshape(-1, *OUTPUT_SIZE)
-        return x
-
 class Nie(nn.Module):
     def __init__(self):
         super().__init__()
@@ -155,6 +98,62 @@ class Nie(nn.Module):
         # print(x.size())
         x = self.deconvolution_3(x)
         # print(x.size())
+        return x
+
+# Return a sequence of layers related to convolution.
+def convolution(in_channels, out_channels, **kwargs):
+    return nn.Sequential(
+        nn.Conv2d(in_channels=in_channels, out_channels=out_channels, **kwargs, padding_mode='replicate'),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
+        )
+
+# Return a sequence of layers related to deconvolution.
+def deconvolution(in_channels, out_channels, **kwargs):
+    return nn.Sequential(
+        nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, **kwargs),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
+        )
+
+class FullyCnn(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.convolution_1 = convolution(
+            in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_2 = convolution(
+            in_channels=4, out_channels=8, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_3 = convolution(
+            in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_4 = convolution(
+            in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1,
+            )
+        self.convolution_5 = convolution(
+            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
+            )
+        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
+        self.linear = nn.Linear(in_features=288, out_features=np.prod(OUTPUT_SIZE))
+
+    def forward(self, x):
+        x = x.float()
+        # Convolution.
+        x = self.convolution_1(x)
+        x = self.pooling(x)
+        x = self.convolution_2(x)
+        x = self.pooling(x)
+        x = self.convolution_3(x)
+        x = self.pooling(x)
+        # x = self.convolution_4(x)
+        # x = self.pooling(x)
+        # x = self.convolution_5(x)
+        # x = self.pooling(x)
+        # Fully connected.
+        x = x.view(x.size(0), -1)
+        x = self.linear(x)
+        x = x.reshape(-1, *OUTPUT_SIZE)
         return x
 
 class UNetCnn(nn.Module):

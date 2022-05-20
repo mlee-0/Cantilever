@@ -128,8 +128,8 @@ MPDATA,PRXY,1,,0.3
 
     ASEL,S,AREA,,6
     NSLA,S,1
-    F,ALL,FX,samples(2,i,1)/(samples(9,i,1)*samples(10,i,1))
-    F,ALL,FY,samples(3,i,1)/(samples(9,i,1)*samples(10,i,1))
+    F,ALL,FX,samples(2,i,1)/(samples(10,i,1)*samples(11,i,1))
+    F,ALL,FY,samples(3,i,1)/(samples(10,i,1)*samples(11,i,1))
 *ENDIF
 
 
@@ -146,10 +146,11 @@ FINISH
 
 
 ! Enter the database results postprocessor.
-/POST1  
+/POST1
+SET,FIRST
 
 
-! Show contour plot.
+! Show contour plot. Skipping this may minimize runtime.
 *IF,0,EQ,1,THEN
     /SHOW,WIN32C
     SET,FIRST   
@@ -194,14 +195,12 @@ FINISH
 *ENDIF
 
 
-! Get nodal results and store them in an array.
+! Get nodal results as an array.
 *VGET,stress,NODE,,S,EQV
-! Get the node coordinates, used for sorting for 3D.
-*IF,dimensions,NE,2,THEN
-    *VGET,location_x,NODE,,LOC,X
-    *VGET,location_y,NODE,,LOC,Y
-    *VGET,location_z,NODE,,LOC,Z
-*ENDIF
+! Get the node coordinates as arrays, used for sorting nodes.
+*VGET,location_x,NODE,,LOC,X
+*VGET,location_y,NODE,,LOC,Y
+*VGET,location_z,NODE,,LOC,Z
 
 
 ! Write the results to a file.
@@ -209,13 +208,8 @@ FINISH
 ! placeholder_define_number
 ! placeholder_define_filename
 *CFOPEN,filename,'txt'
-*IF,dimensions,EQ,2,THEN
-    *VWRITE,stress(1)
-    (E10.4)
-*ELSE
-    *VWRITE,stress(1),location_x(1),location_y(1),location_z(1)
-    (E10.4, ',', F5.2, ',', F5.2, ',', F5.2)
-*ENDIF
+*VWRITE,stress(1),location_x(1),location_y(1),location_z(1)
+(E10.4, ',', F6.3, ',', F6.3, ',', F6.3)
 *CFCLOS
 
 /CLEAR

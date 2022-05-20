@@ -1,5 +1,5 @@
 '''
-Run this script to generate datasets.
+Run this script to generate dataset files.
 '''
 
 import math
@@ -24,21 +24,25 @@ def generate_samples(number_samples: int, start: int = 1) -> dict:
     samples[angle.name] = generate_angles(number_samples, (angle.low, angle.high), angle.step, angle.precision, std=45)
     samples[length.name] = generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
     samples[height.name] = generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
+    samples[width.name] = generate_logspace_values(number_samples, (width.low, width.high), width.step, width.precision, skew_amount=1.0, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
-    # Calculate the image size corresponding to the geometry.
-    image_lengths = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
-    image_heights = np.round(OUTPUT_SIZE[1] * (samples[height.name] / height.high))
-    samples[KEY_IMAGE_LENGTH] = image_lengths
-    samples[KEY_IMAGE_HEIGHT] = image_heights
+    # Calculate the number of nodes in each direction.
+    nodes_length = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
+    nodes_height = np.round(OUTPUT_SIZE[1] * (samples[height.name] / height.high))
+    nodes_width = np.round(OUTPUT_SIZE[0] * (samples[width.name] / width.high))
+
+    samples[KEY_NODES_LENGTH] = nodes_length
+    samples[KEY_NODES_HEIGHT] = nodes_height
+    samples[KEY_NODES_WIDTH] = nodes_width
     
     # Calculate the x- and y-components of the loads and corresponding angles.
     x_loads = np.round(
-        np.cos(samples[angle.name] * (np.pi/180)) * samples[load.name] / (image_heights-1),
+        np.cos(samples[angle.name] * (np.pi/180)) * samples[load.name],
         load.precision
         )
     y_loads = np.round(
-        np.sin(samples[angle.name] * (np.pi/180)) * samples[load.name] / (image_heights-1),
+        np.sin(samples[angle.name] * (np.pi/180)) * samples[load.name],
         load.precision
         )
     samples[KEY_X_LOAD] = x_loads
@@ -116,7 +120,7 @@ def read_samples(filename: str) -> dict:
         print(f'"{filename}" not found.')
         return
     else:
-        print(f'Found samples in {filename}.')
+        print(f'Found {get_sample_size(samples)} samples in {filename}.')
         return samples
 
 def write_ansys_script(samples: dict, filename: str) -> None:
@@ -135,10 +139,10 @@ def write_ansys_script(samples: dict, filename: str) -> None:
         loop_variable = 'i'
         samples_variable = 'samples'
         # Add commands that define the array containing generated samples.
-        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{9},{number_samples}\n']
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{11},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_IMAGE_LENGTH][i]},{samples[KEY_IMAGE_HEIGHT][i]}\n'
+                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.
@@ -234,24 +238,34 @@ def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int,
     return stratified_samples
 
 
-DATASET = 'test'
-NUMBER_SAMPLES = 20
-START_SAMPLE_NUMBER = 1
-WRITE_MODE = 'w'
-
 # if __name__ == "__main__":
 #     samples = read_samples(FILENAME_SAMPLES_TRAIN)
 #     stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', desired_subset_size=1000, bins=15, nonuniformity=1)
 
-if __name__ == '__main__':
-    DATASET_TYPES = ['train', 'test']
-    filename_sample = dict(zip(DATASET_TYPES, [FILENAME_SAMPLES_TRAIN, FILENAME_SAMPLES_TEST]))[DATASET]
-    filename_ansys = dict(zip(DATASET_TYPES, ['ansys_script_train.lgw', 'ansys_script_test.lgw']))[DATASET]
 
-    assert DATASET in DATASET_TYPES
-    assert not (START_SAMPLE_NUMBER > 1 and WRITE_MODE == 'w'), f"The starting sample number {START_SAMPLE_NUMBER} must be 1 when generating a new dataset."
+# Specify either "train" or "test".
+DATASET = "train"
+NUMBER_SAMPLES = 10000
+# Must be 1 if creating a new dataset.
+START_SAMPLE_NUMBER = 1
+# Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
+WRITE_MODE = "w"
 
-    # Try to read sample values from the text file if it already exists. If not, generate the samples.
+if __name__ == "__main__":
+    if DATASET == "train":
+        filename_sample = FILENAME_SAMPLES_TRAIN
+        filename_ansys = "ansys_script_train.lgw"
+    elif DATASET == "test":
+        filename_sample = FILENAME_SAMPLES_TEST
+        filename_ansys = "ansys_script_test.lgw"
+    else:
+        print(f"Invalid dataset type: {DATASET}")
+
+    if START_SAMPLE_NUMBER > 1 and WRITE_MODE == "w":
+        START_SAMPLE_NUMBER = 1
+        print("Changed the starting sample number to 1 because generating a new dataset.")
+
+    # Try to read sample values from the file if it already exists. If not, generate the samples.
     samples = read_samples(filename_sample)
     if samples:
         overwrite_existing_samples = input(f"Overwrite {filename_sample}? [y/n] ") == "y"

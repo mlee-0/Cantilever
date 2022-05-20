@@ -39,7 +39,6 @@ class MainWindow(QMainWindow):
 
         # Menu bar.
         menu_bar = self.menuBar()
-        menu_bar.setNativeMenuBar(False)
         menu_view = menu_bar.addMenu("View")
         menu_help = menu_bar.addMenu("Help")
         self.action_toggle_status_bar = menu_view.addAction("Show Status Bar", self.toggle_status_bar)
@@ -87,9 +86,9 @@ class MainWindow(QMainWindow):
         layout_sidebar.addLayout(layout)
 
         # Checkbox for toggling continuing training a previously saved model.
-        self.checkbox_keep_training = QCheckBox("Keep Training Previous")
-        self.checkbox_keep_training.setChecked(True)
-        layout_sidebar.addWidget(self.checkbox_keep_training)
+        self.checkbox_train_existing = QCheckBox("Train Existing")
+        self.checkbox_train_existing.setChecked(True)
+        layout_sidebar.addWidget(self.checkbox_train_existing)
 
         # Settings.
         self.value_epochs = QSpinBox()
@@ -150,75 +149,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.value_model)
         layout_sidebar.addLayout(layout)
 
-        divider = QFrame()
-        divider.setFrameShape(QFrame.HLine)
-        layout_sidebar.addWidget(divider)
+        # divider = QFrame()
+        # divider.setFrameShape(QFrame.HLine)
+        # layout_sidebar.addWidget(divider)
 
-        # button_choose_subset_file = QPushButton("Select Subset...")
-        # button_choose_subset_file.clicked.connect(self.open_subset_file_dialog)
-        # self.label_subset_file = QLabel()
-        # self.label_subset_file.setFont(font_small)
-        # self.label_subset_file.setHidden(True)
-        # layout_sidebar.addWidget(button_choose_subset_file)
-        # layout_sidebar.addWidget(self.label_subset_file)
-
-        self.checkbox_use_existing_subset = QCheckBox("Use Existing Subset")
-        self.checkbox_use_existing_subset.setChecked(True)
-        self.checkbox_use_existing_subset.stateChanged.connect(self.show_subset_options)
-        layout_sidebar.addWidget(self.checkbox_use_existing_subset)
-
-        filenames = [_ for _ in os.listdir(FOLDER_ROOT) if _.endswith(".txt")]
-        if len(filenames) == 0:
-            filenames = ['']
-        self.filename_subset = QComboBox()
-        self.filename_subset.addItems(filenames)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Subset File:"))
-        layout.addWidget(self.filename_subset)
-        layout_sidebar.addLayout(layout)
-
-        self.value_subset_size = QSpinBox()
-        self.value_subset_size.setMinimum(0)
-        self.value_subset_size.setMaximum(999_999)
-        self.value_subset_size.setSingleStep(10)
-        self.value_subset_size.setValue(10_000)
-        self.value_subset_size.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Subset Size:"))
-        layout.addWidget(self.value_subset_size)
-        layout_sidebar.addLayout(layout)
-        
-        self.value_bins = QSpinBox()
-        self.value_bins.setMinimum(1)
-        self.value_bins.setMaximum(1000)
-        self.value_bins.setSingleStep(1)
-        self.value_bins.setValue(1)
-        self.value_bins.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Bins:"))
-        layout.addWidget(self.value_bins)
-        layout_sidebar.addLayout(layout)
-
-        self.value_nonuniformity = QDoubleSpinBox()
-        self.value_nonuniformity.setMinimum(0.1)
-        self.value_nonuniformity.setMaximum(100_000)
-        self.value_nonuniformity.setDecimals(1)
-        self.value_nonuniformity.setSingleStep(0.1)
-        self.value_nonuniformity.setValue(1.0)
-        self.value_nonuniformity.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Nonuniformity:"))
-        layout.addWidget(self.value_nonuniformity)
-        layout_sidebar.addLayout(layout)
-
-        self.filename_new_subset = QLineEdit("subset.txt")
-        self.filename_new_subset.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("New Subset File:"))
-        layout.addWidget(self.filename_new_subset)
-        layout_sidebar.addLayout(layout)
-
-        self.show_subset_options(self.checkbox_use_existing_subset.isChecked())
+        fields_subset = self._fields_subset()
+        layout_sidebar.addWidget(fields_subset)
+        fields_subset.setVisible(False)
 
         # Progress bar and stop button.
         self.label_progress = QLabel()
@@ -249,10 +186,84 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.check_queue)
         self.timer.setInterval(100)
     
+    def _fields_subset(self) -> QWidget:
+        """Return a widget containing fields for specifying options for subsets."""
+        widget = QWidget()
+        main_layout = QVBoxLayout(widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # button_choose_subset_file = QPushButton("Select Subset...")
+        # button_choose_subset_file.clicked.connect(self.open_subset_file_dialog)
+        # self.label_subset_file = QLabel()
+        # self.label_subset_file.setFont(font_small)
+        # self.label_subset_file.setHidden(True)
+        # main_layout.addWidget(button_choose_subset_file)
+        # main_layout.addWidget(self.label_subset_file)
+
+        self.checkbox_use_existing_subset = QCheckBox("Use Existing Subset")
+        self.checkbox_use_existing_subset.setChecked(True)
+        self.checkbox_use_existing_subset.stateChanged.connect(self.show_subset_options)
+        main_layout.addWidget(self.checkbox_use_existing_subset)
+
+        filenames = [_ for _ in os.listdir(FOLDER_ROOT) if _.endswith(".txt")]
+        if len(filenames) == 0:
+            filenames = ['']
+        self.filename_subset = QComboBox()
+        self.filename_subset.addItems(filenames)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Subset File:"))
+        layout.addWidget(self.filename_subset)
+        main_layout.addLayout(layout)
+
+        self.value_subset_size = QSpinBox()
+        self.value_subset_size.setMinimum(0)
+        self.value_subset_size.setMaximum(999_999)
+        self.value_subset_size.setSingleStep(10)
+        self.value_subset_size.setValue(10_000)
+        self.value_subset_size.setAlignment(Qt.AlignRight)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Subset Size:"))
+        layout.addWidget(self.value_subset_size)
+        main_layout.addLayout(layout)
+        
+        self.value_bins = QSpinBox()
+        self.value_bins.setMinimum(1)
+        self.value_bins.setMaximum(1000)
+        self.value_bins.setSingleStep(1)
+        self.value_bins.setValue(1)
+        self.value_bins.setAlignment(Qt.AlignRight)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Bins:"))
+        layout.addWidget(self.value_bins)
+        main_layout.addLayout(layout)
+
+        self.value_nonuniformity = QDoubleSpinBox()
+        self.value_nonuniformity.setMinimum(0.1)
+        self.value_nonuniformity.setMaximum(100_000)
+        self.value_nonuniformity.setDecimals(1)
+        self.value_nonuniformity.setSingleStep(0.1)
+        self.value_nonuniformity.setValue(1.0)
+        self.value_nonuniformity.setAlignment(Qt.AlignRight)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Nonuniformity:"))
+        layout.addWidget(self.value_nonuniformity)
+        main_layout.addLayout(layout)
+
+        self.filename_new_subset = QLineEdit("subset.txt")
+        self.filename_new_subset.setAlignment(Qt.AlignRight)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("New Subset File:"))
+        layout.addWidget(self.filename_new_subset)
+        main_layout.addLayout(layout)
+
+        self.show_subset_options(self.checkbox_use_existing_subset.isChecked())
+
+        return widget
+
     def on_start(self):
         """Start training or testing."""
         if self.sender() is self.button_train:
-            train_model = self.checkbox_keep_training.isChecked()
+            train_model = self.checkbox_train_existing.isChecked()
             test_only = False
         elif self.sender() is self.button_test:
             train_model = False
@@ -265,20 +276,19 @@ class MainWindow(QMainWindow):
 
         self.thread = threading.Thread(
             target=main.main,
-            args=[
-                self.value_epochs.value(),
-                self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
-                self.value_batch.value(),
-                self.value_subset_size.value(),
-                self.value_bins.value(),
-                self.value_nonuniformity.value(),
-                self.value_training_split.value()/100,
-                networks.networks[self.value_model.currentText()],
-            ],
             kwargs={
+                "epoch_count": self.value_epochs.value(),
+                "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
+                "batch_size": self.value_batch.value(),
+                "Model": networks.networks[self.value_model.currentText()],
+
+                "desired_subset_size": self.value_subset_size.value(),
+                "bins": self.value_bins.value(),
+                "nonuniformity": self.value_nonuniformity.value(),
+                "training_split": self.value_training_split.value()/100,
                 "filename_subset": self.filename_subset.currentText() if self.checkbox_use_existing_subset.isChecked() else None,
                 "filename_new_subset": self.filename_new_subset.text(),
-                "keep_training": train_model,
+                "train_existing": train_model,
                 "test_only": test_only,
                 "queue": self.queue,
                 "queue_to_main": self.queue_to_main,
@@ -364,7 +374,7 @@ class MainWindow(QMainWindow):
             self.sidebar.setEnabled(True)
             self.button_stop.setEnabled(False)
             self.progress_bar.reset()
-            self.checkbox_keep_training.setChecked(True)
+            self.checkbox_train_existing.setChecked(True)
             self.timer.stop()
     
     def closeEvent(self, event):
