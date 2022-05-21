@@ -12,8 +12,8 @@ import pandas as pd
 from setup import *
 
 
-def generate_samples(number_samples: int, start: int = 1) -> dict:
-    """Generate sample values for each parameter and return them as a dictionary. Specify the starting sample number if generating samples to add to an existing dataset."""
+def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
+    """Generate sample values for each parameter and return them as a DataFrame. Specify the starting sample number if generating samples to add to an existing dataset."""
 
     assert start != 0, f"The starting sample number {start} should be a positive integer."
 
@@ -47,6 +47,8 @@ def generate_samples(number_samples: int, start: int = 1) -> dict:
         )
     samples[KEY_X_LOAD] = x_loads
     samples[KEY_Y_LOAD] = y_loads
+
+    samples = pd.DataFrame.from_dict(samples)
     
     return samples
 
@@ -95,7 +97,7 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
 
     return values
 
-def write_samples(samples: dict, filename: str, mode: str = 'w') -> None:
+def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None:
     """
     Write the specified sample values to a file.
 
@@ -104,29 +106,28 @@ def write_samples(samples: dict, filename: str, mode: str = 'w') -> None:
 
     ALLOWED_MODES = ['w', 'a']
     assert mode in ALLOWED_MODES, f"The specified mode '{mode}' should be one of {ALLOWED_MODES}."
-    data = pd.DataFrame.from_dict(samples)
-    data.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), index=False, mode=mode)
+
+    samples.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), index=False, mode=mode)
     print(f"{'Wrote' if mode == 'w' else 'Appended'} samples in {filename}.")
 
-def read_samples(filename: str) -> dict:
+def read_samples(filename: str) -> pd.DataFrame:
     """Return the sample values found in the file previously generated."""
     
     samples = {}
     filename = os.path.join(FOLDER_ROOT, filename)
     try:
-        data = pd.read_csv(filename)
-        samples = data.to_dict(orient="list")
+        samples = pd.read_csv(filename)
     except FileNotFoundError:
         print(f'"{filename}" not found.')
-        return
+        return None
     else:
-        print(f'Found {get_sample_size(samples)} samples in {filename}.')
+        print(f'Found {len(samples)} samples in {filename}.')
         return samples
 
-def write_ansys_script(samples: dict, filename: str) -> None:
+def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
     """Write a text file containing ANSYS commands used to automate FEA and generate stress contour images."""
 
-    number_samples = get_sample_size(samples)
+    number_samples = len(samples)
     # Read the template script.
     with open(os.path.join(FOLDER_ROOT, 'ansys_template.lgw'), 'r') as file:
         lines = file.readlines()
@@ -168,11 +169,11 @@ def write_ansys_script(samples: dict, filename: str) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def get_stratified_samples(samples: dict, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
+def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
     """
     Return a subset of the given samples in which the same number of maximum stress values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
 
-    `samples`: Dictionary of samples of entire dataset.
+    `samples`: DataFrame of samples of entire dataset.
     `folder`: Folder in which labels are read.
     `desired_subset_size`: The number of samples to have in the subset. The actual subset size may not exactly match this number.
     `bins`: The number of bins to use in the histogram of maximum stress values.
@@ -267,11 +268,11 @@ if __name__ == "__main__":
 
     # Try to read sample values from the file if it already exists. If not, generate the samples.
     samples = read_samples(filename_sample)
-    if samples:
+    if samples is not None:
         overwrite_existing_samples = input(f"Overwrite {filename_sample}? [y/n] ") == "y"
     else:
         overwrite_existing_samples = False
-    if not samples or overwrite_existing_samples:
+    if samples is None or overwrite_existing_samples:
         samples = generate_samples(NUMBER_SAMPLES, start=START_SAMPLE_NUMBER)
 
     write_samples(samples, filename_sample, mode=WRITE_MODE)

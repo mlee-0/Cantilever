@@ -10,6 +10,7 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 try:
@@ -77,14 +78,6 @@ def plot_histogram(values: np.ndarray, title=None) -> None:
         plt.title(title)
     plt.show()
 
-def get_sample_size(samples: dict) -> int:
-    """Get the number of samples found in the specified dictionary."""
-
-    sample_sizes = [len(_) for _ in samples.values()]
-    low, high = min(sample_sizes), max(sample_sizes)
-    assert low == high, 'Found different numbers of samples in the provided samples:  min. {low}, max. {high}.'
-    return low
-
 def split_training_validation(number_samples: int, training_split: float) -> Tuple[int, int]:
     """Return the number of samples in the training and validation datasets for the given ratio."""
     assert 0 < training_split < 1, f"Invalid training split: {training_split}."
@@ -93,11 +86,11 @@ def split_training_validation(number_samples: int, training_split: float) -> Tup
     assert training_size + validation_size == number_samples
     return training_size, validation_size
 
-def generate_input_images(samples: dict) -> np.ndarray:
+def generate_input_images(samples: pd.DataFrame) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
     DATA_TYPE = np.uint8
 
-    number_samples = get_sample_size(samples)
+    number_samples = len(samples)
     inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=DATA_TYPE)
     for i in range(number_samples):
         pixel_length = int(samples[KEY_NODES_LENGTH][i])
@@ -135,16 +128,16 @@ def generate_input_images(samples: dict) -> np.ndarray:
         inputs[i, ...] = image
     return inputs
 
-def generate_label_images(samples: dict, folder: str) -> np.ndarray:
+def generate_label_images(samples: pd.DataFrame, folder: str) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
-    number_samples = get_sample_size(samples)
+    number_samples = len(samples)
     
     # Get and sort all FEA filenames.
     filenames = glob.glob(os.path.join(folder, '*.txt'))
     filenames = sorted(filenames)
 
     # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
-    assert len(samples[KEY_SAMPLE_NUMBER]) <= len(filenames), f"The requested number of samples {len(samples[KEY_SAMPLE_NUMBER])} exceeds the number of available files {len(filenames)}."
+    assert len(samples) <= len(filenames), f"The requested number of samples {len(samples)} exceeds the number of available files {len(filenames)}."
     filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
 
     # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.

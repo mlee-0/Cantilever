@@ -8,6 +8,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
@@ -24,13 +25,10 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
-    def __init__(self, samples: dict, folder_labels):
-        self.number_samples = get_sample_size(samples)
+    def __init__(self, samples: pd.DataFrame, folder_labels):
+        self.number_samples = len(samples)
         # Create label images.
-        self.labels = generate_label_images(
-            samples,
-            folder_labels,
-            )
+        self.labels = generate_label_images(samples, folder_labels)
         print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
         # Create input images.
         self.inputs = generate_input_images(samples)
@@ -110,12 +108,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
     #     print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
     
-    sample_size = get_sample_size(samples)
+    sample_size = len(samples)
 
     # Set up the training and validation data.
     sample_size_train, sample_size_validation = split_training_validation(sample_size, training_split)
-    train_samples = {key: value[:sample_size_train] for key, value in samples.items()}
-    validation_samples = {key: value[sample_size_train:sample_size_train+sample_size_validation:] for key, value in samples.items()}
+    train_samples = samples[:sample_size_train].reset_index(drop=True)
+    validation_samples = samples[sample_size_train:sample_size_train+sample_size_validation].reset_index(drop=True)
     
     train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
     validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
@@ -123,7 +121,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
     size_train_dataset = len(train_dataloader)
     size_validation_dataset = len(validation_dataloader)
-    print(f"Split {len(samples[KEY_SAMPLE_NUMBER])} samples into {size_train_dataset} training / {size_validation_dataset} validation.")
+    print(f"Split {sample_size} samples into {size_train_dataset} training / {size_validation_dataset} validation.")
 
     if not test_only:
         if queue:
@@ -226,7 +224,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             test_outputs.append(test_output)
             
             # Write the combined FEA and model output image.
-            # channel = random.randint(0, label.shape[0]-1)
             image = np.vstack((
                 np.hstack([label[channel, ...] for channel in range(label.shape[0])]),  # FEA
                 np.hstack([test_output[channel, ...] for channel in range(test_output.shape[0])]),  # Model output
