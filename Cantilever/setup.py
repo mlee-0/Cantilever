@@ -1,6 +1,7 @@
-'''
+"""
 Information about parameters and functions for reading and writing files.
-'''
+"""
+
 
 import colorsys
 from dataclasses import dataclass
@@ -42,11 +43,14 @@ height = Parameter(low=1, high=2, step=0.1, precision=1, name="Height", units="m
 width = Parameter(low=1, high=2, step=0.1, precision=1, name="Width", units="m")
 elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name="Elastic Modulus", units="GPa")
 load = Parameter(low=500, high=1000, step=5, precision=0, name="Load", units="N")
-angle = Parameter(low=0, high=360, step=1, precision=0, name="Angle", units="Degrees")
-# Names of quantities that are saved but are not randomly generated.
+angle_1 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XY", units="Degrees")
+angle_2 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XZ", units="Degrees")
+
+# Names of quantities that are derived from randomly generated values.
 KEY_SAMPLE_NUMBER = "Sample Number"
 KEY_X_LOAD = "Load X"
 KEY_Y_LOAD = "Load Y"
+KEY_Z_LOAD = "Load Z"
 KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
@@ -63,12 +67,12 @@ FILENAME_SAMPLES_TEST = "samples_test.csv"
 NUMBER_DIGITS = 6
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 4
-INPUT_SIZE = (INPUT_CHANNELS, 20, 40)
+INPUT_CHANNELS = 5
+INPUT_SIZE = (INPUT_CHANNELS, round(height.high / height.step), round(length.high / length.step))
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), "Input image size must match aspect ratio of cantilever: {height.high}:{length.high}."
-# Size of output images (channel-height-width) produced by the network. Output images produced by FEA will be resized to this size.
-OUTPUT_CHANNELS = 20
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 20, 40)
+# Size of output images (channel-height-width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
+OUTPUT_CHANNELS = 15
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 15, 30)
 
 
 def plot_histogram(values: np.ndarray, title=None) -> None:
@@ -104,22 +108,32 @@ def generate_input_images(samples: pd.DataFrame) -> np.ndarray:
         # Create a channel with a white rectangle representing the height and width of the cantilever.
         image[1, :pixel_height, :pixel_width] = 255
 
-        # Create a channel with a gray line of pixels representing the load magnitude and direction.
+        # Create a channel with a gray line of pixels representing the load magnitude and angle 1.
         r = np.arange(max(image.shape[1:]))
-        x = r * np.cos(samples[angle.name][i] * np.pi/180) + image.shape[2]/2
-        y = r * np.sin(samples[angle.name][i] * np.pi/180) + image.shape[1]/2
+        x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + image.shape[2]/2
+        y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + image.shape[1]/2
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
         image[2, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        image[2, :, :] = np.flipud(image[1, :, :])
+        image[2, :, :] = np.flipud(image[2, :, :])
+        
+        # Create a channel with a gray line of pixels representing the load magnitude and angle 2.
+        r = np.arange(max(image.shape[1:]))
+        x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + image.shape[2]/2
+        y = r * np.sin(samples[angle_2.name][i] * np.pi/180) + image.shape[1]/2
+        x = x.astype(int)
+        y = y.astype(int)
+        inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
+        image[3, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
+        image[3, :, :] = np.flipud(image[3, :, :])
 
         # # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
         # # image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
         # image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
         
         # Create a channel with the elastic modulus distribution.
-        image[3, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        image[4, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
         
         # # Create a channel with the fixed boundary conditions.
         # image[3, :pixel_height, 0] = 255

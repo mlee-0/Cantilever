@@ -1,6 +1,7 @@
-'''
+"""
 Run this script to generate dataset files.
-'''
+"""
+
 
 import math
 import os
@@ -20,11 +21,12 @@ def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
     # Generate sample values for each parameter.
     samples = {}
     samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
-    samples[load.name] = generate_logspace_values(number_samples, (load.low, load.high), load.step, load.precision, skew_amount=2.0, skew_high=True)
-    samples[angle.name] = generate_angles(number_samples, (angle.low, angle.high), angle.step, angle.precision, std=45)
-    samples[length.name] = generate_logspace_values(number_samples, (length.low, length.high), length.step, length.precision, skew_amount=1.0, skew_high=True)
-    samples[height.name] = generate_logspace_values(number_samples, (height.low, height.high), height.step, height.precision, skew_amount=1.0, skew_high=False)
-    samples[width.name] = generate_logspace_values(number_samples, (width.low, width.high), width.step, width.precision, skew_amount=1.0, skew_high=False)
+    samples[load.name] = generate_uniform_values(number_samples, (load.low, load.high), load.step, load.precision)  # generate_logspace_values(..., skew_amount=2.0, skew_high=True)
+    samples[angle_1.name] = generate_uniform_values(number_samples, (angle_1.low, angle_1.high), angle_1.step, angle_1.precision)  # generate_angles(..., std=45)
+    samples[angle_2.name] = generate_uniform_values(number_samples, (angle_2.low, angle_2.high), angle_2.step, angle_2.precision)  # generate_angles(..., std=45)
+    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=True)
+    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=False)
+    samples[width.name] = generate_uniform_values(number_samples, (width.low, width.high), width.step, width.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=False)
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the number of nodes in each direction.
@@ -36,17 +38,22 @@ def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
     samples[KEY_NODES_HEIGHT] = nodes_height
     samples[KEY_NODES_WIDTH] = nodes_width
     
-    # Calculate the x- and y-components of the loads and corresponding angles.
+    # Calculate the x-, y-, z-components of the loads.
     x_loads = np.round(
-        np.cos(samples[angle.name] * (np.pi/180)) * samples[load.name],
-        load.precision
-        )
+        np.cos(samples[angle_2.name] * (np.pi/180)) * np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
+        load.precision,
+    )
     y_loads = np.round(
-        np.sin(samples[angle.name] * (np.pi/180)) * samples[load.name],
-        load.precision
-        )
+        np.sin(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
+        load.precision,
+    )
+    z_loads = np.round(
+        np.sin(samples[angle_2.name] * (np.pi/180)) * np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
+        load.precision,
+    )
     samples[KEY_X_LOAD] = x_loads
     samples[KEY_Y_LOAD] = y_loads
+    samples[KEY_Z_LOAD] = z_loads
 
     samples = pd.DataFrame.from_dict(samples)
     
@@ -143,7 +150,7 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{11},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[angle.name][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
+                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[KEY_Z_LOAD][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.

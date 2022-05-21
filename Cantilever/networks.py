@@ -51,12 +51,12 @@ class Nie(nn.Module):
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=1, output_padding=(1,1)),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=(1,2), output_padding=(0,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )

@@ -1,6 +1,6 @@
-'''
+"""
 Run this script to run the main script as a GUI.
-'''
+"""
 
 
 import os
