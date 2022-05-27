@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE
+from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE, EMBEDDING_SIZE
 
 
 # Return a sequence of layers related to convolution.
@@ -120,6 +120,71 @@ class GanGenerator(nn.Module):
     def __init__(self, input_channels: int, number_features: int, output_channels: int):
         super().__init__()
 
+        self.latent_size = input_channels
+
+        self.layers = nn.Sequential(
+            nn.ConvTranspose2d(self.latent_size, number_features * 8, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(number_features * 8),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(number_features * 8, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 4),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(number_features * 4, number_features * 2, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 2),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(number_features * 2, number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(number_features * 1, output_channels, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.Tanh(),
+        )
+
+    def forward(self, x, label: int):
+        label_embedding = nn.Embedding(EMBEDDING_SIZE, self.latent_size)(label)
+        return self.layers(x * label_embedding.flatten().reshape(x.size()))
+
+class GanDiscriminator(nn.Module):
+    def __init__(self, number_features: int, output_channels: int):
+        super().__init__()
+
+        self.layers = nn.Sequential(
+            nn.Conv2d(output_channels + 1, number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),  # Add 1 to account for label channel
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+
+            nn.Conv2d(number_features * 1, number_features * 2, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 2),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+
+            nn.Conv2d(number_features * 2, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 4),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+
+            nn.Conv2d(number_features * 4, number_features * 8, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 8),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+
+            nn.Conv2d(number_features * 8, 1, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.Sigmoid(),
+        )
+    
+    def forward(self, x, label: int):
+        label_embedding = nn.Embedding(EMBEDDING_SIZE, x.numel())(label)
+        label_embedding = torch.reshape(label_embedding.flatten(), x.size())
+        # Concatenate along the channel dimension.
+        return self.layers(torch.cat((x, label_embedding), axis=1))
+
+
+# Conditional GAN based on: https://learnopencv.com/conditional-gan-cgan-in-pytorch-and-tensorflow/
+class ConditionalGanGenerator(nn.Module):
+    def __init__(self, input_channels: int, number_features: int, output_channels: int):
+        super().__init__()
+
+        EMBEDDING_SIZE = 100
+
         self.layers = nn.Sequential(
             nn.ConvTranspose2d(input_channels, number_features * 8, kernel_size=4, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(number_features * 8),
@@ -143,8 +208,9 @@ class GanGenerator(nn.Module):
 
     def forward(self, x):
         return self.layers(x)
-    
-class GanDiscriminator(nn.Module):
+
+
+class ConditionalGanDiscriminator(nn.Module):
     def __init__(self, number_features: int, output_channels: int):
         super().__init__()
 

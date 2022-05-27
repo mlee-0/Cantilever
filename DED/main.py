@@ -50,16 +50,15 @@ class DedDataset(Dataset):
             flipped_label = label.copy()
             flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
             augmented_labels.append(flipped_label)
-        # Insert the augmented labels and corresponding input images.
+        # Insert the augmented labels and corresponding inputs.
+        self.inputs = np.repeat(self.inputs, 2)
         index = 1
-        for input_image, augmented_label in zip(self.inputs, augmented_labels):
-            # Insert after its corresponding image.
-            self.inputs.insert(index, input_image)
+        for augmented_label in augmented_labels:
             self.labels.insert(index, augmented_label)
             index += 2
         
         assert len(self.inputs) == len(self.labels), f"Number of inputs {len(self.inputs)} does not match number of labels {len(self.labels)}"
-        self.number_samples = len(self.inputs)
+        self.number_samples = len(self.labels)
 
     def __len__(self):
         return self.number_samples
@@ -283,7 +282,7 @@ def train_gan_epoch(data, label, device, model_cnn, model_generator, model_discr
     # Create a tensor of labels for each image in the batch.
     label_discriminator = torch.full((label.size(0),), LABEL_REAL, dtype=torch.float, device=device)
     # Forward pass real images through the discriminator.
-    output_discriminator_real = model_discriminator(label).view(-1)
+    output_discriminator_real = model_discriminator(label, data).view(-1)
     # Calculate the loss of the discriminator.
     loss_real = loss_function_gan(output_discriminator_real, label_discriminator)
     # Calculate gradients.
@@ -292,9 +291,9 @@ def train_gan_epoch(data, label, device, model_cnn, model_generator, model_discr
     # Train the discriminator with an all-fake batch.
     # output_cnn = model_cnn(data)
     output_cnn = torch.randn(label.size(0), 100, 1, 1, device=device)
-    output_generator = model_generator(output_cnn)
+    output_generator = model_generator(output_cnn, data)
     # Forward pass fake images through the discriminator.
-    output_discriminator_fake = model_discriminator(output_generator.detach()).view(-1)
+    output_discriminator_fake = model_discriminator(output_generator.detach(), data).view(-1)
     # Calculate the loss of the discriminator.
     label_discriminator[:] = LABEL_FAKE
     loss_fake = loss_function_gan(output_discriminator_fake, label_discriminator)
@@ -309,7 +308,7 @@ def train_gan_epoch(data, label, device, model_cnn, model_generator, model_discr
     # Train the generator.
     model_generator.zero_grad()
     # Forward pass fake images through the discriminator.
-    output_discriminator = model_discriminator(output_generator).view(-1)
+    output_discriminator = model_discriminator(output_generator, data).view(-1)
     # Calculate the loss of the generator, assuming images are real in order to calculate loss correctly.
     label_discriminator[:] = LABEL_REAL
     loss_generator = loss_function_gan(output_discriminator, label_discriminator)
@@ -333,10 +332,10 @@ def test_gan_epoch(data, label, device, model_cnn, model_generator, model_discri
     label = label.float()
 
     output_cnn = torch.randn(label.size(0), 100, 1, 1, device=device)  # model_cnn(data)
-    output_generator = model_generator(output_cnn)
+    output_generator = model_generator(output_cnn, data)
     
-    output_discriminator_real = model_discriminator(label).view(-1)
-    output_discriminator_fake = model_discriminator(output_generator).view(-1)
+    output_discriminator_real = model_discriminator(label, data).view(-1)
+    output_discriminator_fake = model_discriminator(output_generator, data).view(-1)
     label_discriminator_real = torch.full((label.size(0),), LABEL_REAL, dtype=torch.float, device=device)
     label_discriminator_fake = torch.full((label.size(0),), LABEL_FAKE, dtype=torch.float, device=device)
 
@@ -490,8 +489,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             data = data.to(device)
             label = label.to(device)
 
-            latent = torch.randn(label.size(0), 100, 1, 1, device=device)  # model_cnn(data)
-            test_output = model_generator(latent)
+            latent = torch.randn(label.size(0), LATENT_SIZE, 1, 1, device=device)  # model_cnn(data)
+            test_output = model_generator(latent, data)
             test_output = test_output[0, :, ...].cpu().detach().numpy()
             label = label[0, :, ...].cpu().numpy()
             test_labels.append(label)
@@ -506,13 +505,13 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             if OUTPUT_CHANNELS == 1:
                 image = np.dstack((image,)*3)
             write_image(image,
-                os.path.join(FOLDER_ROOT, f'{batch:03d}.png'),
+                os.path.join(FOLDER_RESULTS, f'{batch:03d}.png'),
                 )
             
             if queue:
                 queue.put([None, (batch, size_test_dataset), None, None, None])
     
-    print(f"Wrote {size_test_dataset} test images in {FOLDER_ROOT}.")
+    print(f"Wrote {size_test_dataset} test images in {FOLDER_RESULTS}.")
 
     # # Calculate and plot evaluation metrics.
     # if not queue:
@@ -568,11 +567,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 10
+    EPOCHS = 30
     LEARNING_RATE = 1e-7
     BATCH_SIZE = 1
     Model = Nie
 
     TRAINING_SPLIT = 0.8
 
-    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=True, test_only=not True)
+    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)

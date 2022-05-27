@@ -37,19 +37,32 @@ FEED_RATE_RANGE = (700, 900)
 experiment_number = 2
 
 FOLDER_ROOT = 'DED' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
+FOLDER_RESULTS = os.path.join(FOLDER_ROOT, "Results")
 FILENAME_DATASET = 'Dataset_experiments_031722.xlsx'
 if experiment_number == 1:
     FOLDER_LABELS = os.path.join(FOLDER_ROOT, 'Exp#1_(sheet#1)')
     SHEET_INDEX = 0
     TOTAL_SAMPLES = 81
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 3)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 3)
+    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 3*3)
+    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 3*3)
+
+    # Number of unique sets of input parameters (product of numbers of unique values for each individual parameter found in the dataset).
+    EMBEDDING_SIZE = 4  #4 * 3 * 4
 elif experiment_number == 2:
     FOLDER_LABELS = os.path.join(FOLDER_ROOT, 'Exp#2_(sheet#2)')
     SHEET_INDEX = 1
     TOTAL_SAMPLES = 192
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 4*5)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 4*5)
+    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 4)
+    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 4)
+
+    EMBEDDING_SIZE = 4 * 4 * 3
+elif experiment_number == "faces":
+    FOLDER_LABELS = os.path.join(FOLDER_ROOT, "Faces")
+    TOTAL_SAMPLES = 47_011
+    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 10)
+    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 10)
+    
+    EMBEDDING_SIZE = 2
 else:
     print(f"Invalid experiment number: {experiment_number}")
 
@@ -87,7 +100,7 @@ def split_training_validation(number_samples: int, training_split: float) -> Tup
     assert training_size + validation_size == number_samples
     return training_size, validation_size
 
-def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None) -> List[np.ndarray]:
+def _read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None) -> List[np.ndarray]:
     """Generate an image for each set of input parameters and return a list of images."""
     print("Reading inputs...")
     data = pd.read_excel(os.path.join(FOLDER_ROOT, filename), sheet_name=sheetindex, usecols=(1, 2, 3))
@@ -123,6 +136,37 @@ def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None
         
         images.append(image.astype(np.uint8))
     return images
+
+def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None) -> np.ndarray:
+    """Return a Series of class labels for each set of input parameters."""
+    print("Reading inputs...")
+    if experiment_number == "faces":
+        return np.repeat([0, 1], TOTAL_SAMPLES//2)
+    
+    data = pd.read_excel(os.path.join(FOLDER_ROOT, filename), sheet_name=sheetindex, usecols=(1, 2, 3))
+    value_ranges = (LASER_POWER_RANGE, POWDER_VALUE_RANGE, FEED_RATE_RANGE)
+
+    unique_values = [sorted(pd.unique(data.iloc[:, column])) for column in range(data.shape[1])]
+    # unique_labels = np.empty([len(_) for _ in unique_values], int)
+    # unique_labels = np.arange(unique_labels.size).reshape(unique_labels.shape)
+
+    if not sample_indices:
+        sample_indices = range(len(data))
+    number_samples = len(sample_indices)
+
+    labels = np.empty((number_samples,), int)
+    for i, index in enumerate(sample_indices):
+        labels[i] = unique_values[0].index(data.iloc[index, 0])
+        # TODO: Make generic (not just 3 columns)
+        # labels[i] = unique_labels[
+        #     unique_values[0].index(data.iloc[index, 0]),
+        #     unique_values[1].index(data.iloc[index, 1]),
+        #     unique_values[2].index(data.iloc[index, 2]),
+        # ]
+    
+    labels = np.repeat([1, 2], number_samples//2)
+    
+    return labels
 
 def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarray]:
     print("Reading labels...")
