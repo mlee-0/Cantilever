@@ -55,10 +55,17 @@ KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
 
+# Use the 3D FEA dataset.
+is_3d = True
+
 # Folders and files.
 FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
-FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels 3D")
-FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels 3D")
+if is_3d:
+    FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels 3D")
+    FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels 3D")
+else:
+    FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels")
+    FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels")
 FOLDER_RESULTS = os.path.join(FOLDER_ROOT, "Results")
 FILENAME_SAMPLES_TRAIN = "samples_train.csv"
 FILENAME_SAMPLES_TEST = "samples_test.csv"
@@ -67,11 +74,11 @@ FILENAME_SAMPLES_TEST = "samples_test.csv"
 NUMBER_DIGITS = 6
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 5
+INPUT_CHANNELS = 5 if is_3d else 3
 INPUT_SIZE = (INPUT_CHANNELS, round(height.high / height.step), round(length.high / length.step))
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), "Input image size must match aspect ratio of cantilever: {height.high}:{length.high}."
 # Size of output images (channel-height-width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
-OUTPUT_CHANNELS = 15
+OUTPUT_CHANNELS = 15 if is_3d else 1
 OUTPUT_SIZE = (OUTPUT_CHANNELS, 15, 30)
 
 
@@ -90,7 +97,7 @@ def split_training_validation(number_samples: int, training_split: float) -> Tup
     assert training_size + validation_size == number_samples
     return training_size, validation_size
 
-def generate_input_images(samples: pd.DataFrame) -> np.ndarray:
+def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
     DATA_TYPE = np.uint8
 
@@ -100,49 +107,64 @@ def generate_input_images(samples: pd.DataFrame) -> np.ndarray:
         pixel_length = int(samples[KEY_NODES_LENGTH][i])
         pixel_height = int(samples[KEY_NODES_HEIGHT][i])
         pixel_width = int(samples[KEY_NODES_WIDTH][i])
-        image = np.zeros(INPUT_SIZE, dtype=DATA_TYPE)
+        
+        channels = []
+        h, w = INPUT_SIZE[1:]
 
         # Create a channel with a white rectangle representing the length and height of the cantilever.
-        image[0, :pixel_height, :pixel_length] = 255
+        channel = np.zeros((h, w), dtype=DATA_TYPE)
+        channel[:pixel_height, :pixel_length] = 255
+        channels.append(channel)
 
         # Create a channel with a white rectangle representing the height and width of the cantilever.
-        image[1, :pixel_height, :pixel_width] = 255
+        if not is_3d:
+            channel = np.zeros((h, w), dtype=DATA_TYPE)
+            channel[:pixel_height, :pixel_width] = 255
+            channels.append(channel)
 
         # Create a channel with a gray line of pixels representing the load magnitude and angle 1.
-        r = np.arange(max(image.shape[1:]))
-        x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + image.shape[2]/2
-        y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + image.shape[1]/2
+        channel = np.zeros((h, w), dtype=DATA_TYPE)
+        r = np.arange(max(channel.shape))
+        x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + w/2
+        y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + h/2
         x = x.astype(int)
         y = y.astype(int)
-        inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
-        image[2, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        image[2, :, :] = np.flipud(image[2, :, :])
+        inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
+        channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
+        channel = np.flipud(channel)
+        channels.append(channel)
         
         # Create a channel with a gray line of pixels representing the load magnitude and angle 2.
-        r = np.arange(max(image.shape[1:]))
-        x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + image.shape[2]/2
-        y = r * np.sin(samples[angle_2.name][i] * np.pi/180) + image.shape[1]/2
-        x = x.astype(int)
-        y = y.astype(int)
-        inside_image = (x >= 0) * (x < image.shape[2]) * (y >= 0) * (y < image.shape[1])
-        image[3, y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        image[3, :, :] = np.flipud(image[3, :, :])
-
+        if not is_3d:
+            channel = np.zeros((h, w), dtype=DATA_TYPE)
+            r = np.arange(max(channel.shape))
+            x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + w/2
+            y = r * np.sin(samples[angle_2.name][i] * np.pi/180) + h/2
+            x = x.astype(int)
+            y = y.astype(int)
+            inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
+            channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
+            channel = np.flipud(channel)
+            channels.append(channel)
+        
+        # Create a channel with the elastic modulus distribution.
+        channel = np.zeros((h, w), dtype=DATA_TYPE)
+        channel[:pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        channels.append(channel)
+        
         # # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
         # # image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
         # image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
         
-        # Create a channel with the elastic modulus distribution.
-        image[4, :pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
-        
         # # Create a channel with the fixed boundary conditions.
         # image[3, :pixel_height, 0] = 255
 
-        # Append the image to the list.
-        inputs[i, ...] = image
+        # Create the image and append it to the list.
+        inputs[i, ...] = np.stack(channels, axis=0)
+    
     return inputs
 
-def generate_label_images(samples: pd.DataFrame, folder: str) -> np.ndarray:
+def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
     number_samples = len(samples)
     
@@ -173,20 +195,17 @@ def generate_label_images(samples: pd.DataFrame, folder: str) -> np.ndarray:
         image_height = int(samples[KEY_NODES_HEIGHT][i])
         image_length = int(samples[KEY_NODES_LENGTH][i])
 
-        # Determine if this is a 2D or 3D problem.
-        x = set([_[1] for _ in node_values])
-        y = set([_[2] for _ in node_values])
-        z = set([_[3] for _ in node_values])
-        is_3d = len(z) > 1
-        
-        # Check for rounding errors (for example, 0.32 and 0.33 should likely be the same value).
-        assert len(y) == image_height and len(x) == image_length and len(z) == image_channels, f"Rounding error in the X, Y, Z coordinates in {filename}."
-
         # Insert the values into the combined array, aligned top-left.
-        labels[i, :image_channels, :image_height, :image_length] = np.reshape(
-            [_[0] for _ in node_values],
-            (image_channels, image_height, image_length if is_3d else 1),
-        )
+        if is_3d:
+            labels[i, :image_channels, :image_height, :image_length] = np.reshape(
+                [_[0] for _ in node_values],
+                (image_channels, image_height, image_length),
+            )
+        else:
+            labels[i, :, :image_height, :image_length] = np.reshape(
+                [_[0] for _ in node_values if _[3] == 0.0],
+                (1, image_height, image_length),
+            )
         
         if (i+1) % 100 == 0:
             print(f"Reading label {i+1} / {number_samples}...", end='\r')

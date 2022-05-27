@@ -28,10 +28,10 @@ class CantileverDataset(Dataset):
     def __init__(self, samples: pd.DataFrame, folder_labels):
         self.number_samples = len(samples)
         # Create label images.
-        self.labels = generate_label_images(samples, folder_labels)
+        self.labels = generate_label_images(samples, folder_labels, is_3d)
         print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
         # Create input images.
-        self.inputs = generate_input_images(samples)
+        self.inputs = generate_input_images(samples, is_3d)
         print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
 
     def __len__(self):
