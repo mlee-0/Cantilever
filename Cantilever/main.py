@@ -233,6 +233,21 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 os.path.join(FOLDER_RESULTS, f'{batch}_fea_model.png'),
                 )
             
+            # Plot a voxel model of the model output.
+            from mpl_toolkits.mplot3d import Axes3D
+            if batch in {3, 14, 19}:
+                fig = plt.figure()
+                ax = fig.gca(projection="3d")
+                rgb = np.empty(test_output.shape + (3,))
+                for channel in range(test_output.shape[0]):
+                    rgb[channel, :, :, :] = array_to_colormap(test_output[channel, ...], max_value)
+                rgb /= 255
+                voxels = ax.voxels(filled=np.full(test_output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
+                plt.xlabel("X")
+                plt.ylabel("Y")
+                # plt.zlabel("Z")
+                plt.show()
+            
             if queue:
                 queue.put([None, (batch, size_test_dataset), None, None, None])
     
