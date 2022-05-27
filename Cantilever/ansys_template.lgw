@@ -15,11 +15,11 @@ WPSTYLE,,,,,,,,0
 ! Disable "Solution is done" popup window.
 KEYW,pr_sgui,1
 
-! Define either a 2D or 3D problem.
-dimensions = 3
-
 
 ! placeholder_loop_start
+
+! Define either a 2D or 3D problem.
+dimensions = 3
 
 ! placeholder_define_samples
 
@@ -119,17 +119,28 @@ MPDATA,PRXY,1,,0.3
 *IF,dimensions,EQ,2,THEN
     DL,4, ,ALL,0
 
+    nodal_load_x = samples(2,i,1)/samples(10,i,1)
+    nodal_load_y = samples(3,i,1)/samples(10,i,1)
+
+    ! Interior nodal loads.
     LSEL,S,LINE,,2
-    NSLL,S,1
-    F,ALL,FX,samples(2,i,1)/samples(10,i,1)
-    F,ALL,FY,samples(3,i,1)/samples(10,i,1)
+    NSLL,S,0
+    F,ALL,FX,nodal_load_x
+    F,ALL,FY,nodal_load_y
+    
+    ! Edge nodal loads.
+    KSEL,S,KP,,2,3
+    NSLK,S
+    F,ALL,FX,nodal_load_x/2
+    F,ALL,FY,nodal_load_y/2
 *ELSE
     DA,5,ALL,0
 
     ASEL,S,AREA,,6
-    NSLA,S,1
-    F,ALL,FX,samples(2,i,1)/(samples(10,i,1)*samples(11,i,1))
-    F,ALL,FY,samples(3,i,1)/(samples(10,i,1)*samples(11,i,1))
+    NSLA,S,0
+    F,ALL,FX,samples(2,i,1)/((samples(10,i,1)-2)*(samples(11,i,1)-2))
+    F,ALL,FY,samples(3,i,1)/((samples(10,i,1)-2)*(samples(11,i,1)-2))
+    F,ALL,FZ,samples(4,i,1)/((samples(10,i,1)-2)*(samples(11,i,1)-2))
 *ENDIF
 
 
