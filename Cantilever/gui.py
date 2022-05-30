@@ -29,11 +29,6 @@ class MainWindow(QMainWindow):
         self.queue = Queue()
         self.queue_to_main = Queue()
 
-        # Plot values.
-        self.epochs = None
-        self.loss = None
-        self.previous_loss = None
-
         # Font objects.
         font_small = QFont()
         font_small.setPointSize(10)
@@ -46,7 +41,7 @@ class MainWindow(QMainWindow):
         self.action_toggle_status_bar.setCheckable(True)
         self.action_toggle_status_bar.setChecked(True)
         menu_view.addSeparator()
-        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only", self.plot_loss)
+        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
         self.action_toggle_loss.setCheckable(True)
         menu_help.addAction("About...", self.show_about)
 
@@ -346,14 +341,34 @@ class MainWindow(QMainWindow):
         window.setCentralWidget(text_edit)
         window.show()
 
-    def plot_loss(self, epochs, loss, loss_previous):
+    def plot_loss(self, epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss):
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        if loss_previous and not self.action_toggle_loss.isChecked():
-            axis.plot(range(1, epochs[0]), loss_previous, ':.', color=Colors.GRAY_LIGHT)
-        if loss:
-            axis.plot(epochs[:len(loss)], loss, '-.', color=Colors.BLUE)
-            axis.annotate(f"{loss[-1].item():,.0f}", (epochs[len(loss)-1], loss[-1]), color=Colors.BLUE, fontsize=10)
+        
+        # Plot previous losses.
+        if previous_training_loss and not self.action_toggle_loss.isChecked():
+            axis.plot(
+                range(epochs[0] - len(previous_training_loss), epochs[0]),
+                previous_training_loss,
+                ':.', color=Colors.GRAY_LIGHT
+            )
+        if previous_validation_loss and not self.action_toggle_loss.isChecked():
+            axis.plot(
+                range(epochs[0] - len(previous_validation_loss), epochs[0]),
+                previous_validation_loss,
+                '-.', color=Colors.GRAY_LIGHT
+            )
+        
+        # Plot current losses.
+        if training_loss:
+            axis.plot(epochs[:len(training_loss)], training_loss, ':.', color=Colors.ORANGE, label="Training")
+            axis.annotate(f"{training_loss[-1]:,.0f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
+            axis.legend()
+        if validation_loss:
+            axis.plot(epochs[:len(validation_loss)], validation_loss, '-.', color=Colors.BLUE, label="Validation")
+            axis.annotate(f"{validation_loss[-1]:,.0f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
+            axis.legend()
+        
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -366,8 +381,10 @@ class MainWindow(QMainWindow):
             progress_epoch: Tuple[int, int] = info["progress_epoch"]
             progress_batch: Tuple[int, int] = info["progress_batch"]
             epochs = info["epochs"]
-            loss = info["loss"]
-            loss_previous = info["loss_previous"]
+            training_loss = info["training_loss"]
+            previous_training_loss = info["previous_training_loss"]
+            validation_loss = info["validation_loss"]
+            previous_validation_loss = info["previous_validation_loss"]
 
             # Update the progress label.
             strings_progress = []
@@ -379,13 +396,13 @@ class MainWindow(QMainWindow):
             self.label_progress.setText(text_progress)
 
             # Update the progress bar.
-            progress_value = progress_epoch[0] * progress_batch[1] + progress_batch[0]
+            progress_value = (progress_epoch[0]-1) * progress_batch[1] + progress_batch[0]
             progress_max = progress_epoch[1] * progress_batch[1]
             self.progress_bar.setValue(progress_value)
             self.progress_bar.setMaximum(progress_max)
 
-            if loss or loss_previous:
-                self.plot_loss(epochs, loss, loss_previous)
+            if training_loss or previous_training_loss or validation_loss or previous_validation_loss:
+                self.plot_loss(epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss)
         # Thread has stopped.
         if not self.thread.is_alive():
             self.sidebar.setEnabled(True)

@@ -60,18 +60,6 @@ KEY_NODES_WIDTH = "Nodes Width"
 
 # Folders and files.
 FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
-if is_3d:
-    FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels 3D")
-    FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels 3D")
-else:
-    FOLDER_TRAIN_LABELS = os.path.join(FOLDER_ROOT, "Train Labels")
-    FOLDER_TEST_LABELS = os.path.join(FOLDER_ROOT, "Test Labels")
-FOLDER_RESULTS = os.path.join(FOLDER_ROOT, "Results")
-FILENAME_SAMPLES_TRAIN = "samples_train.csv"
-FILENAME_SAMPLES_TEST = "samples_test.csv"
-
-# Number of digits used for numerical file names.
-NUMBER_DIGITS = 6
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_CHANNELS = 4 if is_3d else 2
@@ -260,6 +248,9 @@ class Colors:
     RED = "#ff4040"
     RED_DARK = "#9e2828"
     RED_LIGHT = "#ffb6b6"
+    ORANGE = "#ff8000"
+    ORANGE_DARK = "#9e4f00"
+    ORANGE_LIGHT = "#ffce9e"
     BLUE = "#0095ff"
     BLUE_DARK = "#005c9e"
     BLUE_LIGHT = "#9ed7ff"

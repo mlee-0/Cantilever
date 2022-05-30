@@ -140,6 +140,9 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
     with open(os.path.join(FOLDER_ROOT, 'ansys_template.lgw'), 'r') as file:
         lines = file.readlines()
     
+    # Number of digits used for numbers in file names (for example, 6 results in "xxx_000123.txt").
+    NUMBER_DIGITS = 6
+    
     # Replace placeholder lines in the template script.
     with open(os.path.join(FOLDER_ROOT, filename), 'w') as file:
         # Initialize dictionary of placeholder strings (keys) and strings they should be replaced with (values).
@@ -264,6 +267,10 @@ NUMBER_SAMPLES = 10000
 START_SAMPLE_NUMBER = 1
 # Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
 WRITE_MODE = "w"
+
+# Dataset file names.
+FILENAME_SAMPLES_TRAIN = "samples_train.csv"
+FILENAME_SAMPLES_TEST = "samples_test.csv"
 
 if __name__ == "__main__":
     if DATASET == "train":

@@ -59,13 +59,14 @@ class CantileverDataset(Dataset):
         # Return copies of arrays so that arrays are not modified.
         return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
 
-def save(epoch, model, optimizer, loss_history) -> None:
+def save(epoch, model, optimizer, training_loss, validation_loss) -> None:
     """Save model parameters to a file."""
     torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss_history,
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "training_loss": training_loss,
+        "validation_loss": validation_loss,
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
@@ -79,6 +80,17 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
+    # Files and folders.
+    if dataset == 2:
+        folder_train_labels = os.path.join(FOLDER_ROOT, "Train Labels")
+        folder_test_labels = os.path.join(FOLDER_ROOT, "Test Labels")
+    elif dataset == 3:
+        folder_train_labels = os.path.join(FOLDER_ROOT, "Train Labels 3D")
+        folder_test_labels = os.path.join(FOLDER_ROOT, "Test Labels 3D")
+    else:
+        raise ValueError(f"Invalid dataset ID: {dataset}.")
+    folder_results = os.path.join(FOLDER_ROOT, "Results")
+
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model_args = {
         Nie: [INPUT_CHANNELS, INPUT_SIZE[1:3], OUTPUT_CHANNELS],
@@ -90,7 +102,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     loss_function = nn.MSELoss()
     
     epoch = 1
-    previous_loss = []
+    previous_training_loss = []
+    previous_validation_loss = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
             if train_existing is None:
@@ -100,10 +113,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         
         if train_existing:
             checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch'] + 1
-            previous_loss = checkpoint['loss']
+            model.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            epoch = checkpoint["epoch"] + 1
+            previous_training_loss = checkpoint["training_loss"]
+            previous_validation_loss = checkpoint["validation_loss"]
     else:
         train_existing = False
         test_only = False
@@ -124,7 +138,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
     # except FileNotFoundError:
     #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-    #     samples = get_stratified_samples(samples, FOLDER_TRAIN_LABELS, 
+    #     samples = get_stratified_samples(samples, folder_train_labels, 
     #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
     #     with open(filepath_subset, 'w') as f:
     #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
@@ -137,8 +151,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     train_samples = samples[:sample_size_train].reset_index(drop=True)
     validation_samples = samples[sample_size_train:sample_size_train+sample_size_validation].reset_index(drop=True)
     
-    train_dataset = CantileverDataset(train_samples, FOLDER_TRAIN_LABELS)
-    validation_dataset = CantileverDataset(validation_samples, FOLDER_TRAIN_LABELS)
+    train_dataset = CantileverDataset(train_samples, folder_train_labels)
+    validation_dataset = CantileverDataset(validation_samples, folder_train_labels)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
     size_train_dataset = len(train_dataloader)
@@ -150,25 +164,30 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         "progress_epoch": (epoch, epochs[-1]),
         "progress_batch": (0, 0),
         "epochs": epochs,
-        "loss": [],
-        "loss_previous": previous_loss,
+        "training_loss": [],
+        "previous_training_loss": previous_training_loss,
+        "validation_loss": [],
+        "previous_validation_loss": previous_validation_loss,
     }
 
     if not test_only:
         if queue:
             queue.put(info_gui)
 
+        training_loss = []
         validation_loss = []
         for epoch in epochs:
             print(f'Epoch {epoch}\n------------------------')
             
             # Train on the training dataset.
             model.train(True)
+            loss_epoch = 0
             for batch, (data, label) in enumerate(train_dataloader, 1):
                 data = data.to(device)
                 label = label.to(device)
                 output = model(data)
                 loss = loss_function(output, label.float())
+                loss_epoch += loss.item()
                 # Reset gradients of model parameters.
                 optimizer.zero_grad()
                 # Backpropagate the prediction loss.
@@ -182,33 +201,37 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                         info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
                         queue.put(info_gui)
             print()
+            loss_epoch /= size_train_dataset
+            training_loss.append(loss_epoch)
+            print(f"Average training loss: {loss_epoch:,.0f}")
 
             # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
             model.train(False)
-            loss = 0
+            loss_epoch = 0
             with torch.no_grad():
                 for batch, (data, label) in enumerate(validation_dataloader, 1):
                     data = data.to(device)
                     label = label.to(device)
                     output = model(data)
-                    loss += loss_function(output, label.float())
+                    loss_epoch += loss_function(output, label.float()).item()
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
                         if queue:
                             info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validation_dataset)
                             queue.put(info_gui)
             print()
-            loss /= size_validation_dataset
-            validation_loss.append(loss)
-            print(f"Average loss: {loss:,.0f}")
+            loss_epoch /= size_validation_dataset
+            validation_loss.append(loss_epoch)
+            print(f"Average validation loss: {loss_epoch:,.0f}")
 
             # Save the model parameters periodically.
             if (epoch) % 5 == 0:
-                save(epoch, model, optimizer, [*previous_loss, *validation_loss])
+                save(epoch, model, optimizer, [*previous_training_loss, *training_loss], [*previous_validation_loss, *validation_loss])
             
             if queue:
                 info_gui["progress_epoch"] = (epoch, epochs[-1])
-                info_gui["loss"] = validation_loss
+                info_gui["training_loss"] = training_loss
+                info_gui["validation_loss"] = validation_loss
                 queue.put(info_gui)
             
             if queue_to_main:
@@ -219,14 +242,17 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                         break
         
         # Save the model parameters.
-        save(epoch, model, optimizer, [*previous_loss, *validation_loss])
+        save(epoch, model, optimizer, [*previous_training_loss, *training_loss], [*previous_validation_loss, *validation_loss])
         
         # Plot the loss history.
         if not queue:
             plt.figure()
-            if previous_loss:
-                plt.plot(range(1, epochs[0]), previous_loss, 'o', color=Colors.GRAY_LIGHT)
-            plt.plot(epochs, validation_loss, '-o', color=Colors.BLUE)
+            if previous_training_loss:
+                plt.plot(range(1, epochs[0]), previous_training_loss, ':.', color=Colors.GRAY_LIGHT)
+            if previous_validation_loss:
+                plt.plot(range(1, epochs[0]), previous_validation_loss, ':.', color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, training_loss, ':.', color=Colors.ORANGE)
+            plt.plot(epochs, validation_loss, '-.', color=Colors.BLUE)
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
@@ -235,7 +261,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     # Set up the testing data.
     test_samples = read_samples(FILENAME_SAMPLES_TEST)
-    test_dataset = CantileverDataset(test_samples, FOLDER_TEST_LABELS)
+    test_dataset = CantileverDataset(test_samples, folder_test_labels)
     test_dataloader = DataLoader(test_dataset, shuffle=False)
     size_test_dataset = len(test_dataloader)
     
@@ -265,7 +291,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             ))
             write_image(
                 array_to_colormap(image, max_value),
-                os.path.join(FOLDER_RESULTS, f"{batch}_fea_model.png"),
+                os.path.join(folder_results, f"{batch}_fea_model.png"),
                 )
             
             # Plot a voxel model of the model output.
@@ -288,7 +314,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 info_gui["progress_batch"] = (batch, size_test_dataset)
                 queue.put(info_gui)
     
-    print(f"Wrote {size_test_dataset} test images in {FOLDER_RESULTS}.")
+    print(f"Wrote {size_test_dataset} test images in {folder_results}.")
 
     # Calculate and plot evaluation metrics.
     if not queue:
