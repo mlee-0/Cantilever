@@ -7,13 +7,14 @@ import os
 from queue import Queue
 import sys
 import threading
+from typing import Tuple
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QGridLayout, QHBoxLayout, QWidget, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
 
 import main
 import networks
@@ -149,12 +150,16 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.value_model)
         layout_sidebar.addLayout(layout)
 
-        # self.button_2d = QRadioButton("2D")
-        # self.button_3d = QRadioButton("3D")
-        # layout = QHBoxLayout()
-        # layout.addWidget(self.button_2d)
-        # layout.addWidget(self.button_3d)
-        # layout_sidebar.addLayout(layout)
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Dataset:"))
+        layout.addStretch(1)
+        self.buttons_dataset = QButtonGroup()
+        buttons = {2: QRadioButton("2D"), 3: QRadioButton("3D")}
+        for id in buttons:
+            self.buttons_dataset.addButton(buttons[id], id=id)
+            layout.addWidget(buttons[id])
+        buttons[2].setChecked(True)
+        layout_sidebar.addLayout(layout)
 
         # divider = QFrame()
         # divider.setFrameShape(QFrame.HLine)
@@ -169,18 +174,14 @@ class MainWindow(QMainWindow):
         self.label_progress_secondary = QLabel()
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar_secondary = QProgressBar()
-        self.progress_bar_secondary.setTextVisible(False)
         self.button_stop = QPushButton("Stop")
         self.button_stop.clicked.connect(self.on_stop)
         self.button_stop.setEnabled(False)
-        layout = QGridLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.label_progress, 0, 0)
-        layout.addWidget(self.progress_bar, 0, 1)
-        layout.addWidget(self.label_progress_secondary, 1, 0)
-        layout.addWidget(self.progress_bar_secondary, 1, 1)
-        layout.addWidget(self.button_stop, 0, 2, 2, 1)
+        self.button_stop.setToolTip("Stop after current epoch.")
+        layout = QHBoxLayout()
+        layout.addWidget(self.label_progress)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.button_stop)
         layout_results.addLayout(layout)
 
         # Plot area.
@@ -277,8 +278,7 @@ class MainWindow(QMainWindow):
             test_only = True
 
         self.sidebar.setEnabled(False)
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setMaximum(0)
+        self.progress_bar.setRange(0, 0)
         self.button_stop.setEnabled(True)
 
         self.thread = threading.Thread(
@@ -288,6 +288,7 @@ class MainWindow(QMainWindow):
                 "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
                 "batch_size": self.value_batch.value(),
                 "Model": networks.networks[self.value_model.currentText()],
+                "dataset": self.buttons_dataset.checkedId(),
 
                 "desired_subset_size": self.value_subset_size.value(),
                 "bins": self.value_bins.value(),
@@ -345,16 +346,14 @@ class MainWindow(QMainWindow):
         window.setCentralWidget(text_edit)
         window.show()
 
-    def plot_loss(self):
-        if self.epochs is None or self.loss is None:
-            return
-        
+    def plot_loss(self, epochs, loss, loss_previous):
         self.figure.clear()
         axis = self.figure.add_subplot(111)
-        if self.previous_loss and not self.action_toggle_loss.isChecked():
-            axis.plot(range(1, self.epochs[0]), self.previous_loss, 'o', color=Colors.GRAY_LIGHT)
-        axis.plot(self.epochs[:len(self.loss)], self.loss, '-o', color=Colors.BLUE)
-        axis.annotate(f"{self.loss[-1].item():,.0f}", (self.epochs[len(self.loss)-1], self.loss[-1]), color=Colors.BLUE, fontsize=10)
+        if loss_previous and not self.action_toggle_loss.isChecked():
+            axis.plot(range(1, epochs[0]), loss_previous, ':.', color=Colors.GRAY_LIGHT)
+        if loss:
+            axis.plot(epochs[:len(loss)], loss, '-.', color=Colors.BLUE)
+            axis.annotate(f"{loss[-1].item():,.0f}", (epochs[len(loss)-1], loss[-1]), color=Colors.BLUE, fontsize=10)
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -363,23 +362,35 @@ class MainWindow(QMainWindow):
     
     def check_queue(self):
         while not self.queue.empty():
-            progress, progress_secondary, epochs, loss, previous_loss = self.queue.get()
-            if progress:
-                self.progress_bar.setValue(progress[0])
-                self.progress_bar.setMaximum(progress[1])
-                self.label_progress.setText(f"Epoch {progress[0]}/{progress[1]}")
-            if progress_secondary:
-                self.progress_bar_secondary.setValue(progress_secondary[0])
-                self.progress_bar_secondary.setMaximum(progress_secondary[1])
-                self.label_progress_secondary.setText(f"Batch {progress_secondary[0]}/{progress_secondary[1]}")
-            # Prevent replacing previously received data with None.
-            if not (epochs is None or loss is None or previous_loss is None):
-                self.epochs, self.loss, self.previous_loss = epochs, loss, previous_loss
-            self.plot_loss()
+            info = self.queue.get()
+            progress_epoch: Tuple[int, int] = info["progress_epoch"]
+            progress_batch: Tuple[int, int] = info["progress_batch"]
+            epochs = info["epochs"]
+            loss = info["loss"]
+            loss_previous = info["loss_previous"]
+
+            # Update the progress label.
+            strings_progress = []
+            if progress_epoch is not None:
+                strings_progress.append(f"Epoch {progress_epoch[0]}/{progress_epoch[1]}")
+            if progress_batch is not None:
+                strings_progress.append(f"Batch {progress_batch[0]}/{progress_batch[1]}")
+            text_progress = "\n".join(strings_progress)
+            self.label_progress.setText(text_progress)
+
+            # Update the progress bar.
+            progress_value = progress_epoch[0] * progress_batch[1] + progress_batch[0]
+            progress_max = progress_epoch[1] * progress_batch[1]
+            self.progress_bar.setValue(progress_value)
+            self.progress_bar.setMaximum(progress_max)
+
+            if loss or loss_previous:
+                self.plot_loss(epochs, loss, loss_previous)
         # Thread has stopped.
         if not self.thread.is_alive():
             self.sidebar.setEnabled(True)
             self.button_stop.setEnabled(False)
+            self.progress_bar.setRange(0, 1)
             self.progress_bar.reset()
             self.checkbox_train_existing.setChecked(True)
             self.timer.stop()

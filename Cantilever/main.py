@@ -69,7 +69,7 @@ def save(epoch, model, optimizer, loss_history) -> None:
     }, FILEPATH_MODEL)
     print(f'Saved model parameters to {FILEPATH_MODEL}.')
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
 
@@ -90,7 +90,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     loss_function = nn.MSELoss()
     
     epoch = 1
-    previous_test_loss = []
+    previous_loss = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
             if train_existing is None:
@@ -103,7 +103,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch'] + 1
-            previous_test_loss = checkpoint['loss']   
+            previous_loss = checkpoint['loss']
     else:
         train_existing = False
         test_only = False
@@ -145,9 +145,18 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     size_validation_dataset = len(validation_dataloader)
     print(f"Split {sample_size} samples into {size_train_dataset} training / {size_validation_dataset} validation.")
 
+    # Initialize values to send to the GUI, to be updated throughout training.
+    info_gui = {
+        "progress_epoch": (epoch, epochs[-1]),
+        "progress_batch": (0, 0),
+        "epochs": epochs,
+        "loss": [],
+        "loss_previous": previous_loss,
+    }
+
     if not test_only:
         if queue:
-            queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
+            queue.put(info_gui)
 
         validation_loss = []
         for epoch in epochs:
@@ -170,7 +179,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 if (batch) % 100 == 0:
                     print(f"Training batch {batch}/{size_train_dataset} with loss {loss:,.0f}...", end="\r")
                     if queue:
-                        queue.put([None, (batch, size_train_dataset+size_validation_dataset), None, None, None])
+                        info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
+                        queue.put(info_gui)
             print()
 
             # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
@@ -185,7 +195,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
                         if queue:
-                            queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validation_dataset), None, None, None])
+                            info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validation_dataset)
+                            queue.put(info_gui)
             print()
             loss /= size_validation_dataset
             validation_loss.append(loss)
@@ -193,10 +204,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
             # Save the model parameters periodically.
             if (epoch) % 5 == 0:
-                save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
+                save(epoch, model, optimizer, [*previous_loss, *validation_loss])
             
             if queue:
-                queue.put([(epoch, epochs[-1]), None, epochs, validation_loss, previous_test_loss])
+                info_gui["progress_epoch"] = (epoch, epochs[-1])
+                info_gui["loss"] = validation_loss
+                queue.put(info_gui)
             
             if queue_to_main:
                 if not queue_to_main.empty():
@@ -206,13 +219,13 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                         break
         
         # Save the model parameters.
-        save(epoch, model, optimizer, [*previous_test_loss, *validation_loss])
+        save(epoch, model, optimizer, [*previous_loss, *validation_loss])
         
         # Plot the loss history.
         if not queue:
             plt.figure()
-            if previous_test_loss:
-                plt.plot(range(1, epochs[0]), previous_test_loss, 'o', color=Colors.GRAY_LIGHT)
+            if previous_loss:
+                plt.plot(range(1, epochs[0]), previous_loss, 'o', color=Colors.GRAY_LIGHT)
             plt.plot(epochs, validation_loss, '-o', color=Colors.BLUE)
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
@@ -271,7 +284,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                     plt.show()
             
             if queue:
-                queue.put([None, (batch, size_test_dataset), None, None, None])
+                info_gui["progress_epoch"] = (0, 0)
+                info_gui["progress_batch"] = (batch, size_test_dataset)
+                queue.put(info_gui)
     
     print(f"Wrote {size_test_dataset} test images in {FOLDER_RESULTS}.")
 
@@ -341,21 +356,19 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
 
 if __name__ == '__main__':
-    # Training hyperparameters.
-    EPOCHS = 20
-    LEARNING_RATE = 1e-7  # 0.000001 for Nie
-    BATCH_SIZE = 1
-    Model = Nie
+    kwargs={
+        "epoch_count": 20,
+        "learning_rate": 1e-7,
+        "batch_size": 1,
+        "Model": Nie,
+        "dataset": 2,
 
-    kwargs = {
         "desired_subset_size": 10_000,
         "bins": 1,
         "nonuniformity": 1.0,
         "training_split": 0.8,
         "train_existing": False,
-        "test_only": False,
+        "test_only": not False,
     }
 
-    main(
-        EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, **kwargs,
-    )
+    main(**kwargs)
