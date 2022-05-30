@@ -3,10 +3,13 @@ Train and test the model.
 """
 
 
+import glob
 import math
 import os
+import pickle
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pandas as pd
 import torch
@@ -77,7 +80,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     print(f'Using {device} device.')
 
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
-    model = Model()
+    model_args = {
+        Nie: [INPUT_CHANNELS, INPUT_SIZE[1:3], OUTPUT_CHANNELS],
+    }
+    args = model_args[Model]
+    model = Model(*args)
     model.to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     loss_function = nn.MSELoss()
@@ -245,23 +252,23 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             ))
             write_image(
                 array_to_colormap(image, max_value),
-                os.path.join(FOLDER_RESULTS, f'{batch}_fea_model.png'),
+                os.path.join(FOLDER_RESULTS, f"{batch}_fea_model.png"),
                 )
             
             # Plot a voxel model of the model output.
-            from mpl_toolkits.mplot3d import Axes3D
-            if batch in {3, 14, 19}:
-                fig = plt.figure()
-                ax = fig.gca(projection="3d")
-                rgb = np.empty(test_output.shape + (3,))
-                for channel in range(test_output.shape[0]):
-                    rgb[channel, :, :, :] = array_to_colormap(test_output[channel, ...], max_value)
-                rgb /= 255
-                voxels = ax.voxels(filled=np.full(test_output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
-                plt.xlabel("X")
-                plt.ylabel("Y")
-                # plt.zlabel("Z")
-                plt.show()
+            if not queue and is_3d:
+                if batch in {3, 14, 19}:
+                    fig = plt.figure()
+                    ax = fig.gca(projection="3d")
+                    rgb = np.empty(test_output.shape + (3,))
+                    for channel in range(test_output.shape[0]):
+                        rgb[channel, :, :, :] = array_to_colormap(test_output[channel, ...], max_value)
+                    rgb /= 255
+                    voxels = ax.voxels(filled=np.full(test_output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
+                    plt.xlabel("X")
+                    plt.ylabel("Y")
+                    # plt.zlabel("Z")
+                    plt.show()
             
             if queue:
                 queue.put([None, (batch, size_test_dataset), None, None, None])
@@ -294,7 +301,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         mv, me, mae, mse, mre = [], [], [], [], []
         results = {"Maximum Value": mv, "Mean Error": me, "Mean Absolute Error": mae, "Mean Squared Error": mse, "Mean Relative Error": mre}
         for test_output, test_label in zip(test_outputs, test_labels):
-            test_output, test_label = test_output[channel, ...], test_label[channel, ...]
             mv.append(metrics.maximum_value(test_output, test_label))
             me.append(metrics.mean_error(test_output, test_label))
             mae.append(metrics.mean_absolute_error(test_output, test_label))

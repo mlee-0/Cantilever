@@ -5,6 +5,7 @@ Networks with different architectures.
 import inspect
 import math
 import sys
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -14,22 +15,24 @@ from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE
 
 
 class Nie(nn.Module):
-    def __init__(self):
+    def __init__(self, input_channels: int, input_size: Tuple[int, int], output_channels: int):
         super().__init__()
 
         TRACK_RUNNING_STATS = False
         MOMENTUM = 0.1
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(INPUT_CHANNELS, 16, kernel_size=9, stride=1, padding=4),
+            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding=4),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
+        # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
+        # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
@@ -46,12 +49,13 @@ class Nie(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
+        output_size_se_1 = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
         self.se_2 = nn.Sequential(
-            nn.AvgPool2d(kernel_size=(5,10)),
+            nn.AvgPool2d(kernel_size=output_size_se_1),
             nn.Flatten(),
             nn.Linear(64, 4),
             nn.ReLU(inplace=True),
-            nn.Linear(4, 10),
+            nn.Linear(4, output_size_se_1[1]),
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
@@ -65,7 +69,7 @@ class Nie(nn.Module):
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(16, OUTPUT_CHANNELS, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
+            nn.Conv2d(16, output_channels, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
             # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
