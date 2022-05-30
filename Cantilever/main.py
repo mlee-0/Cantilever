@@ -25,11 +25,26 @@ FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
 
 class CantileverDataset(Dataset):
     """Dataset that gets input and label images during training."""
-    def __init__(self, samples: pd.DataFrame, folder_labels):
+    def __init__(self, samples: pd.DataFrame, folder_labels: str):
         self.number_samples = len(samples)
-        # Create label images.
-        self.labels = generate_label_images(samples, folder_labels, is_3d)
+        
+        # Load previously generated label images.
+        files = glob.glob(os.path.join(folder_labels, "*.pickle"))
+        files = [_ for _ in files if str(len(samples)) in _]
+        if files:
+            file = files[0]
+            with open(file, "rb") as f:
+                self.labels = pickle.load(f)
+            print(f"Loaded {len(self.labels)} label images from {file}.")
+        # Create label images and save them as a pickle file.
+        else:
+            self.labels = generate_label_images(samples, folder_labels, is_3d)
+            file = f"{len(samples)}_labels.pickle"
+            with open(os.path.join(folder_labels, file), "wb") as f:
+                pickle.dump(self.labels, f)
+            print(f"Saved {len(samples)} label images to {file}.")
         print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
+        
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d)
         print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")

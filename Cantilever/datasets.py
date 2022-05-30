@@ -5,6 +5,7 @@ Run this script to generate dataset files.
 
 import math
 import os
+import pickle
 import random
 
 import numpy as np
@@ -178,24 +179,29 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
 
 def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
     """
-    Return a subset of the given samples in which the same number of maximum stress values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
+    Return a subset of the given samples in which the same number of maximum values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
 
     `samples`: DataFrame of samples of entire dataset.
     `folder`: Folder in which labels are read.
     `desired_subset_size`: The number of samples to have in the subset. The actual subset size may not exactly match this number.
-    `bins`: The number of bins to use in the histogram of maximum stress values.
+    `bins`: The number of bins to use in the histogram of maximum values.
     `nonuniformity`: How much larger than the smallest bin the largest bin is. For example, a value of 1 results in a uniform distribution, in which the largest bin has as many samples as the smallest bin. A value of 2 results in the largest bin having twice as many samples as the smallest bin.
     """
 
-    # Get the maximum stress values in each label.
-    stresses = read_labels(folder)
-    stresses = np.array([np.max(stress) for stress in stresses])
-    actual_raw_size = len(stresses)
+    # Get the maximum values in each label.
+    files = glob.glob(os.path.join(folder, "*.pickle"))
+    files = [_ for _ in files if str(len(samples)) in _]
+    if files:
+        with open(files[0], "rb") as f:
+            labels = pickle.load(f)
+    else:
+        labels = generate_label_images(samples, folder, is_3d, pickle_images=True)
+    maxima = np.array([np.max(_) for _ in labels])
+    actual_raw_size = len(maxima)
 
     # Calculate the histogram.
-    maximum_stress = np.max(stresses)
-    histogram_range = (0, maximum_stress)  # Set minimum to 0 prevent small stresses being excluded
-    frequencies, bin_edges = np.histogram(stresses, bins=bins, range=histogram_range)
+    histogram_range = (0, np.max(maxima))  # Set minimum to 0 prevent small stresses being excluded
+    frequencies, bin_edges = np.histogram(maxima, bins=bins, range=histogram_range)
     minimum_frequency = np.min(frequencies)
     minimum_bin = np.argmin(frequencies)
     
@@ -215,7 +221,7 @@ def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_si
     
     if actual_subset_size < desired_subset_size:
         plt.figure()
-        plt.hist(stresses, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
+        plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
         plt.plot(
             [bin_edges[:-1], bin_edges[1:]],
             [required_frequencies, required_frequencies],
@@ -236,7 +242,7 @@ def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_si
     sample_indices = np.empty(0, dtype=int)
     for i, f in enumerate(required_frequencies):
         # Indices of values that fall inside current bin.
-        indices = np.nonzero((bin_edges[i] < stresses) & (stresses <= bin_edges[i+1]))[0]
+        indices = np.nonzero((bin_edges[i] < maxima) & (maxima <= bin_edges[i+1]))[0]
         # Select the first f values only.
         indices = indices[:f]
         sample_indices = np.append(sample_indices, indices)
