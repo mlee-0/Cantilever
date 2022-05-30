@@ -22,7 +22,7 @@ class Nie(nn.Module):
         MOMENTUM = 0.1
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels+1, 16, kernel_size=9, stride=1, padding=4),
+            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding=4),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -49,17 +49,17 @@ class Nie(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
-        output_size_se_1 = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
+        self.output_size_se_1 = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
         self.se_2 = nn.Sequential(
-            nn.AvgPool2d(kernel_size=output_size_se_1),
+            nn.AvgPool2d(kernel_size=self.output_size_se_1),
             nn.Flatten(),
             nn.Linear(64, 4),
             nn.ReLU(inplace=True),
-            nn.Linear(4, output_size_se_1[1]),
+            nn.Linear(4, self.output_size_se_1[1]),
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
+            nn.ConvTranspose2d(64+1, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
@@ -76,16 +76,11 @@ class Nie(nn.Module):
 
         self.embedding_load = nn.Embedding(
             round(load.high + 1),  # Number of possible values
-            np.prod(input_size),  # Number of output values
+            np.prod(self.output_size_se_1),  # Number of output values
         )
 
-    def forward(self, x, numerical_data: list):
+    def forward(self, x, load: float):
         batch_size = x.size()[0]
-
-        # Concatenate load value to the input image along the channel dimension.
-        embedding_load = self.embedding_load(numerical_data[0])
-        embedding_load = embedding_load.reshape((batch_size, 1, x.size(2), x.size(3)))
-        x = torch.cat((x, embedding_load), axis=1)
 
         x = x.float()
         # print(x.size())
@@ -95,7 +90,9 @@ class Nie(nn.Module):
         # print(x.size())
         x = self.convolution_3(x)
         # print(x.size())
+        
         # x = self.autoencoder(x)
+        
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
@@ -111,6 +108,10 @@ class Nie(nn.Module):
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+
+        # Concatenate embedding along channel dimension.
+        x = torch.concat((x, self.embedding_load(load).reshape((batch_size, 1, *self.output_size_se_1))), dim=1)
+
         # print(x.size())
         x = self.deconvolution_1(x)
         # print(x.size())
@@ -137,10 +138,10 @@ def deconvolution(in_channels, out_channels, **kwargs):
         )
 
 class FullyCnn(nn.Module):
-    def __init__(self):
+    def __init__(self, input_channels: int):
         super().__init__()
         self.convolution_1 = convolution(
-            in_channels=INPUT_CHANNELS, out_channels=4, kernel_size=3, stride=2, padding=1,
+            in_channels=input_channels, out_channels=4, kernel_size=3, stride=2, padding=1,
             )
         self.convolution_2 = convolution(
             in_channels=4, out_channels=8, kernel_size=3, stride=2, padding=1,
@@ -177,10 +178,10 @@ class FullyCnn(nn.Module):
         return x
 
 class UNetCnn(nn.Module):
-    def __init__(self):
+    def __init__(self, input_channels: int, output_channels: int):
         super().__init__()
         self.convolution_1 = convolution(
-            in_channels=INPUT_CHANNELS, out_channels=8, kernel_size=3, stride=3, padding=1,
+            in_channels=input_channels, out_channels=8, kernel_size=3, stride=3, padding=1,
             )
         self.convolution_2 = convolution(
             in_channels=8, out_channels=16, kernel_size=3, stride=3, padding=1,
@@ -192,7 +193,7 @@ class UNetCnn(nn.Module):
             in_channels=8, out_channels=4, kernel_size=7, stride=3, padding=1,
             )
         self.deconvolution_3 = deconvolution(
-            in_channels=4, out_channels=OUTPUT_CHANNELS, kernel_size=7, stride=3, padding=1,
+            in_channels=4, out_channels=output_channels, kernel_size=7, stride=3, padding=1,
             )
         self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
         self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)

@@ -62,7 +62,7 @@ class CantileverDataset(Dataset):
         """Return input data (tuple of image, list of numerical data) and label images."""
         # Return copies of arrays so that arrays are not modified.
         return (
-            (np.copy(self.inputs[index, ...]), [self.loads[index],]),
+            (np.copy(self.inputs[index, ...]), self.loads[index]),
             np.copy(self.labels[index, ...]),
         )
 
@@ -189,13 +189,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             # Train on the training dataset.
             model.train(True)
             loss_epoch = 0
-            for batch, (data, label) in enumerate(train_dataloader, 1):
-                data, numerical_data = data
-                data = data.to(device)
-                label = label.to(device)
-                output = model(data, numerical_data)
+            for batch, ((input_image, load), label_image) in enumerate(train_dataloader, 1):
+                input_image = input_image.to(device)
+                label_image = label_image.to(device)
+                output = model(input_image, load)
                 
-                loss = loss_function(output, label.float())
+                loss = loss_function(output, label_image.float())
                 loss_epoch += loss.item()
                 # Reset gradients of model parameters.
                 optimizer.zero_grad()
@@ -218,12 +217,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             model.train(False)
             loss_epoch = 0
             with torch.no_grad():
-                for batch, (data, label) in enumerate(validation_dataloader, 1):
-                    data, numerical_data = data
-                    data = data.to(device)
-                    label = label.to(device)
-                    output = model(data, numerical_data)
-                    loss_epoch += loss_function(output, label.float()).item()
+                for batch, ((input_image, load), label_image) in enumerate(validation_dataloader, 1):
+                    input_image = input_image.to(device)
+                    label_image = label_image.to(device)
+                    output = model(input_image, load)
+                    loss_epoch += loss_function(output, label_image.float()).item()
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
                         if queue:
@@ -258,11 +256,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         if not queue:
             plt.figure()
             if previous_training_loss:
-                plt.plot(range(1, epochs[0]), previous_training_loss, ':.', color=Colors.GRAY_LIGHT)
+                plt.plot(range(1, epochs[0]), previous_training_loss, '.:', color=Colors.GRAY_LIGHT)
             if previous_validation_loss:
-                plt.plot(range(1, epochs[0]), previous_validation_loss, ':.', color=Colors.GRAY_LIGHT)
-            plt.plot(epochs, training_loss, ':.', color=Colors.ORANGE)
-            plt.plot(epochs, validation_loss, '-.', color=Colors.BLUE)
+                plt.plot(range(1, epochs[0]), previous_validation_loss, '.-', color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, training_loss, '.:', color=Colors.ORANGE)
+            plt.plot(epochs, validation_loss, '.-', color=Colors.BLUE)
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
@@ -282,23 +280,22 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     ])
     # Test on the testing dataset.
     model.train(False)
-    test_labels = []
-    test_outputs = []
+    labels = []
+    outputs = []
     with torch.no_grad():
-        for batch, (data, label) in enumerate(test_dataloader, 1):
-            data, numerical_data = data
-            data = data.to(device)
-            label = label.to(device)
-            test_output = model(data, numerical_data)
-            test_output = test_output[0, :, ...].cpu().detach().numpy()
-            label = label[0, :, ...].cpu().numpy()
-            test_labels.append(label)
-            test_outputs.append(test_output)
+        for batch, ((input_image, load), label_image) in enumerate(test_dataloader, 1):
+            input_image = input_image.to(device)
+            label_image = label_image.to(device)
+            output = model(input_image, load)
+            output = output[0, :, ...].cpu().detach().numpy()
+            label_image = label_image[0, :, ...].cpu().numpy()
+            labels.append(label_image)
+            outputs.append(output)
             
             # Write the combined FEA and model output image.
             image = np.vstack((
-                np.hstack([label[channel, ...] for channel in range(label.shape[0])]),  # FEA
-                np.hstack([test_output[channel, ...] for channel in range(test_output.shape[0])]),  # Model output
+                np.hstack([label_image[channel, ...] for channel in range(label_image.shape[0])]),  # FEA
+                np.hstack([output[channel, ...] for channel in range(output.shape[0])]),  # Model output
             ))
             write_image(
                 array_to_colormap(image, max_value),
@@ -310,11 +307,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 if batch in {3, 14, 19}:
                     fig = plt.figure()
                     ax = fig.gca(projection="3d")
-                    rgb = np.empty(test_output.shape + (3,))
-                    for channel in range(test_output.shape[0]):
-                        rgb[channel, :, :, :] = array_to_colormap(test_output[channel, ...], max_value)
+                    rgb = np.empty(output.shape + (3,))
+                    for channel in range(output.shape[0]):
+                        rgb[channel, :, :, :] = array_to_colormap(output[channel, ...], max_value)
                     rgb /= 255
-                    voxels = ax.voxels(filled=np.full(test_output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
+                    voxels = ax.voxels(filled=np.full(output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
                     plt.xlabel("X")
                     plt.ylabel("Y")
                     # plt.zlabel("Z")
@@ -333,8 +330,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
         # Area metric.
         cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
-            np.array([_ for _ in test_outputs]).flatten(),
-            np.array([_ for _ in test_labels]).flatten(),
+            np.array([_ for _ in outputs]).flatten(),
+            np.array([_ for _ in labels]).flatten(),
             max_value
         )
         plt.figure()
@@ -348,9 +345,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         plt.show()
 
         # NUMBER_COLUMNS = 4
-        # for i, (test_output, test_label) in enumerate(zip(test_outputs, test_labels)):
-        #     plt.subplot(math.ceil(len(test_outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
-        #     cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(test_output[channel, ...], test_label[channel, ...], max_value)
+        # for i, (output, label_image) in enumerate(zip(outputs, labels)):
+        #     plt.subplot(math.ceil(len(outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
+        #     cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(output[channel, ...], label_image[channel, ...], max_value)
         #     plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE)
         #     plt.plot(bin_edges[1:], cdf_label, ':', color=Colors.RED)
         #     if i == 0:
@@ -366,14 +363,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         # Single-value error metrics.
         mv, me, mae, mse, mre = [], [], [], [], []
         results = {"Maximum Value": mv, "Mean Error": me, "Mean Absolute Error": mae, "Mean Squared Error": mse, "Mean Relative Error": mre}
-        for test_output, test_label in zip(test_outputs, test_labels):
-            mv.append(metrics.maximum_value(test_output, test_label))
-            me.append(metrics.mean_error(test_output, test_label))
-            mae.append(metrics.mean_absolute_error(test_output, test_label))
-            mse.append(metrics.mean_squared_error(test_output, test_label))
-            mre.append(metrics.mean_relative_error(test_output, test_label))
+        for output, label_image in zip(outputs, labels):
+            mv.append(metrics.maximum_value(output, label_image))
+            me.append(metrics.mean_error(output, label_image))
+            mae.append(metrics.mean_absolute_error(output, label_image))
+            mse.append(metrics.mean_squared_error(output, label_image))
+            mre.append(metrics.mean_relative_error(output, label_image))
         
-        sample_numbers = range(1, len(test_outputs)+1)
+        sample_numbers = range(1, len(outputs)+1)
         plt.figure()
         for i, (metric, result) in enumerate(results.items()):
             plt.subplot(3, 2, i+1)
