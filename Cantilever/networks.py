@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE
+from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE, load
 
 
 class Nie(nn.Module):
@@ -22,7 +22,7 @@ class Nie(nn.Module):
         MOMENTUM = 0.1
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding=4),
+            nn.Conv2d(input_channels+1, 16, kernel_size=9, stride=1, padding=4),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -73,9 +73,20 @@ class Nie(nn.Module):
             # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
-    
-    def forward(self, x):
+
+        self.embedding_load = nn.Embedding(
+            round(load.high + 1),  # Number of possible values
+            np.prod(input_size),  # Number of output values
+        )
+
+    def forward(self, x, numerical_data: list):
         batch_size = x.size()[0]
+
+        # Concatenate load value to the input image along the channel dimension.
+        embedding_load = self.embedding_load(numerical_data[0])
+        embedding_load = embedding_load.reshape((batch_size, 1, x.size(2), x.size(3)))
+        x = torch.cat((x, embedding_load), axis=1)
+
         x = x.float()
         # print(x.size())
         x = self.convolution_1(x)

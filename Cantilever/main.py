@@ -52,12 +52,19 @@ class CantileverDataset(Dataset):
         self.inputs = generate_input_images(samples, is_3d)
         print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
 
+        # Numerical inputs.
+        self.loads = samples[load.name]
+
     def __len__(self):
         return self.number_samples
     
     def __getitem__(self, index):
+        """Return input data (tuple of image, list of numerical data) and label images."""
         # Return copies of arrays so that arrays are not modified.
-        return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
+        return (
+            (np.copy(self.inputs[index, ...]), [self.loads[index],]),
+            np.copy(self.labels[index, ...]),
+        )
 
 def save(epoch, model, optimizer, training_loss, validation_loss) -> None:
     """Save model parameters to a file."""
@@ -183,9 +190,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             model.train(True)
             loss_epoch = 0
             for batch, (data, label) in enumerate(train_dataloader, 1):
+                data, numerical_data = data
                 data = data.to(device)
                 label = label.to(device)
-                output = model(data)
+                output = model(data, numerical_data)
+                
                 loss = loss_function(output, label.float())
                 loss_epoch += loss.item()
                 # Reset gradients of model parameters.
@@ -210,9 +219,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             loss_epoch = 0
             with torch.no_grad():
                 for batch, (data, label) in enumerate(validation_dataloader, 1):
+                    data, numerical_data = data
                     data = data.to(device)
                     label = label.to(device)
-                    output = model(data)
+                    output = model(data, numerical_data)
                     loss_epoch += loss_function(output, label.float()).item()
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
@@ -275,10 +285,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     test_labels = []
     test_outputs = []
     with torch.no_grad():
-        for batch, (test_input, label) in enumerate(test_dataloader, 1):
-            test_input = test_input.to(device)
+        for batch, (data, label) in enumerate(test_dataloader, 1):
+            data, numerical_data = data
+            data = data.to(device)
             label = label.to(device)
-            test_output = model(test_input)
+            test_output = model(data, numerical_data)
             test_output = test_output[0, :, ...].cpu().detach().numpy()
             label = label[0, :, ...].cpu().numpy()
             test_labels.append(label)
