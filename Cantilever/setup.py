@@ -22,6 +22,9 @@ else:
     GOOGLE_COLAB = True
     drive.mount("/content/drive")
 
+# Use the 3D FEA dataset.
+is_3d = not True
+
 @dataclass
 class Parameter:
     """A dataclass that stores settings for a parameter."""
@@ -41,7 +44,7 @@ class Parameter:
 length = Parameter(low=2, high=4, step=0.1, precision=1, name="Length", units="m")
 height = Parameter(low=1, high=2, step=0.1, precision=1, name="Height", units="m")
 width = Parameter(low=1, high=2, step=0.1, precision=1, name="Width", units="m")
-elastic_modulus = Parameter(low=190, high=210, step=1, precision=0, name="Elastic Modulus", units="GPa")
+elastic_modulus = Parameter(low=200, high=200, step=1, precision=0, name="Elastic Modulus", units="GPa")
 load = Parameter(low=500, high=1000, step=5, precision=0, name="Load", units="N")
 angle_1 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XY", units="Degrees")
 angle_2 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XZ", units="Degrees")
@@ -54,9 +57,6 @@ KEY_Z_LOAD = "Load Z"
 KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
-
-# Use the 3D FEA dataset.
-is_3d = True
 
 # Folders and files.
 FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
@@ -74,7 +74,7 @@ FILENAME_SAMPLES_TEST = "samples_test.csv"
 NUMBER_DIGITS = 6
 
 # Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 5 if is_3d else 3
+INPUT_CHANNELS = 4 if is_3d else 2
 INPUT_SIZE = (INPUT_CHANNELS, round(height.high / height.step), round(length.high / length.step))
 assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), "Input image size must match aspect ratio of cantilever: {height.high}:{length.high}."
 # Size of output images (channel-height-width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
@@ -117,11 +117,12 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         channels.append(channel)
 
         # Create a channel with a white rectangle representing the height and width of the cantilever.
-        if not is_3d:
+        if is_3d:
             channel = np.zeros((h, w), dtype=DATA_TYPE)
             channel[:pixel_height, :pixel_width] = 255
             channels.append(channel)
 
+        # Create a channel with a white line of pixels representing angle 1.
         # Create a channel with a gray line of pixels representing the load magnitude and angle 1.
         channel = np.zeros((h, w), dtype=DATA_TYPE)
         r = np.arange(max(channel.shape))
@@ -134,8 +135,9 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         channel = np.flipud(channel)
         channels.append(channel)
         
+        # Create a channel with a white line of pixels representing angle 2.
         # Create a channel with a gray line of pixels representing the load magnitude and angle 2.
-        if not is_3d:
+        if is_3d:
             channel = np.zeros((h, w), dtype=DATA_TYPE)
             r = np.arange(max(channel.shape))
             x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + w/2
@@ -147,19 +149,13 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
             channel = np.flipud(channel)
             channels.append(channel)
         
-        # Create a channel with the elastic modulus distribution.
-        channel = np.zeros((h, w), dtype=DATA_TYPE)
-        channel[:pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
-        channels.append(channel)
+        # # Create a channel with the elastic modulus distribution.
+        # channel = np.zeros((h, w), dtype=DATA_TYPE)
+        # channel[:pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
+        # channels.append(channel)
         
-        # # Create a channel with a vertical white line whose position represents the load magnitude. Leftmost column is 0, rightmost column is the maximum magnitude.
-        # # image[0, :pixel_height, :pixel_length] = 255 * samples[load.name][i] / load.high
-        # image[0, :, round(image.shape[2] * samples[load.name][i] / load.high) - 1] = 255
-        
-        # # Create a channel with the fixed boundary conditions.
-        # image[3, :pixel_height, 0] = 255
-
         # Create the image and append it to the list.
+        assert len(channels) == INPUT_CHANNELS
         inputs[i, ...] = np.stack(channels, axis=0)
     
     return inputs
@@ -183,7 +179,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
         with open(filename, 'r') as file:
             lines = file.readlines()
         
-        # Assume each line contains the result followed by the corresopnding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
+        # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
         node_values = [
             [float(value) if i == 0 else round(float(value), 2) for i, value in enumerate(line.split(','))]
             for line in lines
@@ -210,7 +206,6 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
         if (i+1) % 100 == 0:
             print(f"Reading label {i+1} / {number_samples}...", end='\r')
     print()
-
 
     return labels
 

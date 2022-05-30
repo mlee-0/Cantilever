@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QGridLayout, QHBoxLayout, QWidget, QPushButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QGridLayout, QHBoxLayout, QWidget, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
 
 import main
 import networks
@@ -148,6 +148,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Model:"))
         layout.addWidget(self.value_model)
         layout_sidebar.addLayout(layout)
+
+        # self.button_2d = QRadioButton("2D")
+        # self.button_3d = QRadioButton("3D")
+        # layout = QHBoxLayout()
+        # layout.addWidget(self.button_2d)
+        # layout.addWidget(self.button_3d)
+        # layout_sidebar.addLayout(layout)
 
         # divider = QFrame()
         # divider.setFrameShape(QFrame.HLine)
