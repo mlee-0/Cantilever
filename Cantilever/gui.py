@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
         self.value_epochs.setMinimum(1)
         self.value_epochs.setMaximum(1_000_000)
         self.value_epochs.setSingleStep(10)
-        self.value_epochs.setValue(100)
+        self.value_epochs.setValue(50)
         self.value_epochs.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
         layout.addWidget(QLabel("Epochs:"))

@@ -15,6 +15,7 @@ from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE, load
 
 
 class Nie(nn.Module):
+    """Based on: https://arxiv.org/pdf/1808.08914.pdf"""
     def __init__(self, input_channels: int, input_size: Tuple[int, int], output_channels: int):
         super().__init__()
 
@@ -59,7 +60,7 @@ class Nie(nn.Module):
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64+1, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
@@ -74,12 +75,7 @@ class Nie(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.embedding_load = nn.Embedding(
-            round(load.high + 1),  # Number of possible values
-            np.prod(self.output_size_se_1),  # Number of output values
-        )
-
-    def forward(self, x, load: float):
+    def forward(self, x, value_load: float):
         batch_size = x.size()[0]
 
         x = x.float()
@@ -110,7 +106,8 @@ class Nie(nn.Module):
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
 
         # Concatenate embedding along channel dimension.
-        x = torch.concat((x, self.embedding_load(load).reshape((batch_size, 1, *self.output_size_se_1))), dim=1)
+        value_load = (value_load - load.low) / (load.high - load.low)
+        x = x + value_load
 
         # print(x.size())
         x = self.deconvolution_1(x)
@@ -224,11 +221,11 @@ class UNetCnn(nn.Module):
         return x
 
 class AutoencoderCnn(nn.Module):
-    def __init__(self):
+    def __init__(self, input_channels: int, output_channels: int):
         super().__init__()
         
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(INPUT_CHANNELS, 16, kernel_size=9, stride=1, padding=4),
+            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding=4),
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
         )
@@ -271,8 +268,8 @@ class AutoencoderCnn(nn.Module):
             nn.BatchNorm2d(16),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(16, OUTPUT_CHANNELS, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
-            # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv2d(16, output_channels, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
+            # nn.BatchNorm2d(output_channels, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
 
@@ -348,7 +345,7 @@ class AutoencoderCnn(nn.Module):
         
         # x = x.view(x.size(0), -1)
         # x = self.linear(x)
-        x = x.reshape((1, *OUTPUT_SIZE))
+        # x = x.reshape((1, *OUTPUT_SIZE))
 
         return x
 

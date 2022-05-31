@@ -101,6 +101,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model_args = {
         Nie: [INPUT_CHANNELS, INPUT_SIZE[1:3], OUTPUT_CHANNELS],
+        AutoencoderCnn: [INPUT_CHANNELS, OUTPUT_CHANNELS],
     }
     args = model_args[Model]
     model = Model(*args)
