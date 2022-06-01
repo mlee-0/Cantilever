@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
 
 import main
 import networks
@@ -64,13 +64,48 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setCentralWidget(main_widget)
         
-        self.sidebar = QWidget()
-        layout_sidebar = QVBoxLayout(self.sidebar)
-        layout_sidebar.setAlignment(Qt.AlignTop)
+        self.sidebar = self._sidebar()
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(self.sidebar)
+        scroll_area.setFrameShape(QFrame.NoFrame)
         layout_results = QVBoxLayout()
-        main_layout.addWidget(self.sidebar)
-        main_layout.addLayout(layout_results)
+        main_layout.addWidget(scroll_area)
+        main_layout.addLayout(layout_results, stretch=1)
         
+        # divider = QFrame()
+        # divider.setFrameShape(QFrame.HLine)
+        # layout_sidebar.addWidget(divider)
+
+        # Progress bar and stop button.
+        self.label_progress = QLabel()
+        self.label_progress_secondary = QLabel()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.button_stop = QPushButton("Stop")
+        self.button_stop.clicked.connect(self.on_stop)
+        self.button_stop.setEnabled(False)
+        self.button_stop.setToolTip("Stop after current epoch.")
+        layout = QHBoxLayout()
+        layout.addWidget(self.label_progress)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.button_stop)
+        layout_results.addLayout(layout)
+
+        # Plot area.
+        layout_results.addLayout(self._plots())
+
+        # Timer that checkes the queue for information from main thread.
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_queue)
+        self.timer.setInterval(100)
+    
+    def _sidebar(self) -> QWidget:
+        """Return a widget containing fields for adjusting settings."""
+        layout_sidebar = QVBoxLayout()
+        layout_sidebar.setAlignment(Qt.AlignTop)
+        widget = QWidget()
+        widget.setLayout(layout_sidebar)
+
         # Train and test buttons.
         self.button_train = QPushButton("Train")
         self.button_test = QPushButton("Test")
@@ -156,39 +191,13 @@ class MainWindow(QMainWindow):
         buttons[2].setChecked(True)
         layout_sidebar.addLayout(layout)
 
-        # divider = QFrame()
-        # divider.setFrameShape(QFrame.HLine)
-        # layout_sidebar.addWidget(divider)
-
+        # Settings for selecting a subset.
         fields_subset = self._fields_subset()
         layout_sidebar.addWidget(fields_subset)
         fields_subset.setVisible(False)
 
-        # Progress bar and stop button.
-        self.label_progress = QLabel()
-        self.label_progress_secondary = QLabel()
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(False)
-        self.button_stop = QPushButton("Stop")
-        self.button_stop.clicked.connect(self.on_stop)
-        self.button_stop.setEnabled(False)
-        self.button_stop.setToolTip("Stop after current epoch.")
-        layout = QHBoxLayout()
-        layout.addWidget(self.label_progress)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.button_stop)
-        layout_results.addLayout(layout)
+        return widget
 
-        # Plot area.
-        self.figure = Figure()
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        layout_results.addWidget(self.canvas)
-
-        # Timer that checkes the queue for information from main thread.
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_queue)
-        self.timer.setInterval(100)
-    
     def _fields_subset(self) -> QWidget:
         """Return a widget containing fields for specifying options for subsets."""
         widget = QWidget()
@@ -262,6 +271,25 @@ class MainWindow(QMainWindow):
         self.show_subset_options(self.checkbox_use_existing_subset.isChecked())
 
         return widget
+
+    def _plots(self) -> QVBoxLayout:
+        """Return a layout with plots."""
+        # widget = QTabWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0 ,0)
+
+        self.figure_loss = Figure()
+        self.canvas_loss = FigureCanvasQTAgg(self.figure_loss)
+        layout.addWidget(self.canvas_loss)
+
+        self.figure_metrics = Figure()
+        self.canvas_metrics = FigureCanvasQTAgg(self.figure_metrics)
+        # layout.addWidget(self.canvas_metrics)
+
+        # scroll_area = QScrollArea()
+        # scroll_area.setWidget(widget)
+
+        return layout
 
     def on_start(self):
         """Start training or testing."""
@@ -342,8 +370,8 @@ class MainWindow(QMainWindow):
         window.show()
 
     def plot_loss(self, epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss):
-        self.figure.clear()
-        axis = self.figure.add_subplot(111)
+        self.figure_loss.clear()
+        axis = self.figure_loss.add_subplot(1, 1, 1)  # Number of rows, number of columns, index
         
         # Plot previous losses.
         if previous_training_loss and not self.action_toggle_loss.isChecked():
@@ -373,8 +401,15 @@ class MainWindow(QMainWindow):
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
         axis.grid(axis='y')
-        self.canvas.draw()
+        self.canvas_loss.draw()
     
+    def plot_metrics(self):
+        NUMBER_COLUMNS = 2
+        self.figure_metrics.clear()
+        # axis = self.figure_metrics.add_subplot(, NUMBER_COLUMNS, 1)
+
+        self.canvas_metrics.draw()
+
     def check_queue(self):
         while not self.queue.empty():
             info = self.queue.get()
