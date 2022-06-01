@@ -101,6 +101,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model_args = {
         Nie: [INPUT_CHANNELS, INPUT_SIZE[1:3], OUTPUT_CHANNELS],
+        FullyCnn: [INPUT_CHANNELS, OUTPUT_SIZE[1:3], OUTPUT_CHANNELS],
+        UNetCnn: [INPUT_CHANNELS, OUTPUT_CHANNELS],
         AutoencoderCnn: [INPUT_CHANNELS, OUTPUT_CHANNELS],
     }
     args = model_args[Model]
@@ -133,6 +135,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     # Load the samples.
     samples = read_samples(FILENAME_SAMPLES_TRAIN)
+    samples = samples.iloc[:10000, :]
 
     # Create a subset of the entire dataset, or load the previously created subset.
     # try:
@@ -205,9 +208,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 optimizer.step()
 
                 if (batch) % 100 == 0:
-                    print(f"Training batch {batch}/{size_train_dataset} with loss {loss:,.0f}...", end="\r")
+                    print(f"Training batch {batch}/{size_train_dataset} with average loss {loss_epoch/batch:,.0f}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
+                        info_gui["training_loss"] = [*training_loss, loss_epoch/batch]
                         queue.put(info_gui)
             print()
             loss_epoch /= size_train_dataset
@@ -403,7 +407,7 @@ if __name__ == '__main__':
         "nonuniformity": 1.0,
         "training_split": 0.8,
         "train_existing": False,
-        "test_only": not False,
+        "test_only": False,
     }
 
     main(**kwargs)
