@@ -119,7 +119,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
-        channel[y[inside_image], x[inside_image]] = 255 #* (samples[load.name][i] / load.high)
+        channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
         channel = np.flipud(channel)
         channels.append(channel)
         
@@ -133,7 +133,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
             x = x.astype(int)
             y = y.astype(int)
             inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
-            channel[y[inside_image], x[inside_image]] = 255 #* (samples[load.name][i] / load.high)
+            channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
             channel = np.flipud(channel)
             channels.append(channel)
         

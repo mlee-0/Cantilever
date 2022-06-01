@@ -23,26 +23,26 @@ class Nie(nn.Module):
         MOMENTUM = 0.1
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding=4),
+            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding="same"),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
-        self.autoencoder = nn.Sequential(
-            nn.Linear(in_features=10, out_features=5),
-            nn.Linear(in_features=5, out_features=10),
-        )
+        # self.autoencoder = nn.Sequential(
+        #     nn.Linear(in_features=10, out_features=5),
+        #     nn.Linear(in_features=5, out_features=10),
+        # )
         self.se_1 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
             nn.ReLU(inplace=True),
@@ -60,17 +60,17 @@ class Nie(nn.Module):
             nn.Sigmoid(),
         )
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=(2,2), padding=(2,3), output_padding=(1,1)),
+            nn.ConvTranspose2d(64, 32, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=(2,2), padding=(1,2), output_padding=(0,1)),
+            nn.ConvTranspose2d(32+32*0, 16, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0)),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(16, output_channels, kernel_size=9, stride=1, padding=4),  # output_padding=(0,0)),
+            nn.Conv2d(16+16*0, output_channels, kernel_size=9, stride=1, padding="same"),
             # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -79,13 +79,9 @@ class Nie(nn.Module):
         batch_size = x.size()[0]
 
         x = x.float()
-        # print(x.size())
-        x = self.convolution_1(x)
-        # print(x.size())
-        x = self.convolution_2(x)
-        # print(x.size())
-        x = self.convolution_3(x)
-        # print(x.size())
+        conv_1 = self.convolution_1(x)
+        conv_2 = self.convolution_2(conv_1)
+        x = self.convolution_3(conv_2)
         
         # x = self.autoencoder(x)
         
@@ -105,17 +101,19 @@ class Nie(nn.Module):
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
 
-        # Concatenate embedding along channel dimension.
-        value_load = (value_load - load.low) / (load.high - load.low)
-        x = x + value_load
+        # Add load value.
+        # value_load = (value_load - load.low) / (load.high - load.low)
+        # x = x + value_load
 
-        # print(x.size())
         x = self.deconvolution_1(x)
-        # print(x.size())
-        x = self.deconvolution_2(x)
-        # print(x.size())
-        x = self.deconvolution_3(x)
-        # print(x.size())
+        x = self.deconvolution_2(conv_2[..., 1:-1, 2:-2] + x)
+        x = self.deconvolution_3(conv_1[..., 2:-3, 5:-5] + x)
+        # x = self.deconvolution_2(torch.cat((conv_2[..., 1:-1, 2:-2], x), dim=1))
+        # x = self.deconvolution_3(torch.cat((conv_1[..., 2:-3, 5:-5], x), dim=1))
+        # x = self.deconvolution_1(x)
+        # x = self.deconvolution_2(x)
+        # x = self.deconvolution_3(x)
+    
         return x
 
 # Return a sequence of layers related to convolution.
@@ -135,89 +133,84 @@ def deconvolution(in_channels, out_channels, **kwargs):
         )
 
 class FullyCnn(nn.Module):
-    def __init__(self, input_channels: int):
+    def __init__(self, input_channels: int, output_size: Tuple[int, int], output_channels: int):
         super().__init__()
-        self.convolution_1 = convolution(
-            in_channels=input_channels, out_channels=4, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_2 = convolution(
-            in_channels=4, out_channels=8, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_3 = convolution(
-            in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_4 = convolution(
-            in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1,
-            )
-        self.convolution_5 = convolution(
-            in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1,
-            )
-        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
-        self.linear = nn.Linear(in_features=288, out_features=np.prod(OUTPUT_SIZE))
+        self.output_size = output_size
+        self.output_channels = output_channels
+
+        self.convolution_1 = nn.Sequential(
+            nn.Conv2d(input_channels, 16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+        )
+        self.convolution_2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+        )
+        # self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
+        self.linear = nn.Linear(in_features=32*5*10, out_features=np.prod(output_size))
 
     def forward(self, x):
         x = x.float()
-        # Convolution.
+
         x = self.convolution_1(x)
-        x = self.pooling(x)
         x = self.convolution_2(x)
-        x = self.pooling(x)
-        x = self.convolution_3(x)
-        x = self.pooling(x)
-        # x = self.convolution_4(x)
-        # x = self.pooling(x)
-        # x = self.convolution_5(x)
-        # x = self.pooling(x)
-        # Fully connected.
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
-        x = x.reshape(-1, *OUTPUT_SIZE)
-        return x
+        x = self.linear(x.view(x.shape[0], -1))
+        
+        return x.reshape((x.shape[0], self.output_channels, *self.output_size))
 
 class UNetCnn(nn.Module):
     def __init__(self, input_channels: int, output_channels: int):
         super().__init__()
-        self.convolution_1 = convolution(
-            in_channels=input_channels, out_channels=8, kernel_size=3, stride=3, padding=1,
-            )
-        self.convolution_2 = convolution(
-            in_channels=8, out_channels=16, kernel_size=3, stride=3, padding=1,
-            )
-        self.deconvolution_1 = deconvolution(
-            in_channels=16, out_channels=8, kernel_size=7, stride=3, padding=1,
-            )
-        self.deconvolution_2 = deconvolution(
-            in_channels=8, out_channels=4, kernel_size=7, stride=3, padding=1,
-            )
-        self.deconvolution_3 = deconvolution(
-            in_channels=4, out_channels=output_channels, kernel_size=7, stride=3, padding=1,
-            )
-        self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
-        self.unpooling = nn.MaxUnpool2d(kernel_size=2, stride=2)
 
-        self.linear = nn.Linear(in_features=11342, out_features=np.prod(OUTPUT_SIZE))
+        # Preserves height and length dimensions.
+        self.encoding_1 = self.two_convolutions(input_channels, 16)
+        # Reduces both the height and width by half.
+        self.downsize_1 = nn.MaxPool2d(kernel_size=4, stride=2, padding=1)
+        # Preserves height and length dimensions.
+        self.encoding_2 = self.two_convolutions(16, 32)
+        # Reduces both the height and width by half.
+        self.downsize_2 = nn.MaxPool2d(kernel_size=4, stride=2, padding=1)
+        # Preserves height and length dimensions.
+        self.encoding_3 = self.two_convolutions(32, 64)
+
+        self.upsize_2 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=3, stride=2, padding=(2,3), output_padding=(1,1))
+        self.decoding_2 = self.two_convolutions(32*2, 32)
+        self.upsize_1 = nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=3, stride=2, padding=(1,2), output_padding=(0,1))
+        self.decoding_1 = self.two_convolutions(16*2, 16)
+
+        self.final_convolution = nn.Conv2d(in_channels=16, out_channels=output_channels, kernel_size=1, stride=1, padding="same")
+
+    def two_convolutions(self, in_channels: int, out_channels: int) -> nn.Sequential:
+        """Return a Sequential with two convolution layers that preserve the height and length dimensions."""
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
     def forward(self, x):
         x = x.float()
-        # Convolution.
-        x = self.convolution_1(x)
-        size_1 = x.size()
-        x, indices_1 = self.pooling(x)
-        x = self.convolution_2(x)
-        size_2 = x.size()
-        x, indices_2 = self.pooling(x)
-        # Deconvolution.
-        # x = self.unpooling(x, indices_2, output_size=size_2)
-        x = self.deconvolution_1(x)
-        # x = self.unpooling(x, indices_1, output_size=size_1)
-        x = self.deconvolution_2(x)
-        x = self.deconvolution_3(x)
 
-        # Fully connected.
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
-
-        x = x.reshape(-1, *OUTPUT_SIZE)
+        encoding_1 = self.encoding_1(x)
+        x = self.downsize_1(encoding_1)
+        encoding_2 = self.encoding_2(x)
+        x = self.downsize_2(encoding_2)
+        x = self.encoding_3(x)
+        upsize_2 = self.upsize_2(x)
+        x = self.decoding_2(torch.cat(
+            (encoding_2[..., 1:-1, 2:-2], upsize_2), dim=1
+        ))
+        upsize_1 = self.upsize_1(x)
+        x = self.decoding_1(torch.cat(
+            (encoding_1[..., 2:-3, 5:-5], upsize_1), dim=1
+        ))
+        x = self.final_convolution(x)
+        
         return x
 
 class AutoencoderCnn(nn.Module):
