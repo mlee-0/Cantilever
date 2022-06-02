@@ -4,6 +4,7 @@ Train and test the model.
 
 
 import os
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,25 +26,46 @@ LABEL_FAKE = 0
 
 
 class DedDataset(Dataset):
-    """Dataset that gets input and label images during training."""
-    def __init__(self, dataset: str):
-        print(f"Creating {dataset} dataset...")
+    def __init__(self, dataset: str, experiment_number: int):
+        if experiment_number == 1:
+            folder_labels = os.path.join(FOLDER_ROOT, "Exp#1_(sheet#1)")
+            total_samples = 81
+            sheet_index = 0
+            validate_indices = range(0, total_samples, 3)
+            # Number of unique sets of input parameters (product of numbers of unique values for each individual parameter found in the dataset).
+            self.embedding_size = 4 * 3 * 4
+        elif experiment_number == 2:
+            folder_labels = os.path.join(FOLDER_ROOT, "Exp#2_(sheet#2)")
+            total_samples = 192
+            sheet_index = 1
+            validate_indices = range(0, total_samples, 4)
+            self.embedding_size = 4 * 4 * 3
 
         if dataset == "train":
-            sample_indices = [
-                _ for _ in range(TOTAL_SAMPLES)
-                if _ not in VALIDATE_SAMPLE_INDICES and _ not in TEST_SAMPLE_INDICES
-            ]
+            sample_indices = [_ for _ in range(total_samples) if _ not in validate_indices]
         elif dataset == "validate":
-            sample_indices = VALIDATE_SAMPLE_INDICES
-        elif dataset == "test":
-            sample_indices = TEST_SAMPLE_INDICES
+            sample_indices = [_ for _ in range(total_samples) if _ in validate_indices] 
         else:
             print(f"Invalid dataset name: {dataset}")
-            
-        self.inputs = read_inputs(FILENAME_DATASET, SHEET_INDEX, sample_indices=sample_indices)
-        self.labels = read_labels(FOLDER_LABELS, sample_indices=sample_indices)
         
+        self.inputs = read_inputs("Dataset_experiments_031722.xlsx", sheet_index=sheet_index, sample_indices=sample_indices)
+
+        # Load previously generated label images.
+        files = glob.glob(os.path.join(folder_labels, "*.pickle"))
+        files = [_ for _ in files if dataset in _]
+        if files:
+            file = files[0]
+            with open(file, "rb") as f:
+                self.labels = pickle.load(f)
+            print(f"Loaded label images from {file}.")
+        # Create label images and save them as a pickle file.
+        else:
+            self.labels = read_labels(folder_labels, sample_indices=sample_indices)
+            file = f"{dataset}_labels.pickle"
+            with open(os.path.join(folder_labels, file), "wb") as f:
+                pickle.dump(self.labels, f)
+            print(f"Saved label images to {file}.")
+
         # Perform data augmentation.
         augmented_labels = []
         for label in self.labels:
@@ -91,19 +113,6 @@ def load(filepath: str, device: str, models: list, optimizers: list, loss_histor
     epoch = checkpoint["epoch"] + 1
     
     return epoch
-
-def create_dataloaders(batch_size: int) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """Create and return the DataLoader objects for the training, validation, and testing datasets."""
-
-    train_dataset = DedDataset(dataset="train")
-    validate_dataset = DedDataset(dataset="validate")
-    test_dataset = DedDataset(dataset="test")
-
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, shuffle=False)
-    
-    return train_dataloader, validate_dataloader, test_dataloader
 
 def initialize_weights(model: nn.Module):
     """Custom weight initialization."""
@@ -170,12 +179,12 @@ def train_gan(device: str, model_cnn: nn.Module, model_generator: nn.Module, mod
 
         # Train on the training dataset.
         for batch, (data, label) in enumerate(train_dataloader, 1):
-            # Add random noise to label images for the first # epochs to improve stability of GAN training.
-            EPOCHS_RANDOM_NOISE = 50
-            if epoch <= EPOCHS_RANDOM_NOISE:
-                std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
-                mean = 0.0
-                label = label + torch.randn(label.size(), device=device) * std + mean
+            # # Add random noise to label images for the first # epochs to improve stability of GAN training.
+            # EPOCHS_RANDOM_NOISE = 50
+            # if epoch <= EPOCHS_RANDOM_NOISE:
+            #     std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
+            #     mean = 0.0
+            #     label = label + torch.randn(label.size(), device=device) * std + mean
             
             train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_cnn, optimizer_generator, optimizer_discriminator, loss_function_cnn, loss_function_gan)
 
@@ -272,10 +281,10 @@ def train_gan_epoch(data, label, device, model_cnn, model_generator, model_discr
     label = label.to(device)
     label = label.float()
 
-    # Reset gradients.
-    optimizer_cnn.zero_grad()
-    optimizer_generator.zero_grad()
-    optimizer_discriminator.zero_grad()
+    # # Reset gradients.
+    # optimizer_cnn.zero_grad()
+    # optimizer_generator.zero_grad()
+    # optimizer_discriminator.zero_grad()
 
     # Train the discriminator with an all-real batch.
     model_discriminator.zero_grad()
@@ -447,24 +456,27 @@ def test_gan_epoch(data, label, device, model_cnn, model_generator, model_discri
 #         plt.grid(axis='y')
 #         plt.show()
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, train_existing=None, test_only=False, queue=None, queue_from_gui=None):
+def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, train_existing=None, test_only=False, queue=None, queue_from_gui=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
     # Create the datasets.
-    train_dataloader, validate_dataloader, test_dataloader = create_dataloaders(batch_size)
-    size_test_dataset = len(test_dataloader)
+    if not test_only:
+        train_dataset = DedDataset("train", experiment_number)
+        validate_dataset = DedDataset("validate", experiment_number)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize the models.
     LATENT_SIZE = 100
     GENERATOR_FEATURES = 64
     DISCRIMINATOR_FEATURES = 64
 
-    model_cnn = FullyCnn(input_channels=INPUT_CHANNELS, output_size=LATENT_SIZE)
-    model_generator = GanGenerator(input_channels=LATENT_SIZE, number_features=GENERATOR_FEATURES, output_channels=OUTPUT_CHANNELS)
-    model_discriminator = GanDiscriminator(number_features=DISCRIMINATOR_FEATURES, output_channels=OUTPUT_CHANNELS)
+    model_cnn = GanGenerator(1, 1, 1, 1) #FullyCnn(input_channels=INPUT_CHANNELS, output_size=LATENT_SIZE)
+    model_generator = GanGenerator(input_channels=LATENT_SIZE, number_features=GENERATOR_FEATURES, output_channels=OUTPUT_CHANNELS, embedding_size=train_dataset.embedding_size)
+    model_discriminator = GanDiscriminator(number_features=DISCRIMINATOR_FEATURES, output_channels=OUTPUT_CHANNELS, embedding_size=train_dataset.embedding_size)
 
     model_cnn.to(device)
     model_generator.to(device)
@@ -567,11 +579,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
 if __name__ == '__main__':
     # Training hyperparameters.
-    EPOCHS = 30
-    LEARNING_RATE = 1e-7
+    EPOCHS = 10
+    LEARNING_RATE = 1e-3
     BATCH_SIZE = 1
-    Model = Nie
+    Model = None
 
     TRAINING_SPLIT = 0.8
 
-    main(EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)
+    dataset = DedDataset
+    experiment_number = 2
+
+    main(dataset, experiment_number, EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)

@@ -34,37 +34,8 @@ POWDER_VALUE_RANGE = (2, 8)
 FEED_RATE_RANGE = (700, 900)
 
 # Folders and files.
-experiment_number = 2
-
 FOLDER_ROOT = 'DED' if not GOOGLE_COLAB else 'drive/My Drive/Colab Notebooks'
 FOLDER_RESULTS = os.path.join(FOLDER_ROOT, "Results")
-FILENAME_DATASET = 'Dataset_experiments_031722.xlsx'
-if experiment_number == 1:
-    FOLDER_LABELS = os.path.join(FOLDER_ROOT, 'Exp#1_(sheet#1)')
-    SHEET_INDEX = 0
-    TOTAL_SAMPLES = 81
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 3*3)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 3*3)
-
-    # Number of unique sets of input parameters (product of numbers of unique values for each individual parameter found in the dataset).
-    EMBEDDING_SIZE = 4  #4 * 3 * 4
-elif experiment_number == 2:
-    FOLDER_LABELS = os.path.join(FOLDER_ROOT, 'Exp#2_(sheet#2)')
-    SHEET_INDEX = 1
-    TOTAL_SAMPLES = 192
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 4)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 4)
-
-    EMBEDDING_SIZE = 4 * 4 * 3
-elif experiment_number == "faces":
-    FOLDER_LABELS = os.path.join(FOLDER_ROOT, "Faces")
-    TOTAL_SAMPLES = 47_011
-    VALIDATE_SAMPLE_INDICES = range(0, TOTAL_SAMPLES, 10)
-    TEST_SAMPLE_INDICES = range(1, TOTAL_SAMPLES, 10)
-    
-    EMBEDDING_SIZE = 2
-else:
-    print(f"Invalid experiment number: {experiment_number}")
 
 # Colors for plots.
 class Colors:
