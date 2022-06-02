@@ -108,18 +108,18 @@ def _read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = Non
         images.append(image.astype(np.uint8))
     return images
 
-def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None) -> np.ndarray:
+def read_inputs(filename: str, sheet_index: int, sample_indices: List[int] = None) -> np.ndarray:
     """Return a Series of class labels for each set of input parameters."""
     print("Reading inputs...")
-    if experiment_number == "faces":
-        return np.repeat([0, 1], TOTAL_SAMPLES//2)
+    # if experiment_number == "faces":
+    #     return np.array([*([0]*23243), *([1]*23766)])
     
-    data = pd.read_excel(os.path.join(FOLDER_ROOT, filename), sheet_name=sheetindex, usecols=(1, 2, 3))
+    data = pd.read_excel(os.path.join(FOLDER_ROOT, filename), sheet_name=sheet_index, usecols=(1, 2, 3))
     value_ranges = (LASER_POWER_RANGE, POWDER_VALUE_RANGE, FEED_RATE_RANGE)
 
-    unique_values = [sorted(pd.unique(data.iloc[:, column])) for column in range(data.shape[1])]
-    # unique_labels = np.empty([len(_) for _ in unique_values], int)
-    # unique_labels = np.arange(unique_labels.size).reshape(unique_labels.shape)
+    data_unique = data.drop_duplicates()
+    labels_unique = {tuple(data_unique.iloc[i, :]): i for i in range(len(data_unique))}
+    print(labels_unique)
 
     if not sample_indices:
         sample_indices = range(len(data))
@@ -127,15 +127,13 @@ def read_inputs(filename: str, sheetindex: int, sample_indices: List[int] = None
 
     labels = np.empty((number_samples,), int)
     for i, index in enumerate(sample_indices):
-        labels[i] = unique_values[0].index(data.iloc[index, 0])
-        # TODO: Make generic (not just 3 columns)
-        # labels[i] = unique_labels[
-        #     unique_values[0].index(data.iloc[index, 0]),
-        #     unique_values[1].index(data.iloc[index, 1]),
-        #     unique_values[2].index(data.iloc[index, 2]),
-        # ]
-    
-    labels = np.repeat([1, 2], number_samples//2)
+        # if experiment_number == "faces":
+        #     labels[i] = data.iloc[index, 0]
+        # else:
+        #     # 
+        #     labels[i] = unique_values[0].index(data.iloc[index, 0])
+        
+        labels[i] = labels_unique[tuple(data.iloc[index, :])]
     
     return labels
 

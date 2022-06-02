@@ -189,7 +189,7 @@ def train_gan(device: str, model_cnn: nn.Module, model_generator: nn.Module, mod
             train_gan_epoch(data, label, device, model_cnn, model_generator, model_discriminator, optimizer_cnn, optimizer_generator, optimizer_discriminator, loss_function_cnn, loss_function_gan)
 
             # Periodically display progress.
-            if (batch) % 5 == 0:
+            if batch % 5 == 0:
                 print(f"Training batch {batch}/{size_train_dataset}...", end="\r")
                 if queue:
                     queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
@@ -210,7 +210,7 @@ def train_gan(device: str, model_cnn: nn.Module, model_generator: nn.Module, mod
                 cumulative_loss_generator += loss_generator
                 cumulative_loss_discriminator += loss_discriminator
 
-                if (batch) % 5 == 0:
+                if batch % 5 == 0:
                     print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
                     if queue:
                         queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
@@ -225,7 +225,7 @@ def train_gan(device: str, model_cnn: nn.Module, model_generator: nn.Module, mod
         print(f"Average loss: {loss_cnn:,.2f} (CNN), {loss_generator:,.2f} (generator), {loss_discriminator:,.2f} (discriminator)")
 
         # Save the model parameters periodically.
-        if (epoch) % 1 == 0:
+        if epoch % 1 == 0:
             save(
                 FILEPATH_MODEL,
                 epoch,
@@ -493,37 +493,37 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
     model_generator.train(False)
     model_discriminator.train(False)
 
-    # Test on the testing dataset.
-    test_labels = []
+    # Test by generating images for the specified classes.
     test_outputs = []
     with torch.no_grad():
-        for batch, (data, label) in enumerate(test_dataloader, 1):
-            data = data.to(device)
-            label = label.to(device)
+        SAMPLES_PER_CLASS = 5
+        classes = np.arange(train_dataset.embedding_size)
+        classes = np.repeat(classes, SAMPLES_PER_CLASS)
+        for batch, data in enumerate(classes, 1):
+            data = torch.tensor([data], dtype=int)
+            latent = torch.randn(1, LATENT_SIZE, 1, 1, device=device)  # model_cnn(data)
 
-            latent = torch.randn(label.size(0), LATENT_SIZE, 1, 1, device=device)  # model_cnn(data)
             test_output = model_generator(latent, data)
             test_output = test_output[0, :, ...].cpu().detach().numpy()
-            label = label[0, :, ...].cpu().numpy()
-            test_labels.append(label)
             test_outputs.append(test_output)
 
             # Scale the generated image and label from [-1, 1] to [0, 255], if training the GAN.
             test_output = (test_output + 1) / 2 * 255
-            label = (label + 1) / 2 * 255
+
+            # Add channels if it only has 1 channel.
+            if test_output.shape[0] == 1:
+                test_output = np.concatenate([test_output] * 3, axis=0)
             
-            # Vertically concatenate the label image and model output and write the combined image to a file.
-            image = np.vstack((label.transpose((1, 2, 0)), test_output.transpose((1, 2, 0))))
-            if OUTPUT_CHANNELS == 1:
-                image = np.dstack((image,)*3)
-            write_image(image,
-                os.path.join(FOLDER_RESULTS, f'{batch:03d}.png'),
-                )
+            # Write the image to a file.
+            write_image(
+                test_output.transpose((1, 2, 0)),
+                os.path.join(FOLDER_RESULTS, f'{batch:03d}_({data.item()}).png'),
+            )
             
             if queue:
-                queue.put([None, (batch, size_test_dataset), None, None, None])
+                queue.put([None, (batch, len(classes)), None, None, None])
     
-    print(f"Wrote {size_test_dataset} test images in {FOLDER_RESULTS}.")
+    print(f"Wrote {batch} test images in {FOLDER_RESULTS}.")
 
     # # Calculate and plot evaluation metrics.
     # if not queue:
