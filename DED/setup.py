@@ -149,18 +149,22 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
     sample_size = len(filenames)
 
     labels = []
-    for filename in filenames:
+    for i, filename in enumerate(filenames):
         with Image.open(filename) as image:
-            # Resize image.
-            image = image.resize((OUTPUT_SIZE[2], OUTPUT_SIZE[1]))
+            # # Resize image.
+            # image = image.resize((OUTPUT_SIZE[2], OUTPUT_SIZE[1]))
 
             # # Blur to reduce noise.
             # image = image.filter(ImageFilter.GaussianBlur(radius=15.0))
 
             # Convert to a numpy array.
-            array = np.asarray(image, dtype=np.uint8).transpose((2, 0, 1))
-            # Convert to grayscale.
-            array = np.mean(array, axis=0)
+            if len(image.getbands()) == 1:
+                array = np.asarray(image, dtype=np.uint8).transpose()
+                array = np.expand_dims(array, axis=0)
+            else:
+                array = np.asarray(image, dtype=np.uint8).transpose((2, 0, 1))
+                # Convert to grayscale.
+                array = np.mean(array, axis=0)
             
             # # Perform k-means clustering.
             # k = 3
@@ -176,10 +180,14 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
 
             # array = array * 255
 
-            # Scale values to [-1, 1]. Required for use with GAN, where the generator outputs images in [-1, 1].
-            array = array / 255 * 2 - 1
+            # # Scale values to [-1, 1]. Required for use with GAN, where the generator outputs images in [-1, 1].
+            # array = array / 255 * 2 - 1
 
-            labels.append(array.reshape(OUTPUT_SIZE))
+            # labels.append(array.reshape(OUTPUT_SIZE))
+            labels.append(array)
+        
+        print(f"Reading label {i+1}...", end="\r")
+    print()
 
     return labels
 

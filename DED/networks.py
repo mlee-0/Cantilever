@@ -30,86 +30,54 @@ def deconvolution(in_channels, out_channels, **kwargs):
         )
 
 
-class FullyCnn(nn.Module):
-    def __init__(self, input_channels: int, output_size: int):
+class ClassifierCnn(nn.Module):
+    def __init__(self, input_channels: int, number_classes: int):
         super().__init__()
-        self.output_size = output_size
 
-        PADDING_MODE = "replicate"
-        KERNEL_SIZE = 3
-        STRIDE = 2
-        PADDING = 1
-
-        self.convolution = nn.Sequential(
-            nn.Conv2d(in_channels=input_channels * 1, out_channels=input_channels * 2, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING, padding_mode=PADDING_MODE),
-            nn.BatchNorm2d(input_channels * 2),
+        self.convolution_1 = nn.Sequential(
+            nn.Conv2d(in_channels=input_channels, out_channels=16, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
-
-            nn.Conv2d(in_channels=input_channels * 2, out_channels=input_channels * 4, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING, padding_mode=PADDING_MODE),
-            nn.BatchNorm2d(input_channels * 4),
+        )
+        self.convolution_2 = nn.Sequential(
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
-
-            nn.Conv2d(in_channels=input_channels * 4, out_channels=input_channels * 8, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING, padding_mode=PADDING_MODE),
-            nn.BatchNorm2d(input_channels * 8),
+        )
+        self.convolution_3 = nn.Sequential(
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
-            
-            # nn.Conv2d(in_channels=input_channels * 8, out_channels=input_channels * 16, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING, padding_mode=PADDING_MODE),
-            # nn.BatchNorm2d(input_channels * 16),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
-            
-            # nn.Conv2d(in_channels=input_channels * 16, out_channels=input_channels * 32, kernel_size=KERNEL_SIZE, stride=STRIDE, padding=PADDING, padding_mode=PADDING_MODE),
-            # nn.BatchNorm2d(input_channels * 32),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
+        )
+        self.convolution_4 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
+        )
+        self.convolution_5 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
         )
 
-        self.linear = nn.Linear(in_features=24, out_features=output_size)
-
-        # self.convolution_1 = convolution(
-        #     in_channels=input_channels, out_channels=input_channels*2, kernel_size=3, stride=2, padding=1,
-        #     )
-        # self.convolution_2 = convolution(
-        #     in_channels=input_channels*2, out_channels=input_channels*4, kernel_size=3, stride=2, padding=1,
-        #     )
-        # self.convolution_3 = convolution(
-        #     in_channels=input_channels*4, out_channels=input_channels*8, kernel_size=3, stride=2, padding=1,
-        #     )
-        # self.convolution_4 = convolution(
-        #     in_channels=input_channels*8, out_channels=input_channels*16, kernel_size=3, stride=2, padding=1,
-        #     )
-        # self.convolution_5 = convolution(
-        #     in_channels=input_channels*16, out_channels=input_channels*32, kernel_size=3, stride=2, padding=1,
-        #     )
-        # self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False)
-        # self.linear = nn.Linear(in_features=288, out_features=output_size)
+        self.linear = nn.Linear(in_features=256*7*7, out_features=number_classes)
+        # self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = x.float()
 
-        x = self.convolution(x)
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
-        x = x.reshape(-1, self.output_size, 1, 1)
-
-        # # Convolution.
-        # x = self.convolution_1(x)
-        # x = self.pooling(x)
-        # x = self.convolution_2(x)
-        # x = self.pooling(x)
-        # x = self.convolution_3(x)
-        # x = self.pooling(x)
-        # # x = self.convolution_4(x)
-        # # x = self.pooling(x)
-        # # x = self.convolution_5(x)
-        # # x = self.pooling(x)
-        # # Fully connected.
-        # x = x.view(x.size(0), -1)
-        # x = self.linear(x)
-        # x = x.reshape(-1, *OUTPUT_SIZE)
+        x = self.convolution_1(x)
+        x = self.convolution_2(x)
+        x = self.convolution_3(x)
+        x = self.convolution_4(x)
+        x = self.convolution_5(x)
+        x = self.linear(x.view(x.shape[0], -1))
+        # x = self.softmax(x)
 
         return x
 
