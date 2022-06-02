@@ -23,7 +23,7 @@ from setup import *
 
 
 # Model parameters file path.
-FILEPATH_MODEL = os.path.join(FOLDER_ROOT, 'model.pth')
+FILEPATH_MODEL = os.path.join(FOLDER_ROOT, "model.pth")
 
 
 class CantileverDataset(Dataset):
@@ -66,16 +66,10 @@ class CantileverDataset(Dataset):
             np.copy(self.labels[index, ...]),
         )
 
-def save(epoch, model, optimizer, training_loss, validation_loss) -> None:
+def save(filepath: str, **kwargs) -> None:
     """Save model parameters to a file."""
-    torch.save({
-        "epoch": epoch,
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "training_loss": training_loss,
-        "validation_loss": validation_loss,
-    }, FILEPATH_MODEL)
-    print(f'Saved model parameters to {FILEPATH_MODEL}.')
+    torch.save(kwargs, filepath)
+    print(f"Saved model parameters to {filepath}.")
 
 def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
@@ -208,7 +202,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 optimizer.step()
 
                 if (batch) % 100 == 0:
-                    print(f"Training batch {batch}/{size_train_dataset} with average loss {loss_epoch/batch:,.0f}...", end="\r")
+                    print(f"Training batch {batch}/{size_train_dataset} with average loss {loss_epoch/batch:,.2f}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
                         info_gui["training_loss"] = [*training_loss, loss_epoch/batch]
@@ -216,7 +210,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             print()
             loss_epoch /= size_train_dataset
             training_loss.append(loss_epoch)
-            print(f"Average training loss: {loss_epoch:,.0f}")
+            print(f"Average training loss: {loss_epoch:,.2f}")
 
             # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
             model.train(False)
@@ -235,11 +229,18 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             print()
             loss_epoch /= size_validation_dataset
             validation_loss.append(loss_epoch)
-            print(f"Average validation loss: {loss_epoch:,.0f}")
+            print(f"Average validation loss: {loss_epoch:,.2f}")
 
             # Save the model parameters periodically.
             if (epoch) % 5 == 0:
-                save(epoch, model, optimizer, [*previous_training_loss, *training_loss], [*previous_validation_loss, *validation_loss])
+                save(
+                    FILEPATH_MODEL,
+                    epoch=epoch,
+                    model_state_dict=model.state_dict(),
+                    optimizer_state_dict=optimizer.state_dict(),
+                    training_loss=[*previous_training_loss, *training_loss],
+                    validation_loss=[*previous_validation_loss, *validation_loss],
+                )
             
             if queue:
                 info_gui["progress_epoch"] = (epoch, epochs[-1])
@@ -255,7 +256,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                         break
         
         # Save the model parameters.
-        save(epoch, model, optimizer, [*previous_training_loss, *training_loss], [*previous_validation_loss, *validation_loss])
+        save(
+            FILEPATH_MODEL,
+            epoch=epoch,
+            model_state_dict=model.state_dict(),
+            optimizer_state_dict=optimizer.state_dict(),
+            training_loss=[*previous_training_loss, *training_loss],
+            validation_loss=[*previous_validation_loss, *validation_loss],
+        )
         
         # Plot the loss history.
         if not queue:
@@ -285,6 +293,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     ])
     # Test on the testing dataset.
     model.train(False)
+    loss = 0
     labels = []
     outputs = []
     with torch.no_grad():
@@ -292,6 +301,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             input_image = input_image.to(device)
             label_image = label_image.to(device)
             output = model(input_image, load)
+            
+            loss += loss_function(output, label_image.float()).item()
             output = output[0, :, ...].cpu().detach().numpy()
             label_image = label_image[0, :, ...].cpu().numpy()
             labels.append(label_image)
@@ -326,6 +337,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 info_gui["progress_epoch"] = (0, 0)
                 info_gui["progress_batch"] = (batch, size_test_dataset)
                 queue.put(info_gui)
+    loss /= size_test_dataset
+    print(f"Average testing loss: {loss:,.2f}")
     
     print(f"Wrote {size_test_dataset} test images in {folder_results}.")
 
@@ -406,8 +419,8 @@ if __name__ == '__main__':
         "bins": 1,
         "nonuniformity": 1.0,
         "training_split": 0.8,
-        "train_existing": False,
-        "test_only": False,
+        "train_existing": not False,
+        "test_only": not False,
     }
 
     main(**kwargs)

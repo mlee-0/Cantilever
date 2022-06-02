@@ -101,18 +101,17 @@ class Nie(nn.Module):
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
 
-        # Add load value.
+        # # Add load value.
         # value_load = (value_load - load.low) / (load.high - load.low)
         # x = x + value_load
 
         x = self.deconvolution_1(x)
-        x = self.deconvolution_2(conv_2[..., 1:-1, 2:-2] + x)
-        x = self.deconvolution_3(conv_1[..., 2:-3, 5:-5] + x)
+        # x = self.deconvolution_2(conv_2[..., 1:-1, 2:-2] + x)
+        # x = self.deconvolution_3(conv_1[..., 2:-3, 5:-5] + x)
         # x = self.deconvolution_2(torch.cat((conv_2[..., 1:-1, 2:-2], x), dim=1))
         # x = self.deconvolution_3(torch.cat((conv_1[..., 2:-3, 5:-5], x), dim=1))
-        # x = self.deconvolution_1(x)
-        # x = self.deconvolution_2(x)
-        # x = self.deconvolution_3(x)
+        x = self.deconvolution_2(x)
+        x = self.deconvolution_3(x)
     
         return x
 

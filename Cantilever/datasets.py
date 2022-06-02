@@ -195,10 +195,12 @@ def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_si
     files = glob.glob(os.path.join(folder, "*.pickle"))
     files = [_ for _ in files if str(len(samples)) in _]
     if files:
-        with open(files[0], "rb") as f:
+        file = files[0]
+        with open(file, "rb") as f:
             labels = pickle.load(f)
+        print(f"Loaded label images from {file}.")
     else:
-        labels = generate_label_images(samples, folder, is_3d, pickle_images=True)
+        labels = generate_label_images(samples, folder, is_3d)
     maxima = np.array([np.max(_) for _ in labels])
     actual_raw_size = len(maxima)
 
