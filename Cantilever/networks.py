@@ -1,6 +1,6 @@
-'''
+"""
 Networks with different architectures.
-'''
+"""
 
 import inspect
 import math
@@ -10,8 +10,6 @@ from typing import Tuple
 import numpy as np
 import torch
 from torch import nn
-
-from setup import INPUT_CHANNELS, INPUT_SIZE, OUTPUT_CHANNELS, OUTPUT_SIZE, load
 
 
 class Nie(nn.Module):
@@ -75,7 +73,7 @@ class Nie(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-    def forward(self, x, value_load: float):
+    def forward(self, x, value_load: float = None):
         batch_size = x.size()[0]
 
         x = x.float()
@@ -101,9 +99,9 @@ class Nie(nn.Module):
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
 
-        # # Add load value.
-        # value_load = (value_load - load.low) / (load.high - load.low)
-        # x = x + value_load
+        # Add load value.
+        if value_load is not None:
+            x = x + value_load
 
         x = self.deconvolution_1(x)
         # x = self.deconvolution_2(conv_2[..., 1:-1, 2:-2] + x)

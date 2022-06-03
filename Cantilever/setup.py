@@ -7,7 +7,8 @@ import colorsys
 from dataclasses import dataclass
 import glob
 import os
-from typing import List, Tuple
+import pickle
+from typing import Any, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,9 +22,6 @@ except ModuleNotFoundError:
 else:
     GOOGLE_COLAB = True
     drive.mount("/content/drive")
-
-# Use the 3D FEA dataset.
-is_3d = not True
 
 @dataclass
 class Parameter:
@@ -61,13 +59,14 @@ KEY_NODES_WIDTH = "Nodes Width"
 # Folders and files.
 FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
 
-# Size of input images (channel-height-width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_CHANNELS = 4 if is_3d else 2
-INPUT_SIZE = (INPUT_CHANNELS, round(height.high / height.step), round(length.high / length.step))
-assert (INPUT_SIZE[1] / INPUT_SIZE[2]) == (height.high / length.high), "Input image size must match aspect ratio of cantilever: {height.high}:{length.high}."
-# Size of output images (channel-height-width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
-OUTPUT_CHANNELS = 15 if is_3d else 1
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 15, 30)
+# Size of input images (height, width). Must have the same aspect ratio as the largest possible cantilever geometry.
+INPUT_SIZE = (round(height.high / height.step), round(length.high / length.step))
+# Number of nodes to create in each direction in FEA.
+NODES_X = 30
+NODES_Y = 15
+NODES_Z = 15
+# Size of output images (height, width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
+OUTPUT_SIZE = (NODES_Y, NODES_X)
 
 
 def plot_histogram(values: np.ndarray, title=None) -> None:
@@ -77,27 +76,33 @@ def plot_histogram(values: np.ndarray, title=None) -> None:
         plt.title(title)
     plt.show()
 
-def split_training_validation(number_samples: int, training_split: float) -> Tuple[int, int]:
-    """Return the number of samples in the training and validation datasets for the given ratio."""
-    assert 0 < training_split < 1, f"Invalid training split: {training_split}."
-    training_size = round(training_split * number_samples)
-    validation_size = round((1 - training_split) * number_samples)
-    assert training_size + validation_size == number_samples
-    return training_size, validation_size
+def read_samples(filepath: str) -> pd.DataFrame:
+    """Return the sample values found in the given file."""
+    
+    try:
+        samples = pd.read_csv(filepath)
+    except FileNotFoundError:
+        print(f'"{filepath}" not found.')
+        return None
+    else:
+        print(f"Found {len(samples)} samples in {filepath}.")
+        return samples
 
 def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
-    """Return a 4D array of images for each of the specified sample values, with dimensions: [samples, channels, height, width]."""
+    """Return a 4D array of images for each of the specified sample values, with dimensions: (samples, channels, height, width)."""
+
     DATA_TYPE = np.uint8
 
     number_samples = len(samples)
-    inputs = np.full((number_samples, *INPUT_SIZE), 0, dtype=DATA_TYPE)
+    images = [None] * number_samples
+
     for i in range(number_samples):
         pixel_length = int(samples[KEY_NODES_LENGTH][i])
         pixel_height = int(samples[KEY_NODES_HEIGHT][i])
         pixel_width = int(samples[KEY_NODES_WIDTH][i])
         
         channels = []
-        h, w = INPUT_SIZE[1:]
+        h, w = INPUT_SIZE
 
         # Create a channel with a white rectangle representing the length and height of the cantilever.
         channel = np.zeros((h, w), dtype=DATA_TYPE)
@@ -136,20 +141,20 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
             channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
             channel = np.flipud(channel)
             channels.append(channel)
+
+        # # Add two channels with vertical and horizontal indices.
+        # indices = np.indices((h, w), dtype=DATA_TYPE)
+        # channels.append(indices[0, ...])
+        # channels.append(indices[1, ...])
         
-        # # Create a channel with the elastic modulus distribution.
-        # channel = np.zeros((h, w), dtype=DATA_TYPE)
-        # channel[:pixel_height, :pixel_length] = 255 * (samples[elastic_modulus.name][i] / elastic_modulus.high)
-        # channels.append(channel)
-        
-        # Create the image and append it to the list.
-        assert len(channels) == INPUT_CHANNELS
-        inputs[i, ...] = np.stack(channels, axis=0)
+        images[i] = channels
     
-    return inputs
+    images = np.array(images)
+
+    return images
 
 def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np.ndarray:
-    """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: [samples, channels, height, width]."""
+    """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: (samples, channels, height, width)."""
     number_samples = len(samples)
     
     # Get and sort all FEA filenames.
@@ -157,12 +162,15 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     filenames = sorted(filenames)
 
     # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
-    assert len(samples) <= len(filenames), f"The requested number of samples {len(samples)} exceeds the number of available files {len(filenames)}."
+    assert len(samples) <= len(filenames), f"Folder {folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
     filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
 
     # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
     DEFAULT_VALUE = 0
-    labels = np.full((number_samples, *OUTPUT_SIZE), DEFAULT_VALUE, dtype=float)
+    labels = np.full(
+        (number_samples, NODES_Z if is_3d else 1, *OUTPUT_SIZE),
+        DEFAULT_VALUE, dtype=float
+    )
     for i, filename in enumerate(filenames):
         with open(filename, 'r') as file:
             lines = file.readlines()
@@ -242,6 +250,18 @@ def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
 
+def read_pickle(filepath: str) -> Any:
+    with open(filepath, "rb") as f:
+        x = pickle.load(f)
+    print(f"Loaded {type(x)} from {filepath}.")
+
+    return x
+
+def write_pickle(x: object, filepath: str) -> None:
+    assert filepath.endswith(".pickle")
+    with open(filepath, "wb") as f:
+        pickle.dump(x, f)
+    print(f"Saved {type(x)} to {filepath}.")
 
 # Colors for plots.
 class Colors:
@@ -257,3 +277,13 @@ class Colors:
     GRAY = "#808080"
     GRAY_DARK = "#404040"
     GRAY_LIGHT = "#bfbfbf"
+
+
+if __name__ == "__main__":
+    # Convert text files to images and save them as pickles reduce runtime during training.
+    samples = read_samples(os.path.join(FOLDER_ROOT, "samples_train.csv"))
+    samples = samples[:10000]
+
+    folder = os.path.join(FOLDER_ROOT, "Train Labels")
+    labels = generate_label_images(samples, folder, is_3d=not True)
+    write_pickle(labels, os.path.join(folder, "labels.pickle"))

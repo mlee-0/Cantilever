@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, Subset, DataLoader
 
 from datasets import *
 import metrics
@@ -26,34 +26,33 @@ from setup import *
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, "model.pth")
 
 
-class CantileverDataset(Dataset):
-    """Dataset that gets input and label images during training."""
+class CantileverDataset2d(Dataset):
+    """Dataset that contains input images and label images."""
     def __init__(self, samples: pd.DataFrame, folder_labels: str):
         self.number_samples = len(samples)
         
         # Load previously generated label images.
         files = glob.glob(os.path.join(folder_labels, "*.pickle"))
-        files = [_ for _ in files if str(len(samples)) in _]
         if files:
             file = files[0]
-            with open(file, "rb") as f:
-                self.labels = pickle.load(f)
-            print(f"Loaded {len(self.labels)} label images from {file}.")
+            self.labels = read_pickle(file)
         # Create label images and save them as a pickle file.
         else:
-            self.labels = generate_label_images(samples, folder_labels, is_3d)
-            file = f"{len(samples)}_labels.pickle"
-            with open(os.path.join(folder_labels, file), "wb") as f:
-                pickle.dump(self.labels, f)
-            print(f"Saved {len(samples)} label images to {file}.")
+            self.labels = generate_label_images(samples, folder_labels, is_3d=False)
+            file = os.path.join(folder_labels, f"labels.pickle")
+            write_pickle(self.labels, file)
         print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
         
         # Create input images.
-        self.inputs = generate_input_images(samples, is_3d)
+        self.inputs = generate_input_images(samples, is_3d=False)
         print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
 
-        # Numerical inputs.
-        self.loads = samples[load.name]
+        # Numerical inputs, scaled to [0, 1].
+        self.loads = (samples[load.name] - load.low) / (load.high - load.low)
+
+        # Number of channels in input and label images.
+        self.input_channels = self.inputs.shape[1]
+        self.output_channels = self.labels.shape[1]
 
     def __len__(self):
         return self.number_samples
@@ -71,7 +70,7 @@ def save(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: float, filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: Tuple[float, float, float], filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
 
@@ -92,12 +91,52 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         raise ValueError(f"Invalid dataset ID: {dataset}.")
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
+    # Load the samples.
+    samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES_TRAIN))
+    samples = samples.iloc[:10000, :]
+
+    # Create a subset of the entire dataset, or load the previously created subset.
+    # try:
+    #     if not filename_subset:
+    #         raise FileNotFoundError
+    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
+    #     with open(filepath_subset, 'r') as f:
+    #         sample_numbers = [int(_) for _ in f.readlines()]
+    #     sample_indices = np.array(sample_numbers) - 1
+    #     samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
+    #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
+    # except FileNotFoundError:
+    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
+    #     samples = get_stratified_samples(samples, folder_train_labels, 
+    #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
+    #     with open(filepath_subset, 'w') as f:
+    #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
+    #     print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
+
+    # Calculate the dataset split sizes.
+    sample_size = len(samples)
+    train_size, validate_size, test_size = [int(split * sample_size) for split in training_split]
+    assert train_size + validate_size + test_size == sample_size
+    print(f"Split {sample_size} samples into {train_size} training / {validate_size} validation / {test_size} test.")
+    
+    # Create the training, validation, and testing dataloaders.
+    dataset = CantileverDataset2d(samples, folder_train_labels)
+    train_dataset = Subset(dataset, range(0, train_size))
+    validation_dataset = Subset(dataset, range(train_size, train_size+validate_size))
+    test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    size_train_dataset = len(train_dataloader)
+    size_validation_dataset = len(validation_dataloader)
+    size_test_dataset = len(test_dataloader)
+
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model_args = {
-        Nie: [INPUT_CHANNELS, INPUT_SIZE[1:3], OUTPUT_CHANNELS],
-        FullyCnn: [INPUT_CHANNELS, OUTPUT_SIZE[1:3], OUTPUT_CHANNELS],
-        UNetCnn: [INPUT_CHANNELS, OUTPUT_CHANNELS],
-        AutoencoderCnn: [INPUT_CHANNELS, OUTPUT_CHANNELS],
+        Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
+        FullyCnn: [dataset.input_channels, OUTPUT_SIZE, dataset.output_channels],
+        UNetCnn: [dataset.input_channels, dataset.output_channels],
+        AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
     }
     args = model_args[Model]
     model = Model(*args)
@@ -127,53 +166,17 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         test_only = False
     epochs = range(epoch, epoch+epoch_count)
 
-    # Load the samples.
-    samples = read_samples(FILENAME_SAMPLES_TRAIN)
-    samples = samples.iloc[:10000, :]
-
-    # Create a subset of the entire dataset, or load the previously created subset.
-    # try:
-    #     if not filename_subset:
-    #         raise FileNotFoundError
-    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
-    #     with open(filepath_subset, 'r') as f:
-    #         sample_numbers = [int(_) for _ in f.readlines()]
-    #     sample_indices = np.array(sample_numbers) - 1
-    #     samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-    #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
-    # except FileNotFoundError:
-    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-    #     samples = get_stratified_samples(samples, folder_train_labels, 
-    #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
-    #     with open(filepath_subset, 'w') as f:
-    #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-    #     print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
-    
-    sample_size = len(samples)
-
-    # Set up the training and validation data.
-    sample_size_train, sample_size_validation = split_training_validation(sample_size, training_split)
-    train_samples = samples[:sample_size_train].reset_index(drop=True)
-    validation_samples = samples[sample_size_train:sample_size_train+sample_size_validation].reset_index(drop=True)
-    
-    train_dataset = CantileverDataset(train_samples, folder_train_labels)
-    validation_dataset = CantileverDataset(validation_samples, folder_train_labels)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
-    size_train_dataset = len(train_dataloader)
-    size_validation_dataset = len(validation_dataloader)
-    print(f"Split {sample_size} samples into {size_train_dataset} training / {size_validation_dataset} validation.")
-
     # Initialize values to send to the GUI, to be updated throughout training.
-    info_gui = {
-        "progress_epoch": (epoch, epochs[-1]),
-        "progress_batch": (0, 0),
-        "epochs": epochs,
-        "training_loss": [],
-        "previous_training_loss": previous_training_loss,
-        "validation_loss": [],
-        "previous_validation_loss": previous_validation_loss,
-    }
+    if queue:
+        info_gui = {
+            "progress_epoch": (epoch, epochs[-1]),
+            "progress_batch": (0, 0),
+            "epochs": epochs,
+            "training_loss": [],
+            "previous_training_loss": previous_training_loss,
+            "validation_loss": [],
+            "previous_validation_loss": previous_validation_loss,
+        }
 
     if not test_only:
         if queue:
@@ -190,7 +193,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             for batch, ((input_image, load), label_image) in enumerate(train_dataloader, 1):
                 input_image = input_image.to(device)
                 label_image = label_image.to(device)
-                output = model(input_image, load)
+                output = model(input_image)
                 
                 loss = loss_function(output, label_image.float())
                 loss_epoch += loss.item()
@@ -219,7 +222,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 for batch, ((input_image, load), label_image) in enumerate(validation_dataloader, 1):
                     input_image = input_image.to(device)
                     label_image = label_image.to(device)
-                    output = model(input_image, load)
+                    output = model(input_image)
                     loss_epoch += loss_function(output, label_image.float()).item()
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
@@ -280,17 +283,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             plt.grid(axis='y')
             plt.show()
 
-    # Set up the testing data.
-    test_samples = read_samples(FILENAME_SAMPLES_TEST)
-    test_dataset = CantileverDataset(test_samples, folder_test_labels)
-    test_dataloader = DataLoader(test_dataset, shuffle=False)
-    size_test_dataset = len(test_dataloader)
-    
-    # The maximum value found among the training and testing datasets, used to normalize values for images.
-    max_value = max([
-        np.max(train_dataset.labels),
-        np.max(test_dataset.labels),
-    ])
+    # The maximum value found in the entire dataset, used to normalize values for images.
+    max_value = np.max(dataset.labels)
+
     # Test on the testing dataset.
     model.train(False)
     loss = 0
@@ -300,7 +295,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         for batch, ((input_image, load), label_image) in enumerate(test_dataloader, 1):
             input_image = input_image.to(device)
             label_image = label_image.to(device)
-            output = model(input_image, load)
+            output = model(input_image)
             
             loss += loss_function(output, label_image.float()).item()
             output = output[0, :, ...].cpu().detach().numpy()
@@ -319,7 +314,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 )
             
             # Plot a voxel model of the model output.
-            if not queue and is_3d:
+            if not queue and dataset == 3:
                 if batch in {3, 14, 19}:
                     fig = plt.figure()
                     ax = fig.gca(projection="3d")
@@ -418,9 +413,9 @@ if __name__ == '__main__':
         "desired_subset_size": 10_000,
         "bins": 1,
         "nonuniformity": 1.0,
-        "training_split": 0.8,
+        "training_split": (0.8, 0.1, 0.1),
         "train_existing": not False,
-        "test_only": not False,
+        "test_only": False,
     }
 
     main(**kwargs)

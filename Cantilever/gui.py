@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout,
 
 import main
 import networks
-from setup import split_training_validation, Colors, FOLDER_ROOT
+from setup import Colors, FOLDER_ROOT
 
 
 class MainWindow(QMainWindow):
@@ -161,16 +161,31 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.value_batch)
         layout_sidebar.addLayout(layout)
 
-        self.value_training_split = QSpinBox()
-        self.value_training_split.setMinimum(1)
-        self.value_training_split.setMaximum(99)
-        self.value_training_split.setSingleStep(5)
-        self.value_training_split.setValue(80)
-        self.value_training_split.setSuffix("%")
-        self.value_training_split.setAlignment(Qt.AlignRight)
+        self.value_train_split = QSpinBox()
+        self.value_train_split.setMinimum(1)
+        self.value_train_split.setMaximum(99)
+        self.value_train_split.setValue(80)
+        self.value_train_split.setAlignment(Qt.AlignRight)
+        self.value_train_split.setToolTip("Training split")
+        self.value_validate_split = QSpinBox()
+        self.value_validate_split.setMinimum(1)
+        self.value_validate_split.setMaximum(99)
+        self.value_validate_split.setValue(10)
+        self.value_validate_split.setAlignment(Qt.AlignRight)
+        self.value_train_split.setToolTip("Validation split")
+        self.value_test_split = QSpinBox()
+        self.value_test_split.setMinimum(1)
+        self.value_test_split.setMaximum(99)
+        self.value_test_split.setValue(10)
+        self.value_test_split.setAlignment(Qt.AlignRight)
+        self.value_train_split.setToolTip("Testing split")
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("Training Split:"))
-        layout.addWidget(self.value_training_split)
+        layout.setSpacing(0)
+        layout.addWidget(QLabel("Split:"))
+        layout.addStretch(1)
+        layout.addWidget(self.value_train_split)
+        layout.addWidget(self.value_validate_split)
+        layout.addWidget(self.value_test_split)
         layout_sidebar.addLayout(layout)
 
         self.value_model = QComboBox()
@@ -316,7 +331,11 @@ class MainWindow(QMainWindow):
                 "desired_subset_size": self.value_subset_size.value(),
                 "bins": self.value_bins.value(),
                 "nonuniformity": self.value_nonuniformity.value(),
-                "training_split": self.value_training_split.value()/100,
+                "training_split": (
+                    self.value_train_split.value() / 100,
+                    self.value_validate_split.value() / 100,
+                    self.value_test_split.value() / 100,
+                ),
                 "filename_subset": self.filename_subset.currentText() if self.checkbox_use_existing_subset.isChecked() else None,
                 "filename_new_subset": self.filename_new_subset.text(),
                 "train_existing": train_model,
