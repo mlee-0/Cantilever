@@ -5,12 +5,13 @@ Train and test the model.
 
 import os
 import pickle
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, Subset, DataLoader
 
 import metrics
 from networks import *
@@ -90,7 +91,7 @@ class DedDataset(Dataset):
         return np.copy(self.inputs[index]), np.copy(self.labels[index])
 
 class DedDatasetClassification(Dataset):
-    def __init__(self, dataset: str) -> None:
+    def __init__(self) -> None:
         folder = "Classification_CNN_UNIST"
         images_burr = read_labels(os.path.join(FOLDER_ROOT, folder, "burr"))
         images_cracked = read_labels(os.path.join(FOLDER_ROOT, folder, "cracked"))
@@ -98,26 +99,23 @@ class DedDatasetClassification(Dataset):
         
         self.inputs = images_burr + images_cracked + images_normal
         self.labels = [0] * len(images_burr) + [1] * len(images_cracked) + [2] * len(images_normal)
-        
-        validate_indices = range(0, len(self.inputs), 10)
-        test_indices = range(1, len(self.inputs), 10)
-        if dataset == "train":
-            self.inputs = [_ for i, _ in enumerate(self.inputs) if i not in [*validate_indices, *test_indices]]
-            self.labels = [_ for i, _ in enumerate(self.labels) if i not in [*validate_indices, *test_indices]]
-        elif dataset == "validate":
-            self.inputs = [_ for i, _ in enumerate(self.inputs) if i in validate_indices]
-            self.labels = [_ for i, _ in enumerate(self.labels) if i in validate_indices]
-        elif dataset == "test":
-            self.inputs = [_ for i, _ in enumerate(self.inputs) if i in test_indices]
-            self.labels = [_ for i, _ in enumerate(self.labels) if i in test_indices]
-        self.labels = nn.functional.one_hot(torch.tensor(np.array(self.labels)), 3)
 
+        # Randomize order of images and labels.
+        _ = list(zip(self.inputs, self.labels))
+        random.shuffle(_)
+        self.inputs, self.labels = zip(*_)
+        self.inputs = list(self.inputs)
+        self.labels = list(self.labels)
+        
         # Data augmentation.
         inputs_augmented = []
         for image in self.inputs:
             inputs_augmented.append(np.copy(image[:, :, ::-1]))
         self.inputs.extend(inputs_augmented)
-        self.labels = torch.cat((self.labels,)*2, dim=0)
+        self.labels.extend(self.labels)
+        
+        # Convert labels to one-hot tensors.
+        self.labels = nn.functional.one_hot(torch.tensor(np.array(self.labels)), 3)
     
     def __len__(self):
         return len(self.inputs)
@@ -397,172 +395,186 @@ def train_classifier(Model: nn.Module, learning_rate: float, batch_size: int, ep
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
 
-    train_dataset = DedDatasetClassification("train")
-    validate_dataset = DedDatasetClassification("validate")
-    test_dataset = DedDatasetClassification("test")
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-    
-    size_train_dataset = len(train_dataloader)
-    size_validate_dataset = len(validate_dataloader)
+    k_folds = 5
 
-    # Initialize the optimizer and loss function.
-    model = Model(1, 3)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    loss_function = nn.CrossEntropyLoss()
+    dataset = DedDatasetClassification()
 
-    # Load their parameters if they have been saved previously.
-    epoch = 1
-    previous_training_accuracies = []
-    previous_validation_accuracies = []
-    previous_training_losses = []
-    previous_validation_losses = []
-    if os.path.exists(FILEPATH_MODEL):
-        if not test_only:
-            if train_existing is None:
-                train_existing = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+    test_accuracies = []
+    test_losses = []
+    for k in range(k_folds):
+        validate_indices = range(k, len(dataset), 10)
+        test_indices = range(k+1, len(dataset), 10)
+        train_indices = [_ for _ in range(len(dataset)) if _ not in {*validate_indices, *test_indices}]
+        train_dataloader = DataLoader(Subset(dataset, train_indices), batch_size=batch_size, shuffle=True)
+        validate_dataloader = DataLoader(Subset(dataset, validate_indices), batch_size=batch_size, shuffle=True)
+        test_dataloader = DataLoader(Subset(dataset, test_indices), batch_size=batch_size, shuffle=True)
+
+        # Initialize the optimizer and loss function.
+        model = Model(1, 3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        loss_function = nn.CrossEntropyLoss()
+
+        # Load their parameters if they have been saved previously.
+        epoch = 1
+        previous_training_accuracies = []
+        previous_validation_accuracies = []
+        previous_training_losses = []
+        previous_validation_losses = []
+        if os.path.exists(FILEPATH_MODEL):
+            if not test_only:
+                if train_existing is None:
+                    train_existing = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+            else:
+                train_existing = True
+            
+            if train_existing:
+                epoch = load(FILEPATH_MODEL, device, [model], [optimizer], [previous_validation_losses])
         else:
-            train_existing = True
+            train_existing = False
+            test_only = False
         
-        if train_existing:
-            epoch = load(FILEPATH_MODEL, device, [model], [optimizer], [previous_validation_losses])
-    else:
-        train_existing = False
-        test_only = False
-    
-    epochs = range(epoch, epoch+epoch_count)
-    if queue:
-        queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
-    
-    training_accuracies = []
-    validation_accuracies = []
-    training_losses = []
-    validation_losses = []
-    for epoch in epochs:
-        print(f'Epoch {epoch}\n------------------------')
+        epochs = range(epoch, epoch+epoch_count)
+        if queue:
+            queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
         
-        model.train(True)
+        training_accuracies = []
+        validation_accuracies = []
+        training_losses = []
+        validation_losses = []
+        for epoch in epochs:
+            print(f"Epoch {epoch} (k = {k})\n------------------------")
+            
+            model.train(True)
 
-        # Train on the training dataset.
-        correct = 0
-        loss = 0
-        for batch, (data, label) in enumerate(train_dataloader, 1):
-            data = data.to(device)
-            label = label.to(device)
-            output = model(data)
-
-            correct += sum(torch.argmax(output, dim=1) == torch.argmax(label, dim=1))
-            loss_current = loss_function(output, label.float())
-            loss += loss_current.item()
-            # Reset gradients of model parameters.
-            optimizer.zero_grad()
-            # Backpropagate the prediction loss.
-            loss_current.backward()
-            # Adjust model parameters.
-            optimizer.step()
-
-            if batch % 5 == 0:
-                print(f"Training batch {batch}/{size_train_dataset}...", end="\r")
-                if queue:
-                    queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
-        print()
-        accuracy = correct / len(train_dataset)
-        loss /= size_train_dataset
-        training_accuracies.append(accuracy)
-        training_losses.append(loss)
-        print(f"Average training accuracy: {100*accuracy:,.1f}%")
-        print(f"Average training loss: {loss:,.1f}")
-
-        model.train(False)
-
-        # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
-        correct = 0
-        loss = 0
-        with torch.no_grad():
-            for batch, (data, label) in enumerate(validate_dataloader, 1):
+            # Train on the training dataset.
+            correct = 0
+            loss = 0
+            for batch, (data, label) in enumerate(train_dataloader, 1):
                 data = data.to(device)
                 label = label.to(device)
                 output = model(data)
 
                 correct += sum(torch.argmax(output, dim=1) == torch.argmax(label, dim=1))
-                loss += loss_function(output, label.float()).item()
+                loss_current = loss_function(output, label.float())
+                loss += loss_current.item()
+                # Reset gradients of model parameters.
+                optimizer.zero_grad()
+                # Backpropagate the prediction loss.
+                loss_current.backward()
+                # Adjust model parameters.
+                optimizer.step()
+
                 if batch % 5 == 0:
-                    print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
+                    print(f"Training batch {batch}/{len(train_dataloader)}...", end="\r")
                     if queue:
-                        queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
+                        queue.put([None, (batch, len(train_dataloader)+len(validate_dataloader)), None, None, None])
+            print()
+            accuracy = correct / len(train_indices)
+            loss /= len(train_dataloader)
+            training_accuracies.append(accuracy)
+            training_losses.append(loss)
+            print(f"Average training accuracy: {100*accuracy:,.1f}%")
+            print(f"Average training loss: {loss:,.1f}")
+
+            model.train(False)
+
+            # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
+            correct = 0
+            loss = 0
+            with torch.no_grad():
+                for batch, (data, label) in enumerate(validate_dataloader, 1):
+                    data = data.to(device)
+                    label = label.to(device)
+                    output = model(data)
+
+                    correct += sum(torch.argmax(output, dim=1) == torch.argmax(label, dim=1))
+                    loss += loss_function(output, label.float()).item()
+                    if batch % 5 == 0:
+                        print(f"Validating batch {batch}/{len(validate_dataloader)}...", end="\r")
+                        if queue:
+                            queue.put([None, (len(train_dataloader)+batch, len(train_dataloader)+len(validate_dataloader)), None, None, None])
+            print()
+            accuracy = correct / len(validate_indices)
+            loss /= len(validate_dataloader)
+            validation_accuracies.append(accuracy)
+            validation_losses.append(loss)
+            print(f"Average validation accuracy: {100*accuracy:,.1f}%")
+            print(f"Average validation loss: {loss:,.1f}")
+
+            # # Save the model parameters periodically.
+            # if epoch % 1 == 0:
+            #     save(FILEPATH_MODEL, epoch, model, optimizer, [], [*previous_validation_losses, *validation_losses])
+            
+            if queue:
+                queue.put([(epoch, epochs[-1]), None, epochs, validation_losses, previous_validation_losses])
+            
+            if queue_from_gui:
+                if not queue_from_gui.empty():
+                    # Stop training.
+                    if queue_from_gui.get() == True:
+                        queue_from_gui.queue.clear()
+                        break
+        
+        # # Save the model parameters.
+        # save(FILEPATH_MODEL, epoch, model, optimizer, [*previous_validation_losses, *validation_losses])
+
+        # Test on the testing dataset.
+        model.train(False)
+        correct = 0
+        loss = 0
+        with torch.no_grad():
+            for batch, (data, label) in enumerate(test_dataloader, 1):
+                data = data.to(device)
+                label = label.to(device)
+                output = model(data)
+
+                correct_current = sum(torch.argmax(output, dim=1) == torch.argmax(label, dim=1))
+                correct += correct_current
+                loss += loss_function(output, label.float()).item()
+                print(f"Batch {batch}: predicted {output}, true {label}")
         print()
-        accuracy = correct / len(validate_dataset)
-        loss /= size_validate_dataset
-        validation_accuracies.append(accuracy)
-        validation_losses.append(loss)
-        print(f"Average validation accuracy: {100*accuracy:,.1f}%")
-        print(f"Average validation loss: {loss:,.1f}")
-
-        # # Save the model parameters periodically.
-        # if epoch % 1 == 0:
-        #     save(FILEPATH_MODEL, epoch, model, optimizer, [], [*previous_validation_losses, *validation_losses])
+        accuracy = correct / len(test_indices)
+        loss /= len(test_dataloader)
+        print(f"Average testing accuracy: {100*accuracy:,.1f}%")
+        print(f"Average testing loss: {loss:,.1f}")
+        test_accuracies.append(accuracy)
+        test_losses.append(loss)
         
-        if queue:
-            queue.put([(epoch, epochs[-1]), None, epochs, validation_losses, previous_validation_losses])
-        
-        if queue_from_gui:
-            if not queue_from_gui.empty():
-                # Stop training.
-                if queue_from_gui.get() == True:
-                    queue_from_gui.queue.clear()
-                    break
+        # Plot the accuracy and loss history.
+        if not queue:
+            plt.figure()
+
+            plt.subplot(1, 2, 1)
+            if previous_training_accuracies:
+                plt.plot(range(1, epochs[0]), previous_training_accuracies, '.:', color=Colors.GRAY_LIGHT)
+            if previous_validation_accuracies:
+                plt.plot(range(1, epochs[0]), previous_validation_accuracies, '.-', color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, training_accuracies, '.:', color=Colors.ORANGE, label="Training")
+            plt.plot(epochs, validation_accuracies, '.-', color=Colors.BLUE, label="Validation")
+            plt.legend()
+            plt.ylim(bottom=0)
+            plt.grid(axis='y')
+            plt.xlabel("Epochs")
+            plt.ylabel("Accuracy")
+            plt.title("Accuracy")
+
+            plt.subplot(1, 2, 2)
+            if previous_validation_losses:
+                plt.plot(range(1, epochs[0]), previous_training_losses, '.:', color=Colors.GRAY_LIGHT)
+                plt.plot(range(1, epochs[0]), previous_validation_losses, '.-', color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, training_losses, '.:', color=Colors.ORANGE, label="Training")
+            plt.plot(epochs, validation_losses, '.-', color=Colors.BLUE, label="Validation")
+            plt.legend()
+            plt.ylim(bottom=0)
+            plt.grid(axis='y')
+            plt.xlabel("Epochs")
+            plt.ylabel("Loss")
+            plt.title("Loss")
+
+            plt.show()
     
-    # # Save the model parameters.
-    # save(FILEPATH_MODEL, epoch, model, optimizer, [*previous_validation_losses, *validation_losses])
-
-    # Test on the testing dataset.
-    model.train(False)
-    correct = 0
-    with torch.no_grad():
-        for batch, (data, label) in enumerate(test_dataloader, 1):
-            data = data.to(device)
-            label = label.to(device)
-            output = model(data)
-
-            correct += sum(torch.argmax(output, dim=1) == torch.argmax(label, dim=1))
-            # loss += loss_function(output, label.float()).item()
-    print()
-    accuracy = correct / len(validate_dataset)
-    print(f"Average testing accuracy: {100*accuracy:,.1f}%")
-    
-    # Plot the accuracy and loss history.
-    if not queue:
-        plt.figure()
-
-        plt.subplot(1, 2, 1)
-        if previous_training_accuracies:
-            plt.plot(range(1, epochs[0]), previous_training_accuracies, '.:', color=Colors.GRAY_LIGHT)
-        if previous_validation_accuracies:
-            plt.plot(range(1, epochs[0]), previous_validation_accuracies, '.-', color=Colors.GRAY_LIGHT)
-        plt.plot(epochs, training_accuracies, '.:', color=Colors.ORANGE, label="Training")
-        plt.plot(epochs, validation_accuracies, '.-', color=Colors.BLUE, label="Validation")
-        plt.legend()
-        plt.ylim(bottom=0)
-        plt.grid(axis='y')
-        plt.xlabel("Epochs")
-        # plt.ylabel("Accuracy")
-        plt.title("Accuracy")
-
-        plt.subplot(1, 2, 2)
-        if previous_validation_losses:
-            plt.plot(range(1, epochs[0]), previous_training_losses, '.:', color=Colors.GRAY_LIGHT)
-            plt.plot(range(1, epochs[0]), previous_validation_losses, '.-', color=Colors.GRAY_LIGHT)
-        plt.plot(epochs, training_losses, '.:', color=Colors.ORANGE, label="Training")
-        plt.plot(epochs, validation_losses, '.-', color=Colors.BLUE, label="Validation")
-        plt.legend()
-        plt.ylim(bottom=0)
-        plt.grid(axis='y')
-        plt.xlabel("Epochs")
-        # plt.ylabel("Loss")
-        plt.title("Loss")
-
-        plt.show()
+    print(f"Average testing accuracy over {k_folds} folds: {100 * np.mean(test_accuracies)}%")
+    print(f"Average testing loss over {k_folds} folds: {np.mean(test_losses)}")
 
 def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, train_existing=None, test_only=False, queue=None, queue_from_gui=None):
     """Train and test the model."""
@@ -688,7 +700,7 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
 if __name__ == '__main__':
     # Training hyperparameters.
     EPOCHS = 10
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 1e-6  #1e-3
     BATCH_SIZE = 1
     Model = None
 
