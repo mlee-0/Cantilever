@@ -11,9 +11,7 @@ Cantilever/Test Labels
 Cantilever/Train Labels 3D
 Cantilever/Test Labels 3D
 Cantilever/Results
-DED/Exp#1_(sheet#1)
-DED/Exp#2_(sheet#2)
-DED/Faces
+DED/*
 
 aclImdb
 aclImdb_v1.tar.gz

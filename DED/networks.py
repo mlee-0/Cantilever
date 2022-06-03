@@ -64,9 +64,8 @@ class ClassifierCnn(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2, return_indices=False),
         )
-
         self.linear = nn.Linear(in_features=256*7*7, out_features=number_classes)
-        # self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = x.float()
@@ -77,7 +76,7 @@ class ClassifierCnn(nn.Module):
         x = self.convolution_4(x)
         x = self.convolution_5(x)
         x = self.linear(x.view(x.shape[0], -1))
-        # x = self.softmax(x)
+        x = self.softmax(x)
 
         return x
 
