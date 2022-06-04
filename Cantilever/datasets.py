@@ -31,9 +31,9 @@ def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
     samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
     
     # Calculate the number of nodes in each direction.
-    nodes_length = np.round(OUTPUT_SIZE[2] * (samples[length.name] / length.high))
-    nodes_height = np.round(OUTPUT_SIZE[1] * (samples[height.name] / height.high))
-    nodes_width = np.round(OUTPUT_SIZE[0] * (samples[width.name] / width.high))
+    nodes_length = np.round(NODES_X * (samples[length.name] / length.high))
+    nodes_height = np.round(NODES_Y * (samples[height.name] / height.high))
+    nodes_width = np.round(NODES_Z * (samples[width.name] / width.high))
 
     samples[KEY_NODES_LENGTH] = nodes_length
     samples[KEY_NODES_HEIGHT] = nodes_height
@@ -118,20 +118,6 @@ def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None
     samples.to_csv(os.path.join(FOLDER_ROOT, filename), header=(mode == 'w'), index=False, mode=mode)
     print(f"{'Wrote' if mode == 'w' else 'Appended'} samples in {filename}.")
 
-def read_samples(filename: str) -> pd.DataFrame:
-    """Return the sample values found in the file previously generated."""
-    
-    samples = {}
-    filename = os.path.join(FOLDER_ROOT, filename)
-    try:
-        samples = pd.read_csv(filename)
-    except FileNotFoundError:
-        print(f'"{filename}" not found.')
-        return None
-    else:
-        print(f'Found {len(samples)} samples in {filename}.')
-        return samples
-
 def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
     """Write a text file containing ANSYS commands used to automate FEA and generate stress contour images."""
 
@@ -180,87 +166,6 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         file.writelines(lines)
         print(f'Wrote {filename}.')
 
-def get_stratified_samples(samples: pd.DataFrame, folder: str, desired_subset_size: int, bins: int, nonuniformity: float = 1.0) -> dict:
-    """
-    Return a subset of the given samples in which the same number of maximum values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
-
-    `samples`: DataFrame of samples of entire dataset.
-    `folder`: Folder in which labels are read.
-    `desired_subset_size`: The number of samples to have in the subset. The actual subset size may not exactly match this number.
-    `bins`: The number of bins to use in the histogram of maximum values.
-    `nonuniformity`: How much larger than the smallest bin the largest bin is. For example, a value of 1 results in a uniform distribution, in which the largest bin has as many samples as the smallest bin. A value of 2 results in the largest bin having twice as many samples as the smallest bin.
-    """
-
-    # Get the maximum values in each label.
-    files = glob.glob(os.path.join(folder, "*.pickle"))
-    files = [_ for _ in files if str(len(samples)) in _]
-    if files:
-        file = files[0]
-        with open(file, "rb") as f:
-            labels = pickle.load(f)
-        print(f"Loaded label images from {file}.")
-    else:
-        labels = generate_label_images(samples, folder, is_3d)
-    maxima = np.array([np.max(_) for _ in labels])
-    actual_raw_size = len(maxima)
-
-    # Calculate the histogram.
-    histogram_range = (0, np.max(maxima))  # Set minimum to 0 prevent small stresses being excluded
-    frequencies, bin_edges = np.histogram(maxima, bins=bins, range=histogram_range)
-    minimum_frequency = np.min(frequencies)
-    minimum_bin = np.argmin(frequencies)
-    
-    assert nonuniformity > 0, f"The nonuniformity value {nonuniformity} should be positive."
-    if nonuniformity == 1.0:
-        required_frequencies = np.full(bins, math.ceil(desired_subset_size / bins))
-    else:
-        required_frequencies = frequencies / np.min(frequencies)
-        required_frequencies = np.power(
-            required_frequencies,
-            np.log(nonuniformity) / np.log(np.max(required_frequencies))
-        )
-        required_frequencies *= desired_subset_size / np.sum(required_frequencies)
-        required_frequencies = np.round(required_frequencies).astype(int)
-    actual_subset_size = np.sum(required_frequencies) if minimum_frequency >= required_frequencies[minimum_bin] else np.sum(required_frequencies) * (minimum_frequency / required_frequencies[minimum_bin])
-    recommended_raw_size = actual_raw_size * required_frequencies[minimum_bin] / minimum_frequency
-    
-    if actual_subset_size < desired_subset_size:
-        plt.figure()
-        plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
-        plt.plot(
-            [bin_edges[:-1], bin_edges[1:]],
-            [required_frequencies, required_frequencies],
-            'k--'
-        )
-        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
-        plt.xticks(bin_edges, rotation=90, fontsize=6)
-        plt.xlabel("Stress")
-        plt.title(f"Subset contains {actual_subset_size} out of desired {desired_subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
-        plt.legend([f"Samples required in each bin"])
-        plt.show()
-
-    # Verify that there are enough samples to create a dataset of the desired size.
-    print(f"The subset contains {actual_subset_size} out of the desired {desired_subset_size}.")
-    assert actual_subset_size >= desired_subset_size, f"The raw dataset of {actual_raw_size} samples should be around {recommended_raw_size:.0f}."
-
-    # Create the subset.
-    sample_indices = np.empty(0, dtype=int)
-    for i, f in enumerate(required_frequencies):
-        # Indices of values that fall inside current bin.
-        indices = np.nonzero((bin_edges[i] < maxima) & (maxima <= bin_edges[i+1]))[0]
-        # Select the first f values only.
-        indices = indices[:f]
-        sample_indices = np.append(sample_indices, indices)
-    np.random.shuffle(sample_indices)
-    stratified_samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-
-    return stratified_samples
-
-
-# if __name__ == "__main__":
-#     samples = read_samples(FILENAME_SAMPLES_TRAIN)
-#     stratified_samples = get_stratified_samples(samples, 'Cantilever/Train Labels', desired_subset_size=1000, bins=15, nonuniformity=1)
-
 
 # Specify either "train" or "test".
 DATASET = "train"
@@ -289,13 +194,15 @@ if __name__ == "__main__":
         print("Changed the starting sample number to 1 because generating a new dataset.")
 
     # Try to read sample values from the file if it already exists. If not, generate the samples.
-    samples = read_samples(filename_sample)
-    if samples is not None:
+    samples_existing = read_samples(os.path.join(FOLDER_ROOT, filename_sample))
+    if samples_existing is not None:
         overwrite_existing_samples = input(f"Overwrite {filename_sample}? [y/n] ") == "y"
     else:
         overwrite_existing_samples = False
-    if samples is None or overwrite_existing_samples:
+    if samples_existing is None or overwrite_existing_samples:
         samples = generate_samples(NUMBER_SAMPLES, start=START_SAMPLE_NUMBER)
+        if WRITE_MODE == "a" and samples_existing is not None:
+            samples = pd.concat((samples_existing, samples), axis=0, ignore_index=True)
 
     write_samples(samples, filename_sample, mode=WRITE_MODE)
     write_ansys_script(samples, filename_ansys)
