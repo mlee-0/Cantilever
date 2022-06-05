@@ -167,8 +167,6 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         print(f'Wrote {filename}.')
 
 
-# Specify either "train" or "test".
-DATASET = "train"
 NUMBER_SAMPLES = 10000
 # Must be 1 if creating a new dataset.
 START_SAMPLE_NUMBER = 1
@@ -176,18 +174,11 @@ START_SAMPLE_NUMBER = 1
 WRITE_MODE = "w"
 
 # Dataset file names.
-FILENAME_SAMPLES_TRAIN = "samples_train.csv"
-FILENAME_SAMPLES_TEST = "samples_test.csv"
+FILENAME_SAMPLES = "samples_train.csv"
 
 if __name__ == "__main__":
-    if DATASET == "train":
-        filename_sample = FILENAME_SAMPLES_TRAIN
-        filename_ansys = "ansys_script_train.lgw"
-    elif DATASET == "test":
-        filename_sample = FILENAME_SAMPLES_TEST
-        filename_ansys = "ansys_script_test.lgw"
-    else:
-        print(f"Invalid dataset type: {DATASET}")
+    filename_sample = FILENAME_SAMPLES
+    filename_ansys = "ansys_script.lgw"
 
     if START_SAMPLE_NUMBER > 1 and WRITE_MODE == "w":
         START_SAMPLE_NUMBER = 1

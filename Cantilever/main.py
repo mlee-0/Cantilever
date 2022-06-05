@@ -121,17 +121,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     # Files and folders.
     if dataset == 2:
-        folder_train_labels = os.path.join(FOLDER_ROOT, "Train Labels")
-        folder_test_labels = os.path.join(FOLDER_ROOT, "Test Labels")
+        folder_labels = os.path.join(FOLDER_ROOT, "Labels")
     elif dataset == 3:
-        folder_train_labels = os.path.join(FOLDER_ROOT, "Train Labels 3D")
-        folder_test_labels = os.path.join(FOLDER_ROOT, "Test Labels 3D")
+        folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
     else:
         raise ValueError(f"Invalid dataset ID: {dataset}.")
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     # Load the samples.
-    samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES_TRAIN))
+    samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES))
     samples = samples.iloc[:10000, :]
 
     # Create a subset of the entire dataset, or load the previously created subset.
@@ -146,7 +144,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
     # except FileNotFoundError:
     #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-    #     samples = get_stratified_samples(samples, folder_train_labels, 
+    #     samples = get_stratified_samples(samples, folder_labels, 
     #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
     #     with open(filepath_subset, 'w') as f:
     #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
@@ -160,9 +158,9 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     
     # Create the training, validation, and testing dataloaders.
     if dataset == 2:
-        dataset = CantileverDataset2d(samples, folder_train_labels)
+        dataset = CantileverDataset2d(samples, folder_labels)
     elif dataset == 3:
-        dataset = CantileverDataset3d(samples, folder_train_labels)
+        dataset = CantileverDataset3d(samples, folder_labels)
     train_dataset = Subset(dataset, range(0, train_size))
     validation_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
@@ -193,7 +191,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
             if train_existing is None:
-                train_existing = input(f'Continue training the model in {FILEPATH_MODEL}? [y/n] ') == 'y'
+                train_existing = input(f"Continue training the model in {FILEPATH_MODEL}? [y/n] ") == "y"
         else:
             train_existing = True
         
@@ -228,7 +226,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         training_loss = []
         validation_loss = []
         for epoch in epochs:
-            print(f'Epoch {epoch}\n------------------------')
+            print(f"Epoch {epoch}\n------------------------")
             
             # Train on the training dataset.
             model.train(True)
