@@ -174,7 +174,7 @@ START_SAMPLE_NUMBER = 1
 WRITE_MODE = "w"
 
 # Dataset file names.
-FILENAME_SAMPLES = "samples_train.csv"
+FILENAME_SAMPLES = "samples.csv"
 
 if __name__ == "__main__":
     filename_sample = FILENAME_SAMPLES

@@ -380,7 +380,7 @@ class Colors:
 
 if __name__ == "__main__":
     # Convert text files to images and save them as pickles reduce runtime during training.
-    samples = read_samples(os.path.join(FOLDER_ROOT, "samples_train.csv"))
+    samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
     samples = samples[:10000]
 
     folder = os.path.join(FOLDER_ROOT, "Train Labels 3D")
