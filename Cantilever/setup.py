@@ -61,12 +61,18 @@ FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebo
 
 # Size of input images (height, width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_SIZE = (round(height.high / height.step), round(length.high / length.step))
+INPUT_SIZE_3D = (
+    round(height.high / height.step),
+    round(length.high / length.step),
+    round(width.high / width.step)
+)
 # Number of nodes to create in each direction in FEA.
 NODES_X = 30
 NODES_Y = 15
 NODES_Z = 15
 # Size of output images (height, width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
 OUTPUT_SIZE = (NODES_Y, NODES_X)
+OUTPUT_SIZE_3D = (NODES_Y, NODES_X, NODES_Z)
 
 
 def plot_histogram(values: np.ndarray, title=None) -> None:
@@ -153,6 +159,52 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
 
     return images
 
+def generate_input_images_3d(samples: pd.DataFrame) -> np.ndarray:
+    """Return a 5D array of images for each of the specified sample values, with dimensions: (samples, channels, height, width, depth)."""
+
+    DATA_TYPE = np.uint8
+
+    number_samples = len(samples)
+    images = [None] * number_samples
+
+    for i in range(number_samples):
+        pixel_length = int(samples[KEY_NODES_LENGTH][i])
+        pixel_height = int(samples[KEY_NODES_HEIGHT][i])
+        pixel_width = int(samples[KEY_NODES_WIDTH][i])
+        
+        channels = []
+        h, w, d = INPUT_SIZE_3D
+
+        # Create a channel with a white rectangular volume representing the length, height, and width of the cantilever.
+        channel = np.zeros((h, w, d), dtype=DATA_TYPE)
+        channel[:pixel_height, :pixel_length, :pixel_width] = 255
+        channels.append(channel)
+
+        # Create a channel with a gray line of pixels representing the load magnitude and both angles. The line is oriented by both angles and extends from the midpoint of the volume. The brightness of the line represents the load magnitude.
+        channel = np.zeros((h, w, d), dtype=DATA_TYPE)
+        r = np.arange(max(channel.shape))
+        x = r * np.cos(samples[angle_1.name][i] * np.pi/180) * np.cos(samples[angle_2.name][i]) + w/2
+        y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + h/2
+        z = r * np.cos(samples[angle_1.name][i] * np.pi/180) * np.sin(samples[angle_2.name][i]) + d/2
+        x = x.astype(int)
+        y = y.astype(int)
+        z = z.astype(int)
+        inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h) * (z >= 0) * (z < d)
+        channel[y[inside_image], x[inside_image], z[inside_image]] = 255 * (samples[load.name][i] / load.high)
+        channel = np.flipud(channel)
+        channels.append(channel)
+        
+        # # Add two channels with vertical and horizontal indices.
+        # indices = np.indices((h, w), dtype=DATA_TYPE)
+        # channels.append(indices[0, ...])
+        # channels.append(indices[1, ...])
+        
+        images[i] = channels
+    
+    images = np.array(images)
+
+    return images
+
 def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: (samples, channels, height, width)."""
     number_samples = len(samples)
@@ -205,6 +257,52 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
 
     return labels
 
+def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
+    """Return a 5D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: (samples, channels, height, width, depth)."""
+    number_samples = len(samples)
+    
+    # Get and sort all FEA filenames.
+    filenames = glob.glob(os.path.join(folder, '*.txt'))
+    filenames = sorted(filenames)
+
+    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
+    assert len(samples) <= len(filenames), f"Folder {folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
+    filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
+
+    # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
+    DEFAULT_VALUE = 0
+    labels = np.full(
+        (number_samples, 1, *OUTPUT_SIZE_3D),
+        DEFAULT_VALUE, dtype=float
+    )
+    for i, filename in enumerate(filenames):
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+        
+        # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
+        node_values = [
+            [float(value) if i == 0 else round(float(value), 2) for i, value in enumerate(line.split(','))]
+            for line in lines
+        ]
+        # Sort the values using the coordinates.
+        node_values.sort(key=lambda _: (_[2], _[1], _[3]))
+
+        image_height = int(samples[KEY_NODES_HEIGHT][i])
+        image_length = int(samples[KEY_NODES_LENGTH][i])
+        image_width = int(samples[KEY_NODES_WIDTH][i])
+
+        # Insert the values into the combined array, aligned top-left.
+        labels[i, 0, :image_height, :image_length, :image_width] = np.reshape(
+            [_[0] for _ in node_values],
+            (image_height, image_length, image_width),
+        )
+        
+        if (i+1) % 100 == 0:
+            print(f"Reading label {i+1} / {number_samples}...", end='\r')
+    print()
+
+    return labels
+
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
 
@@ -249,6 +347,7 @@ def array_to_colormap(array: np.ndarray, divide_by=None) -> np.ndarray:
 def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
+    print(f"Saved array with shape {array.shape} to {filename}.")
 
 def read_pickle(filepath: str) -> Any:
     with open(filepath, "rb") as f:
@@ -284,6 +383,7 @@ if __name__ == "__main__":
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples_train.csv"))
     samples = samples[:10000]
 
-    folder = os.path.join(FOLDER_ROOT, "Train Labels")
-    labels = generate_label_images(samples, folder, is_3d=not True)
+    folder = os.path.join(FOLDER_ROOT, "Train Labels 3D")
+    labels = generate_label_images_3d(samples, folder)
+    # labels = generate_label_images(samples, folder, is_3d=not True)
     write_pickle(labels, os.path.join(folder, "labels.pickle"))

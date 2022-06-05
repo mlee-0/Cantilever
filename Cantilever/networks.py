@@ -14,6 +14,7 @@ from torch import nn
 
 class Nie(nn.Module):
     """Based on: https://arxiv.org/pdf/1808.08914.pdf"""
+
     def __init__(self, input_channels: int, input_size: Tuple[int, int], output_channels: int):
         super().__init__()
 
@@ -37,10 +38,6 @@ class Nie(nn.Module):
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
-        # self.autoencoder = nn.Sequential(
-        #     nn.Linear(in_features=10, out_features=5),
-        #     nn.Linear(in_features=5, out_features=10),
-        # )
         self.se_1 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, padding='same'),
             nn.ReLU(inplace=True),
@@ -81,8 +78,6 @@ class Nie(nn.Module):
         conv_2 = self.convolution_2(conv_1)
         x = self.convolution_3(conv_2)
         
-        # x = self.autoencoder(x)
-        
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
         x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
@@ -113,21 +108,95 @@ class Nie(nn.Module):
     
         return x
 
-# Return a sequence of layers related to convolution.
-def convolution(in_channels, out_channels, **kwargs):
-    return nn.Sequential(
-        nn.Conv2d(in_channels=in_channels, out_channels=out_channels, **kwargs, padding_mode='replicate'),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(inplace=True),
+class Nie3d(nn.Module):
+    def __init__(self, input_channels: int, input_size: Tuple[int, int, int], output_channels: int):
+        super().__init__()
+
+        TRACK_RUNNING_STATS = False
+        MOMENTUM = 0.1
+
+        self.convolution_1 = nn.Sequential(
+            nn.Conv3d(input_channels, 16, kernel_size=9, stride=1, padding="same"),
+            nn.BatchNorm3d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.ReLU(inplace=True),
+        )
+        # Reduces all 3 dimensions by half.
+        self.convolution_2 = nn.Sequential(
+            nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.BatchNorm3d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.ReLU(inplace=True),
+        )
+        # Reduces all 3 dimensions by half.
+        self.convolution_3 = nn.Sequential(
+            nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.ReLU(inplace=True),
+        )
+        self.se_1 = nn.Sequential(
+            nn.Conv3d(64, 64, kernel_size=3, padding='same'),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv3d(64, 64, kernel_size=3, padding='same'),
+            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+        )
+        self.output_size_se_1 = [round(_ / 2 / 2) for _ in input_size]
+        self.se_2 = nn.Sequential(
+            nn.AvgPool3d(kernel_size=self.output_size_se_1),
+            nn.Flatten(),
+            nn.Linear(64, 4),
+            nn.ReLU(inplace=True),
+            nn.Linear(4, self.output_size_se_1[-1]),
+            nn.Sigmoid(),
+        )
+        self.deconvolution_1 = nn.Sequential(
+            nn.ConvTranspose3d(64, 32, kernel_size=(4,2,4), stride=(1,2,1), padding=(0,2,0), output_padding=(0,0,0)),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm3d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+        )
+        self.deconvolution_2 = nn.Sequential(
+            nn.ConvTranspose3d(32, 16, kernel_size=(3,2,3), stride=2, padding=1, output_padding=(0,0,0)),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm3d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+        )
+        self.deconvolution_3 = nn.Sequential(
+            nn.Conv3d(16, output_channels, kernel_size=9, stride=1, padding="same"),
+            # nn.BatchNorm3d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.ReLU(inplace=True),
         )
 
-# Return a sequence of layers related to deconvolution.
-def deconvolution(in_channels, out_channels, **kwargs):
-    return nn.Sequential(
-        nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, **kwargs),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(inplace=True),
-        )
+    def forward(self, x, value_load: float = None):
+        batch_size = x.size()[0]
+
+        x = x.float()
+        conv_1 = self.convolution_1(x)
+        conv_2 = self.convolution_2(conv_1)
+        x = self.convolution_3(conv_2)
+        
+        se_1 = self.se_1(x)
+        se_2 = self.se_2(se_1)
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        se_1 = self.se_1(x)
+        se_2 = self.se_2(se_1)
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        se_1 = self.se_1(x)
+        se_2 = self.se_2(se_1)
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        se_1 = self.se_1(x)
+        se_2 = self.se_2(se_1)
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        se_1 = self.se_1(x)
+        se_2 = self.se_2(se_1)
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+
+        # Add load value.
+        if value_load is not None:
+            x = x + value_load
+
+        x = self.deconvolution_1(x)
+        x = self.deconvolution_2(x)
+        x = self.deconvolution_3(x)
+    
+        return x
 
 class FullyCnn(nn.Module):
     def __init__(self, input_channels: int, output_size: Tuple[int, int], output_channels: int):

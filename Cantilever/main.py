@@ -65,6 +65,45 @@ class CantileverDataset2d(Dataset):
             np.copy(self.labels[index, ...]),
         )
 
+class CantileverDataset3d(Dataset):
+    """Dataset that contains input images and label images."""
+    def __init__(self, samples: pd.DataFrame, folder_labels: str):
+        self.number_samples = len(samples)
+        
+        # Load previously generated label images.
+        files = glob.glob(os.path.join(folder_labels, "*.pickle"))
+        if files:
+            file = files[0]
+            self.labels = read_pickle(file)
+        # Create label images and save them as a pickle file.
+        else:
+            self.labels = generate_label_images_3d(samples, folder_labels)
+            file = os.path.join(folder_labels, f"labels.pickle")
+            write_pickle(self.labels, file)
+        print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
+        
+        # Create input images.
+        self.inputs = generate_input_images_3d(samples)
+        print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
+
+        # Numerical inputs, scaled to [0, 1].
+        self.loads = (samples[load.name] - load.low) / (load.high - load.low)
+
+        # Number of channels in input and label images.
+        self.input_channels = self.inputs.shape[1]
+        self.output_channels = self.labels.shape[1]
+
+    def __len__(self):
+        return self.number_samples
+    
+    def __getitem__(self, index):
+        """Return input data (tuple of image, list of numerical data) and label images."""
+        # Return copies of arrays so that arrays are not modified.
+        return (
+            (np.copy(self.inputs[index, ...]), self.loads[index]),
+            np.copy(self.labels[index, ...]),
+        )
+
 def save(filepath: str, **kwargs) -> None:
     """Save model parameters to a file."""
     torch.save(kwargs, filepath)
@@ -120,7 +159,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     print(f"Split {sample_size} samples into {train_size} training / {validate_size} validation / {test_size} test.")
     
     # Create the training, validation, and testing dataloaders.
-    dataset = CantileverDataset2d(samples, folder_train_labels)
+    if dataset == 2:
+        dataset = CantileverDataset2d(samples, folder_train_labels)
+    elif dataset == 3:
+        dataset = CantileverDataset3d(samples, folder_train_labels)
     train_dataset = Subset(dataset, range(0, train_size))
     validation_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
@@ -134,7 +176,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
     model_args = {
         Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
-        FullyCnn: [dataset.input_channels, OUTPUT_SIZE, dataset.output_channels],
+        Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
+        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset == 3 else OUTPUT_SIZE, dataset.output_channels],
         UNetCnn: [dataset.input_channels, dataset.output_channels],
         AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
     }
@@ -189,50 +232,50 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             
             # Train on the training dataset.
             model.train(True)
-            loss_epoch = 0
+            loss = 0
             for batch, ((input_image, load), label_image) in enumerate(train_dataloader, 1):
                 input_image = input_image.to(device)
                 label_image = label_image.to(device)
                 output = model(input_image)
                 
-                loss = loss_function(output, label_image.float())
-                loss_epoch += loss.item()
+                loss_current = loss_function(output, label_image.float())
+                loss += loss_current.item()
                 # Reset gradients of model parameters.
                 optimizer.zero_grad()
                 # Backpropagate the prediction loss.
-                loss.backward()
+                loss_current.backward()
                 # Adjust model parameters.
                 optimizer.step()
 
                 if (batch) % 100 == 0:
-                    print(f"Training batch {batch}/{size_train_dataset} with average loss {loss_epoch/batch:,.2f}...", end="\r")
+                    print(f"Training batch {batch}/{size_train_dataset} with average loss {loss/batch:,.2f}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
-                        info_gui["training_loss"] = [*training_loss, loss_epoch/batch]
+                        info_gui["training_loss"] = [*training_loss, loss/batch]
                         queue.put(info_gui)
             print()
-            loss_epoch /= size_train_dataset
-            training_loss.append(loss_epoch)
-            print(f"Average training loss: {loss_epoch:,.2f}")
+            loss /= size_train_dataset
+            training_loss.append(loss)
+            print(f"Average training loss: {loss:,.2f}")
 
             # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
             model.train(False)
-            loss_epoch = 0
+            loss = 0
             with torch.no_grad():
                 for batch, ((input_image, load), label_image) in enumerate(validation_dataloader, 1):
                     input_image = input_image.to(device)
                     label_image = label_image.to(device)
                     output = model(input_image)
-                    loss_epoch += loss_function(output, label_image.float()).item()
+                    loss += loss_function(output, label_image.float()).item()
                     if (batch) % 100 == 0:
                         print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
                         if queue:
                             info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validation_dataset)
                             queue.put(info_gui)
             print()
-            loss_epoch /= size_validation_dataset
-            validation_loss.append(loss_epoch)
-            print(f"Average validation loss: {loss_epoch:,.2f}")
+            loss /= size_validation_dataset
+            validation_loss.append(loss)
+            print(f"Average validation loss: {loss:,.2f}")
 
             # Save the model parameters periodically.
             if (epoch) % 5 == 0:
@@ -277,6 +320,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 plt.plot(range(1, epochs[0]), previous_validation_loss, '.-', color=Colors.GRAY_LIGHT)
             plt.plot(epochs, training_loss, '.:', color=Colors.ORANGE)
             plt.plot(epochs, validation_loss, '.-', color=Colors.BLUE)
+            plt.legend()
             plt.ylim(bottom=0)
             plt.xlabel('Epochs')
             plt.ylabel('Loss')
@@ -296,22 +340,30 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             input_image = input_image.to(device)
             label_image = label_image.to(device)
             output = model(input_image)
-            
             loss += loss_function(output, label_image.float()).item()
-            output = output[0, :, ...].cpu().detach().numpy()
-            label_image = label_image[0, :, ...].cpu().numpy()
-            labels.append(label_image)
-            outputs.append(output)
             
-            # Write the combined FEA and model output image.
-            image = np.vstack((
-                np.hstack([label_image[channel, ...] for channel in range(label_image.shape[0])]),  # FEA
-                np.hstack([output[channel, ...] for channel in range(output.shape[0])]),  # Model output
-            ))
+            # Concatenate the FEA and model output images and write it to a file.
+            if dataset == 2:
+                output = output[0, :, ...].cpu().detach().numpy()
+                label_image = label_image[0, :, ...].cpu().numpy()
+                image = np.vstack((
+                    np.hstack([label_image[channel, ...] for channel in range(label_image.shape[0])]),  # FEA
+                    np.hstack([output[channel, ...] for channel in range(output.shape[0])]),  # Model output
+                ))
+            elif dataset == 3:
+                output = output[0, 0, ...].cpu().detach().numpy()
+                label_image = label_image[0, 0, ...].cpu().numpy()
+                image = np.vstack((
+                    np.hstack([label_image[..., channel] for channel in range(label_image.shape[-1])]),  # FEA
+                    np.hstack([output[..., channel] for channel in range(output.shape[-1])]),  # Model output
+                ))
             write_image(
                 array_to_colormap(image, max_value),
                 os.path.join(folder_results, f"{batch}_fea_model.png"),
                 )
+            
+            labels.append(label_image)
+            outputs.append(output)
             
             # Plot a voxel model of the model output.
             if not queue and dataset == 3:
@@ -407,14 +459,14 @@ if __name__ == '__main__':
         "epoch_count": 20,
         "learning_rate": 1e-7,
         "batch_size": 1,
-        "Model": Nie,
-        "dataset": 2,
+        "Model": Nie3d,
+        "dataset": 3,
 
         "desired_subset_size": 10_000,
         "bins": 1,
         "nonuniformity": 1.0,
         "training_split": (0.8, 0.1, 0.1),
-        "train_existing": not False,
+        "train_existing": True,
         "test_only": False,
     }
 
