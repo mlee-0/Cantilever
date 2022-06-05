@@ -13,7 +13,7 @@ from datasets import FILENAME_SAMPLES, read_samples
 from setup import *
 
 
-def stratify_samples(samples: pd.DataFrame, folder: str, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
+def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
     """
     Write a text file containing indices of the given samples that form a subset in which the same number of maximum values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
 
@@ -24,13 +24,13 @@ def stratify_samples(samples: pd.DataFrame, folder: str, filename: str, subset_s
     `nonuniformity`: How much larger than the smallest bin the largest bin is. For example, a value of 1 results in a uniform distribution, in which the largest bin has as many samples as the smallest bin. A value of 2 results in the largest bin having twice as many samples as the smallest bin.
     """
 
-    # Get the maximum values in each label.
+    # Load the label images.
     files = glob.glob(os.path.join(folder, "*.pickle"))
     assert len(files), f"A .pickle file must exist in {folder}."
     file = files[0]
-    with open(file, "rb") as f:
-        labels = pickle.load(f)
-    print(f"Loaded label images from {file}.")
+    labels = read_pickle(file)
+
+    # Get the maximum values in each label.
     maxima = np.array([np.max(_) for _ in labels])
     actual_raw_size = len(maxima)
 

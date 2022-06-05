@@ -4,9 +4,7 @@ Train and test the model.
 
 
 import glob
-import math
 import os
-import pickle
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -109,7 +107,7 @@ def save(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, desired_subset_size: int, bins: int, nonuniformity: float, training_split: Tuple[float, float, float], filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, training_split: Tuple[float, float, float], filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
 
@@ -132,23 +130,14 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES))
     samples = samples.iloc[:10000, :]
 
-    # Create a subset of the entire dataset, or load the previously created subset.
-    # try:
-    #     if not filename_subset:
-    #         raise FileNotFoundError
-    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
-    #     with open(filepath_subset, 'r') as f:
-    #         sample_numbers = [int(_) for _ in f.readlines()]
-    #     sample_indices = np.array(sample_numbers) - 1
-    #     samples = {key: [value[i] for i in sample_indices] for key, value in samples.items()}
-    #     print(f"Using previously created subset with {len(sample_numbers)} samples from {filepath_subset}.")
-    # except FileNotFoundError:
-    #     filepath_subset = os.path.join(FOLDER_ROOT, filename_new_subset)
-    #     samples = get_stratified_samples(samples, folder_labels, 
-    #     desired_subset_size=desired_subset_size, bins=bins, nonuniformity=nonuniformity)
-    #     with open(filepath_subset, 'w') as f:
-    #         f.writelines([f"{_}\n" for _ in samples[KEY_SAMPLE_NUMBER]])
-    #     print(f"Wrote subset with {len(samples[KEY_SAMPLE_NUMBER])} samples to {filepath_subset}.")
+    # Get the specified subset of the dataset, if provided.
+    if filename_subset is not None:
+        filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
+        with open(filepath_subset, "r") as f:
+            sample_indices = [int(_) - 1 for _ in f.readlines()]
+        
+        samples = samples.iloc[sample_indices]
+        print(f"Using a subset with {len(samples)} samples loaded from {filepath_subset}.")
 
     # Calculate the dataset split sizes.
     sample_size = len(samples)

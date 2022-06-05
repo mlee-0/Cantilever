@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QFileDialog
 
 import main
 import networks
@@ -209,81 +209,26 @@ class MainWindow(QMainWindow):
         # Settings for selecting a subset.
         fields_subset = self._fields_subset()
         layout_sidebar.addWidget(fields_subset)
-        fields_subset.setVisible(False)
+        self.update_button_browse_subset(self.checkbox_use_subset.isChecked())
 
         return widget
 
     def _fields_subset(self) -> QWidget:
-        """Return a widget containing fields for specifying options for subsets."""
+        """Return a widget containing fields for selecting subset files."""
         widget = QWidget()
         main_layout = QVBoxLayout(widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # button_choose_subset_file = QPushButton("Select Subset...")
-        # button_choose_subset_file.clicked.connect(self.open_subset_file_dialog)
-        # self.label_subset_file = QLabel()
-        # self.label_subset_file.setFont(font_small)
-        # self.label_subset_file.setHidden(True)
-        # main_layout.addWidget(button_choose_subset_file)
-        # main_layout.addWidget(self.label_subset_file)
-
-        self.checkbox_use_existing_subset = QCheckBox("Use Existing Subset")
-        self.checkbox_use_existing_subset.setChecked(True)
-        self.checkbox_use_existing_subset.stateChanged.connect(self.show_subset_options)
-        main_layout.addWidget(self.checkbox_use_existing_subset)
-
-        filenames = [_ for _ in os.listdir(FOLDER_ROOT) if _.endswith(".txt")]
-        if len(filenames) == 0:
-            filenames = ['']
-        self.filename_subset = QComboBox()
-        self.filename_subset.addItems(filenames)
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("Subset File:"))
-        layout.addWidget(self.filename_subset)
-        main_layout.addLayout(layout)
+        self.checkbox_use_subset = QCheckBox("Use Subset")
+        self.checkbox_use_subset.setChecked(False)
+        self.checkbox_use_subset.stateChanged.connect(self.update_button_browse_subset)
+        layout.addWidget(self.checkbox_use_subset)
+        self.button_browse_subset = QPushButton()
+        self.button_browse_subset.clicked.connect(self.open_dialog_subset)
+        layout.addWidget(self.button_browse_subset)
 
-        self.value_subset_size = QSpinBox()
-        self.value_subset_size.setMinimum(0)
-        self.value_subset_size.setMaximum(999_999)
-        self.value_subset_size.setSingleStep(10)
-        self.value_subset_size.setValue(10_000)
-        self.value_subset_size.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Subset Size:"))
-        layout.addWidget(self.value_subset_size)
         main_layout.addLayout(layout)
-        
-        self.value_bins = QSpinBox()
-        self.value_bins.setMinimum(1)
-        self.value_bins.setMaximum(1000)
-        self.value_bins.setSingleStep(1)
-        self.value_bins.setValue(1)
-        self.value_bins.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Bins:"))
-        layout.addWidget(self.value_bins)
-        main_layout.addLayout(layout)
-
-        self.value_nonuniformity = QDoubleSpinBox()
-        self.value_nonuniformity.setMinimum(0.1)
-        self.value_nonuniformity.setMaximum(100_000)
-        self.value_nonuniformity.setDecimals(1)
-        self.value_nonuniformity.setSingleStep(0.1)
-        self.value_nonuniformity.setValue(1.0)
-        self.value_nonuniformity.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Nonuniformity:"))
-        layout.addWidget(self.value_nonuniformity)
-        main_layout.addLayout(layout)
-
-        self.filename_new_subset = QLineEdit("subset.txt")
-        self.filename_new_subset.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("New Subset File:"))
-        layout.addWidget(self.filename_new_subset)
-        main_layout.addLayout(layout)
-
-        self.show_subset_options(self.checkbox_use_existing_subset.isChecked())
 
         return widget
 
@@ -336,7 +281,7 @@ class MainWindow(QMainWindow):
                     self.value_validate_split.value() / 100,
                     self.value_test_split.value() / 100,
                 ),
-                "filename_subset": self.filename_subset.currentText() if self.checkbox_use_existing_subset.isChecked() else None,
+                "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
                 "filename_new_subset": self.filename_new_subset.text(),
                 "train_existing": train_model,
                 "test_only": test_only,
@@ -352,12 +297,10 @@ class MainWindow(QMainWindow):
         self.button_stop.setEnabled(False)
         self.queue_to_main.put(True)
     
-    def show_subset_options(self, state):
-        self.filename_subset.setEnabled(state)
-        self.value_subset_size.setEnabled(not state)
-        self.value_bins.setEnabled(not state)
-        self.value_nonuniformity.setEnabled(not state)
-        self.filename_new_subset.setEnabled(not state)
+    def update_button_browse_subset(self, state):
+        self.button_browse_subset.setEnabled(state)
+        if not state:
+            self.button_browse_subset.setText("Browse...")
 
     def update_status_bar(self, text):
         """Display text in the status bar."""
@@ -368,12 +311,11 @@ class MainWindow(QMainWindow):
         """Toggle visibility of status bar."""
         self.status_bar.setVisible(self.action_toggle_status_bar.isChecked())
     
-    # def open_subset_file_dialog(self):
-    #     filename, _ = QFileDialog.getOpenFileName(self, directory=FOLDER_ROOT, filter="(*.txt)")
-    #     filename = os.path.basename(filename)
-    #     if filename:
-    #         self.label_subset_file.setText(filename)
-    #         self.label_subset_file.setHidden(False)
+    def open_dialog_subset(self):
+        filename, _ = QFileDialog.getOpenFileName(self, directory=FOLDER_ROOT, filter="(*.txt)")
+        filename = os.path.basename(filename)
+        if filename:
+            self.button_browse_subset.setText(filename)
 
     def show_about(self):
         """Show a window displaying the README file."""
