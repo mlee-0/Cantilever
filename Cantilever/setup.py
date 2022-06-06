@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import glob
 import os
 import pickle
+import re
 from typing import Any, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -213,9 +214,9 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     filenames = glob.glob(os.path.join(folder, '*.txt'))
     filenames = sorted(filenames)
 
-    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
-    assert len(samples) <= len(filenames), f"Folder {folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
-    filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
+    # Only use the filenames that match the specified sample numbers (filename "...000123.txt" matches sample number 123).
+    assert len(samples) <= len(filenames), f"{folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
+    filenames = [_ for _ in filenames if int(re.split("_|\.", os.path.basename(_))[1]) in samples[KEY_SAMPLE_NUMBER].values]
 
     # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
     DEFAULT_VALUE = 0
@@ -223,21 +224,21 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
         (number_samples, NODES_Z if is_3d else 1, *OUTPUT_SIZE),
         DEFAULT_VALUE, dtype=float
     )
-    for i, filename in enumerate(filenames):
-        with open(filename, 'r') as file:
+    for i, (index, filename) in enumerate(zip(samples.index, filenames)):
+        with open(filename, "r") as file:
             lines = file.readlines()
         
         # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
         node_values = [
-            [float(value) if i == 0 else round(float(value), 2) for i, value in enumerate(line.split(','))]
+            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(','))]
             for line in lines
         ]
         # Sort the values using the coordinates.
         node_values.sort(key=lambda _: (_[3], _[2], _[1]))
 
-        image_channels = int(samples[KEY_NODES_WIDTH][i])
-        image_height = int(samples[KEY_NODES_HEIGHT][i])
-        image_length = int(samples[KEY_NODES_LENGTH][i])
+        image_channels = int(samples[KEY_NODES_WIDTH][index])
+        image_height = int(samples[KEY_NODES_HEIGHT][index])
+        image_length = int(samples[KEY_NODES_LENGTH][index])
 
         # Insert the values into the combined array, aligned top-left.
         if is_3d:
@@ -265,9 +266,9 @@ def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
     filenames = glob.glob(os.path.join(folder, '*.txt'))
     filenames = sorted(filenames)
 
-    # Only use the filenames that match the specified sample numbers. Assumes that filename numbers start from 1 and are contiguous.
-    assert len(samples) <= len(filenames), f"Folder {folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
-    filenames = [filenames[number-1] for number in samples[KEY_SAMPLE_NUMBER]]
+    # Only use the filenames that match the specified sample numbers (filename "...000123.txt" matches sample number 123).
+    assert len(samples) <= len(filenames), f"{folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
+    filenames = [_ for _ in filenames if int(re.split("_|\.", os.path.basename(_))[1]) in samples[KEY_SAMPLE_NUMBER].values]
 
     # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
     DEFAULT_VALUE = 0
@@ -275,21 +276,21 @@ def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
         (number_samples, 1, *OUTPUT_SIZE_3D),
         DEFAULT_VALUE, dtype=float
     )
-    for i, filename in enumerate(filenames):
-        with open(filename, 'r') as file:
+    for i, (index, filename) in enumerate(zip(samples.index, filenames)):
+        with open(filename, "r") as file:
             lines = file.readlines()
         
         # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
         node_values = [
-            [float(value) if i == 0 else round(float(value), 2) for i, value in enumerate(line.split(','))]
+            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(','))]
             for line in lines
         ]
         # Sort the values using the coordinates.
         node_values.sort(key=lambda _: (_[2], _[1], _[3]))
 
-        image_height = int(samples[KEY_NODES_HEIGHT][i])
-        image_length = int(samples[KEY_NODES_LENGTH][i])
-        image_width = int(samples[KEY_NODES_WIDTH][i])
+        image_height = int(samples[KEY_NODES_HEIGHT][index])
+        image_length = int(samples[KEY_NODES_LENGTH][index])
+        image_width = int(samples[KEY_NODES_WIDTH][index])
 
         # Insert the values into the combined array, aligned top-left.
         labels[i, 0, :image_height, :image_length, :image_width] = np.reshape(
@@ -383,7 +384,7 @@ if __name__ == "__main__":
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
     samples = samples[:10000]
 
-    folder = os.path.join(FOLDER_ROOT, "Train Labels 3D")
+    folder = os.path.join(FOLDER_ROOT, "Labels 3D")
     labels = generate_label_images_3d(samples, folder)
     # labels = generate_label_images(samples, folder, is_3d=not True)
-    write_pickle(labels, os.path.join(folder, "labels.pickle"))
+    write_pickle(labels, os.path.join(folder, "labels_.pickle"))

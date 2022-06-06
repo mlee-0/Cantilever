@@ -107,11 +107,9 @@ def save(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, training_split: Tuple[float, float, float], filename_subset: str = None, filename_new_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, training_split: Tuple[float, float, float], filename_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
-
-    `desired_subset_size`: Number of samples to include in the subset. Enter 0 to use all samples found instead of creating a subset.
     """
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -245,7 +243,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             training_loss.append(loss)
             print(f"Average training loss: {loss:,.2f}")
 
-            # Train on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
+            # Test on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
             model.train(False)
             loss = 0
             with torch.no_grad():
@@ -265,7 +263,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             print(f"Average validation loss: {loss:,.2f}")
 
             # Save the model parameters periodically.
-            if (epoch) % 5 == 0:
+            if (epoch) % 1 == 0:
                 save(
                     FILEPATH_MODEL,
                     epoch=epoch,
