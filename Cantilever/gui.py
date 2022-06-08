@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
                 "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
                 "batch_size": self.value_batch.value(),
                 "Model": networks.networks[self.value_model.currentText()],
-                "dataset": self.buttons_dataset.checkedId(),
+                "dataset_id": self.buttons_dataset.checkedId(),
 
                 "desired_subset_size": self.value_subset_size.value(),
                 "bins": self.value_bins.value(),

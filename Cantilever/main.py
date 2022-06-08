@@ -107,26 +107,22 @@ def save(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset: int, training_split: Tuple[float, float, float], filename_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset_id: int, training_split: Tuple[float, float, float], filename_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
     """
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device.')
+    
+    assert dataset_id in {2, 3}, f"Invalid dataset ID: {dataset_id}."
 
     # Files and folders.
-    if dataset == 2:
-        folder_labels = os.path.join(FOLDER_ROOT, "Labels")
-    elif dataset == 3:
-        folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
-    else:
-        raise ValueError(f"Invalid dataset ID: {dataset}.")
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES))
-    samples = samples.iloc[:10000, :]
+    samples = samples.iloc[:30000, :]
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
@@ -144,10 +140,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     print(f"Split {sample_size} samples into {train_size} training / {validate_size} validation / {test_size} test.")
     
     # Create the training, validation, and testing dataloaders.
-    if dataset == 2:
-        dataset = CantileverDataset2d(samples, folder_labels)
-    elif dataset == 3:
-        dataset = CantileverDataset3d(samples, folder_labels)
+    dataset = CantileverDataset(samples, is_3d=dataset_id == 3)
+    # if dataset_id == 2:
+    #     dataset = CantileverDataset(samples, folder_labels)
+    # elif dataset_id == 3:
+    #     dataset = CantileverDataset3d(samples, folder_labels)
     train_dataset = Subset(dataset, range(0, train_size))
     validation_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
@@ -162,7 +159,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     model_args = {
         Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
         Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
-        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset == 3 else OUTPUT_SIZE, dataset.output_channels],
+        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
         UNetCnn: [dataset.input_channels, dataset.output_channels],
         AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
     }
@@ -239,7 +236,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                         info_gui["training_loss"] = [*training_loss, loss/batch]
                         queue.put(info_gui)
             print()
-            loss /= size_train_dataset
+            loss /= batch
             training_loss.append(loss)
             print(f"Average training loss: {loss:,.2f}")
 
@@ -258,7 +255,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                             info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validation_dataset)
                             queue.put(info_gui)
             print()
-            loss /= size_validation_dataset
+            loss /= batch
             validation_loss.append(loss)
             print(f"Average validation loss: {loss:,.2f}")
 
@@ -444,12 +441,9 @@ if __name__ == '__main__':
         "epoch_count": 20,
         "learning_rate": 1e-7,
         "batch_size": 1,
-        "Model": Nie3d,
-        "dataset": 3,
+        "Model": Nie,
+        "dataset_id": 3,
 
-        "desired_subset_size": 10_000,
-        "bins": 1,
-        "nonuniformity": 1.0,
         "training_split": (0.8, 0.1, 0.1),
         "train_existing": True,
         "test_only": False,
