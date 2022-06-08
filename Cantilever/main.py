@@ -25,9 +25,6 @@ from setup import *
 if GOOGLE_COLAB:
     gc.collect()
 
-# Model parameters file path.
-FILEPATH_MODEL = os.path.join(FOLDER_ROOT, "model.pth")
-
 
 class CantileverDataset(Dataset):
     """Dataset that contains input images and label images."""
@@ -118,7 +115,7 @@ def save(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset_id: int, training_split: Tuple[float, float, float], filename_subset: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
+def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, dataset_id: int, training_split: Tuple[float, float, float], filename_subset: str = None, filename_model: str = None, train_existing=None, test_only=False, queue=None, queue_to_main=None):
     """
     Train and test the model.
     """
@@ -129,6 +126,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     assert dataset_id in {2, 3}, f"Invalid dataset ID: {dataset_id}."
 
     # Files and folders.
+    filepath_model = os.path.join(FOLDER_ROOT, filename_model)
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     # Load the samples.
@@ -183,15 +181,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     epoch = 1
     previous_training_loss = []
     previous_validation_loss = []
-    if os.path.exists(FILEPATH_MODEL):
+    if os.path.exists(filepath_model):
         if not test_only:
             if train_existing is None:
-                train_existing = input(f"Continue training the model in {FILEPATH_MODEL}? [y/n] ") == "y"
+                train_existing = input(f"Continue training the model in {filepath_model}? [y/n] ") == "y"
         else:
             train_existing = True
         
         if train_existing:
-            checkpoint = torch.load(FILEPATH_MODEL, map_location=torch.device(device))
+            checkpoint = torch.load(filepath_model, map_location=torch.device(device))
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             epoch = checkpoint["epoch"] + 1
@@ -273,7 +271,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             # Save the model parameters periodically.
             if (epoch) % 1 == 0:
                 save(
-                    FILEPATH_MODEL,
+                    filepath_model,
                     epoch=epoch,
                     model_state_dict=model.state_dict(),
                     optimizer_state_dict=optimizer.state_dict(),
@@ -296,7 +294,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         
         # Save the model parameters.
         save(
-            FILEPATH_MODEL,
+            filepath_model,
             epoch=epoch,
             model_state_dict=model.state_dict(),
             optimizer_state_dict=optimizer.state_dict(),
@@ -419,8 +417,9 @@ if __name__ == '__main__':
         "batch_size": 1,
         "Model": Nie,
         "dataset_id": 3,
-
         "training_split": (0.8, 0.1, 0.1),
+        
+        "filename_model": "model.pth",
         "train_existing": True,
         "test_only": False,
     }

@@ -119,7 +119,14 @@ class MainWindow(QMainWindow):
         # Checkbox for toggling continuing training a previously saved model.
         self.checkbox_train_existing = QCheckBox("Train Existing")
         self.checkbox_train_existing.setChecked(True)
-        layout_sidebar.addWidget(self.checkbox_train_existing)
+        self.label_filename_model = QLineEdit("model.pth")
+        self.label_filename_model.setAlignment(Qt.AlignRight)
+        # self.button_browse_model = QPushButton("model.pth")
+        # self.button_browse_model.clicked.connect(self.open_dialog_model)
+        layout = QHBoxLayout()
+        layout.addWidget(self.checkbox_train_existing)
+        layout.addWidget(self.label_filename_model)
+        layout_sidebar.addLayout(layout)
 
         # Settings.
         self.value_epochs = QSpinBox()
@@ -272,17 +279,13 @@ class MainWindow(QMainWindow):
                 "batch_size": self.value_batch.value(),
                 "Model": networks.networks[self.value_model.currentText()],
                 "dataset_id": self.buttons_dataset.checkedId(),
-
-                "desired_subset_size": self.value_subset_size.value(),
-                "bins": self.value_bins.value(),
-                "nonuniformity": self.value_nonuniformity.value(),
                 "training_split": (
                     self.value_train_split.value() / 100,
                     self.value_validate_split.value() / 100,
                     self.value_test_split.value() / 100,
                 ),
                 "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
-                "filename_new_subset": self.filename_new_subset.text(),
+                "filename_model": self.label_filename_model.text(),
                 "train_existing": train_model,
                 "test_only": test_only,
                 "queue": self.queue,
@@ -311,8 +314,20 @@ class MainWindow(QMainWindow):
         """Toggle visibility of status bar."""
         self.status_bar.setVisible(self.action_toggle_status_bar.isChecked())
     
+    def open_dialog_model(self):
+        """Show a file dialog to choose an existing model file or specify a new model file name."""
+        dialog = QFileDialog(self, directory=FOLDER_ROOT, filter="(*.pth)")
+        dialog.setFileMode(QFileDialog.AnyFile)
+        if dialog.exec_():
+            files = dialog.selectedFiles()
+            file = os.path.basename(files[0])
+            if file:
+                self.button_browse_model.setText(file)
+
     def open_dialog_subset(self):
+        """Show a file dialog to choose an existing subset file."""
         filename, _ = QFileDialog.getOpenFileName(self, directory=FOLDER_ROOT, filter="(*.txt)")
+
         filename = os.path.basename(filename)
         if filename:
             self.button_browse_subset.setText(filename)
