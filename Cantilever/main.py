@@ -3,6 +3,7 @@ Train and test the model.
 """
 
 
+import gc
 import glob
 import os
 
@@ -19,6 +20,10 @@ import metrics
 from networks import *
 from setup import *
 
+
+# Free memory between subsequent runs.
+if GOOGLE_COLAB:
+    gc.collect()
 
 # Model parameters file path.
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, "model.pth")
