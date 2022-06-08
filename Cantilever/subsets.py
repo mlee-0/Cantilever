@@ -86,6 +86,7 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
     # Write the sample indices to a text file.
     with open(filename, "w") as f:
         f.writelines([str(_) for _ in sample_indices])
+        print(f"Wrote subset of {len(sample_indices)} samples to {filename}.")
 
 
 if __name__ == "__main__":

@@ -2,11 +2,13 @@ from typing import Tuple
 
 from matplotlib import pyplot as plt
 import numpy as np
-from scipy import stats
+
+from setup import Colors
 
 
-def area_metric(network: np.ndarray, label: np.ndarray, max_value) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
-    """Return the CDF of the inputs and the difference between their areas under the CDF."""
+def area_metric(network: np.ndarray, label: np.ndarray, max_value, plot=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    """Plot and return the CDFs of the inputs and the difference between their areas under the CDF."""
+    
     NUMBER_BINS = 1000
     # Specify the range of possible values for the histogram to use for both network and label data.
     value_range = (0, max_value)
@@ -21,11 +23,30 @@ def area_metric(network: np.ndarray, label: np.ndarray, max_value) -> Tuple[np.n
     area_label = np.sum(cdf_label * np.diff(bin_edges))
     area_difference = area_network - area_label
 
+    if plot:
+        plt.figure()
+        plt.plot(bin_edges[1:], cdf_network, "-", color=Colors.BLUE)
+        plt.plot(bin_edges[1:], cdf_label, ":", color=Colors.RED)
+        plt.legend(["CNN", "FEA"])
+        plt.grid(visible=True, axis="y")
+        plt.xticks([*plt.xticks()[0], max_value])
+        plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")
+        plt.show()
+
     return cdf_network, cdf_label, bin_edges, area_difference
 
-def maximum_value(network: np.ndarray, label: np.ndarray) -> Tuple[float, float]:
-    """Return the maxima in both inputs."""
-    return np.max(network), np.max(label)
+def maximum_value(network: np.ndarray, label: np.ndarray, plot=False) -> Tuple[float, float]:
+    """Plot and return the maxima along the first dimension in both inputs."""
+    max_network = np.max(network, axis=0)
+    max_label = np.max(network, axis=0)
+
+    if plot:
+        plt.figure()
+        plt.plot(max_label, 'o', color=Colors.RED, label="True")
+        plt.plot(max_network, '.', color=Colors.BLUE, label="Predicted")
+        plt.legend()
+    
+    return max_network, max_label
 
 def mean_error(network: np.ndarray, label: np.ndarray) -> float:
     """Return the mean error."""

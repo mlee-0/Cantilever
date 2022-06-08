@@ -29,25 +29,28 @@ if GOOGLE_COLAB:
 FILEPATH_MODEL = os.path.join(FOLDER_ROOT, "model.pth")
 
 
-class CantileverDataset2d(Dataset):
+class CantileverDataset(Dataset):
     """Dataset that contains input images and label images."""
-    def __init__(self, samples: pd.DataFrame, folder_labels: str):
+    def __init__(self, samples: pd.DataFrame, is_3d: bool):
         self.number_samples = len(samples)
+
+        folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D" if is_3d else "Labels")
         
         # Load previously generated label images.
         files = glob.glob(os.path.join(folder_labels, "*.pickle"))
+        files.sort()
         if files:
             file = files[0]
             self.labels = read_pickle(file)
         # Create label images and save them as a pickle file.
         else:
-            self.labels = generate_label_images(samples, folder_labels, is_3d=False)
+            self.labels = generate_label_images(samples, folder_labels, is_3d=is_3d)
             file = os.path.join(folder_labels, f"labels.pickle")
             write_pickle(self.labels, file)
         print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
         
         # Create input images.
-        self.inputs = generate_input_images(samples, is_3d=False)
+        self.inputs = generate_input_images(samples, is_3d=is_3d)
         print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
 
         # Numerical inputs, scaled to [0, 1].
@@ -75,9 +78,12 @@ class CantileverDataset3d(Dataset):
         
         # Load previously generated label images.
         files = glob.glob(os.path.join(folder_labels, "*.pickle"))
+        files.sort()
         if files:
             file = files[0]
             self.labels = read_pickle(file)
+            # Transpose dimensions to form: (samples, 1, height (Y), length (X), width (Z))
+            self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         # Create label images and save them as a pickle file.
         else:
             self.labels = generate_label_images_3d(samples, folder_labels)
@@ -155,7 +161,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
     size_train_dataset = len(train_dataloader)
     size_validation_dataset = len(validation_dataloader)
     size_test_dataset = len(test_dataloader)
@@ -320,126 +326,91 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Test on the testing dataset.
     model.train(False)
     loss = 0
-    labels = []
     outputs = []
+    labels = []
     with torch.no_grad():
         for batch, ((input_image, load), label_image) in enumerate(test_dataloader, 1):
             input_image = input_image.to(device)
             label_image = label_image.to(device)
             output = model(input_image)
             loss += loss_function(output, label_image.float()).item()
-            
-            # Concatenate the FEA and model output images and write it to a file.
-            if dataset == 2:
-                output = output[0, :, ...].cpu().detach().numpy()
-                label_image = label_image[0, :, ...].cpu().numpy()
-                image = np.vstack((
-                    np.hstack([label_image[channel, ...] for channel in range(label_image.shape[0])]),  # FEA
-                    np.hstack([output[channel, ...] for channel in range(output.shape[0])]),  # Model output
-                ))
-            elif dataset == 3:
-                output = output[0, 0, ...].cpu().detach().numpy()
-                label_image = label_image[0, 0, ...].cpu().numpy()
-                image = np.vstack((
-                    np.hstack([label_image[..., channel] for channel in range(label_image.shape[-1])]),  # FEA
-                    np.hstack([output[..., channel] for channel in range(output.shape[-1])]),  # Model output
-                ))
-            write_image(
-                array_to_colormap(image, max_value),
-                os.path.join(folder_results, f"{batch}_fea_model.png"),
-                )
+
+            # Convert to NumPy arrays for evaluation metric calculations.
+            output = output.cpu().detach().numpy()
+            label_image = label_image.cpu().numpy()
             
             labels.append(label_image)
             outputs.append(output)
-            
-            # Plot a voxel model of the model output.
-            if not queue and dataset == 3:
-                if batch in {3, 14, 19}:
-                    fig = plt.figure()
-                    ax = fig.gca(projection="3d")
-                    rgb = np.empty(output.shape + (3,))
-                    for channel in range(output.shape[0]):
-                        rgb[channel, :, :, :] = array_to_colormap(output[channel, ...], max_value)
-                    rgb /= 255
-                    voxels = ax.voxels(filled=np.full(output.transpose((2, 0, 1)).shape, True), facecolors=rgb.transpose((2, 0, 1, 3)))
-                    plt.xlabel("X")
-                    plt.ylabel("Y")
-                    # plt.zlabel("Z")
-                    plt.show()
             
             if queue:
                 info_gui["progress_epoch"] = (0, 0)
                 info_gui["progress_batch"] = (batch, size_test_dataset)
                 queue.put(info_gui)
-    loss /= size_test_dataset
+    loss /= batch
     print(f"Average testing loss: {loss:,.2f}")
     
-    print(f"Wrote {size_test_dataset} test images in {folder_results}.")
+    # Concatenate testing results from all batches into a single array.
+    outputs = np.concatenate(outputs, axis=0)
+    labels = np.concatenate(labels, axis=0)
 
-    # Calculate and plot evaluation metrics.
-    if not queue:
-        # plt.rc('font', family='Source Code Pro', size=10.0, weight='semibold')
+    # Concatenate corresponding model output images and label images for specified samples and write them to files.
+    indices = range(0, len(test_dataset), 10)
+    for i in indices:
+        image = np.vstack((
+            np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
+            np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
+        ))
+        # if dataset_id == 2:
+        # elif dataset_id == 3:
+        #     image = np.vstack((
+        #         np.hstack([labels[i, 0, ..., channel] for channel in range(labels.shape[-1])]),
+        #         np.hstack([outputs[i, 0, ..., channel] for channel in range(outputs.shape[-1])]),
+        #     ))
+        write_image(
+            array_to_colormap(image, max_value),
+            os.path.join(folder_results, f"{i+1}_fea_model.png"),
+            )
+    print(f"Wrote {len(indices)} test images in {folder_results}.")
+    
+    # Plot 3D voxel models of the specified model outputs.
+    if not queue and dataset_id == 3:
+        for i in {3, 14, 19}:
+            fig = plt.figure()
+            ax = fig.gca(projection="3d")
+            rgb = np.empty(outputs.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
+            for channel in range(outputs.shape[1]):
+                rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], max_value)
+            rgb /= 255
+            # Make an array with a True region with the height, length, and width of the current sample.
+            filled = labels[i, ...].transpose((2, 0, 1)) != 0
+            # Plot voxels using arrays of shape (X = length, Y = width, Z = height).
+            voxels = ax.voxels(
+                filled=filled,
+                facecolors=rgb.transpose((2, 0, 1, 3)),
+                linewidth=0.25,
+                edgecolors=(1, 1, 1),
+            )
+            ax.set(xlabel="X", ylabel="Y", zlabel="Z")
+            axis_limits = [0, max(outputs.shape[1:])]
+            ax.set(xlim=axis_limits, ylim=axis_limits, zlim=axis_limits)
+            plt.show()
 
-        # Area metric.
-        cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
-            np.array([_ for _ in outputs]).flatten(),
-            np.array([_ for _ in labels]).flatten(),
-            max_value
-        )
-        plt.figure()
-        plt.plot(bin_edges[1:], cdf_network, "-", color=Colors.BLUE)
-        plt.plot(bin_edges[1:], cdf_label, ":", color=Colors.RED)
-        plt.legend(["CNN", "FEA"])
-        plt.grid(visible=True, axis="y")
-        plt.xticks([*plt.xticks()[0], max_value])
-        # plt.yticks([0, 1])
-        plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")
-        plt.show()
+    # Plot or print evaluation metrics.
+    cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
+        outputs.flatten(),
+        labels.flatten(),
+        max_value,
+        plot=not queue,
+    )
 
-        # NUMBER_COLUMNS = 4
-        # for i, (output, label_image) in enumerate(zip(outputs, labels)):
-        #     plt.subplot(math.ceil(len(outputs) / NUMBER_COLUMNS), NUMBER_COLUMNS, i+1)
-        #     cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(output[channel, ...], label_image[channel, ...], max_value)
-        #     plt.plot(bin_edges[1:], cdf_network, '-', color=Colors.BLUE)
-        #     plt.plot(bin_edges[1:], cdf_label, ':', color=Colors.RED)
-        #     if i == 0:
-        #         plt.legend(["CNN", "FEA"])
-        #     plt.grid(visible=True, axis='y')
-        #     plt.xticks([0, max_value])
-        #     plt.yticks([0, 1])
-        #     plt.title(f"[#{i+1}] {area_difference:0.2f}", fontsize=10, fontweight='bold')
-        # plt.suptitle(f"Area Metric", fontweight='bold')
-        # plt.tight_layout()  # Increase spacing between subplots
-        # plt.show()
+    max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
-        # Single-value error metrics.
-        mv, me, mae, mse, mre = [], [], [], [], []
-        results = {"Maximum Value": mv, "Mean Error": me, "Mean Absolute Error": mae, "Mean Squared Error": mse, "Mean Relative Error": mre}
-        for output, label_image in zip(outputs, labels):
-            mv.append(metrics.maximum_value(output, label_image))
-            me.append(metrics.mean_error(output, label_image))
-            mae.append(metrics.mean_absolute_error(output, label_image))
-            mse.append(metrics.mean_squared_error(output, label_image))
-            mre.append(metrics.mean_relative_error(output, label_image))
-        
-        sample_numbers = range(1, len(outputs)+1)
-        plt.figure()
-        for i, (metric, result) in enumerate(results.items()):
-            plt.subplot(3, 2, i+1)
-            plt.grid()
-            if isinstance(result[0], tuple):
-                plt.plot(sample_numbers, [_[1] for _ in result], 'o', color=Colors.RED, label="FEA")
-                plt.plot(sample_numbers, [_[0] for _ in result], '.', color=Colors.BLUE, label="CNN")
-            else:
-                plt.plot(sample_numbers, result, '.', markeredgewidth=5, color=Colors.BLUE)
-                average = np.mean(result)
-                plt.axhline(average, color=Colors.BLUE_LIGHT, label=f"{average:.2f} average")
-            plt.legend()
-            plt.xlabel("Sample Number")
-            plt.xticks([sample_numbers[0], sample_numbers[-1]])
-            plt.title(metric)
-        plt.show()
-
+    mae = metrics.mean_absolute_error(output, label_image)
+    mse = metrics.mean_squared_error(output, label_image)
+    mre = metrics.mean_relative_error(output, label_image)
+    print(f"Mean absolute error: {mae}")
+    print(f"Mean squared error: {mse}")
+    print(f"Mean relative error: {mre}%")
 
 if __name__ == '__main__':
     kwargs={
