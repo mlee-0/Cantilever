@@ -1,5 +1,5 @@
 """
-Run this script to perform stratified sampling and write text files containing subsets of a dataset.
+Run this script to perform stratified sampling on a dataset and write a subset to a text file.
 """
 
 import math
@@ -53,20 +53,19 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
     actual_subset_size = np.sum(required_frequencies) if minimum_frequency >= required_frequencies[minimum_bin] else np.sum(required_frequencies) * (minimum_frequency / required_frequencies[minimum_bin])
     recommended_raw_size = actual_raw_size * required_frequencies[minimum_bin] / minimum_frequency
     
-    if actual_subset_size < subset_size:
-        plt.figure()
-        plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
-        plt.plot(
-            [bin_edges[:-1], bin_edges[1:]],
-            [required_frequencies, required_frequencies],
-            "k--"
-        )
-        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight="bold", horizontalalignment="center")
-        plt.xticks(bin_edges, rotation=90, fontsize=6)
-        plt.xlabel("Stress")
-        plt.title(f"Subset contains {actual_subset_size} out of desired {subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
-        plt.legend([f"Samples required in each bin"])
-        plt.show()
+    plt.figure()
+    plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
+    plt.plot(
+        [bin_edges[:-1], bin_edges[1:]],
+        [required_frequencies, required_frequencies],
+        "k--"
+    )
+    plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight="bold", horizontalalignment="center")
+    plt.xticks(bin_edges, rotation=90, fontsize=6)
+    plt.xlabel("Stress")
+    plt.title(f"Subset contains {actual_subset_size} out of desired {subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
+    plt.legend([f"Samples required in each bin"])
+    plt.show()
 
     # Verify that there are enough samples to create a dataset of the desired size.
     print(f"The subset contains {actual_subset_size} out of the desired {subset_size}.")
@@ -89,7 +88,21 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
 
 
 if __name__ == "__main__":
-    samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    filename = "subset.txt"
-
-    stratified_samples = stratify_samples(samples, "Cantilever/Labels", filename, subset_size=1000, bins=15, nonuniformity=1)
+    stratify_samples(
+        "Cantilever/Labels 3D",
+        "subset_2d_500.txt",
+        subset_size=500,
+        bins=10,
+        nonuniformity=1
+    )
+    
+    # import matplotlib.pyplot as plt
+    # labels = read_pickle(os.path.join(FOLDER_ROOT, "Labels 3D", "labels_to_50k.pickle"))
+    # y = np.max(labels, axis=(1, 2, 3))
+    # y = labels.flatten() ** (1/5)
+    # plt.figure()
+    # plt.hist(y, bins=100)
+    # # plt.hist(y, bins=100)
+    # # plt.title("Natural logarithm (modified to avoid -inf): ln(y + 1)")
+    # plt.title("y ^ 1/5")
+    # plt.show()
