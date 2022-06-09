@@ -120,8 +120,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     Train and test the model.
     """
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Using {device} device.')
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using {device} device.")
     
     assert dataset_id in {2, 3}, f"Invalid dataset ID: {dataset_id}."
 
@@ -306,16 +306,16 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
         if not queue:
             plt.figure()
             if previous_training_loss:
-                plt.plot(range(1, epochs[0]), previous_training_loss, '.:', color=Colors.GRAY_LIGHT)
+                plt.plot(range(1, epochs[0]), previous_training_loss, ".:", color=Colors.GRAY_LIGHT)
             if previous_validation_loss:
-                plt.plot(range(1, epochs[0]), previous_validation_loss, '.-', color=Colors.GRAY_LIGHT)
-            plt.plot(epochs, training_loss, '.:', color=Colors.ORANGE)
-            plt.plot(epochs, validation_loss, '.-', color=Colors.BLUE)
+                plt.plot(range(1, epochs[0]), previous_validation_loss, ".-", color=Colors.GRAY_LIGHT)
+            plt.plot(epochs, training_loss, ".:", color=Colors.ORANGE)
+            plt.plot(epochs, validation_loss, ".-", color=Colors.BLUE)
             plt.legend()
             plt.ylim(bottom=0)
-            plt.xlabel('Epochs')
-            plt.ylabel('Loss')
-            plt.grid(axis='y')
+            plt.xlabel("Epochs")
+            plt.ylabel("Loss")
+            plt.grid(axis="y")
             plt.show()
 
     # The maximum value found in the entire dataset, used to normalize values for images.
@@ -352,18 +352,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     labels = np.concatenate(labels, axis=0)
 
     # Concatenate corresponding model output images and label images for specified samples and write them to files.
-    indices = range(0, len(test_dataset), 10)
+    indices = range(0, len(test_dataset), 20)
     for i in indices:
         image = np.vstack((
             np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
             np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
         ))
-        # if dataset_id == 2:
-        # elif dataset_id == 3:
-        #     image = np.vstack((
-        #         np.hstack([labels[i, 0, ..., channel] for channel in range(labels.shape[-1])]),
-        #         np.hstack([outputs[i, 0, ..., channel] for channel in range(outputs.shape[-1])]),
-        #     ))
         write_image(
             array_to_colormap(image, max_value),
             os.path.join(folder_results, f"{i+1}_fea_model.png"),
@@ -373,8 +367,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Plot 3D voxel models of the specified model outputs.
     if not queue and dataset_id == 3:
         for i in {3, 14, 19}:
-            fig = plt.figure()
-            ax = fig.gca(projection="3d")
+            plt.figure()
+            ax = plt.axes(projection="3d")
             rgb = np.empty(outputs.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
             for channel in range(outputs.shape[1]):
                 rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], max_value)
@@ -406,11 +400,11 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     mae = metrics.mean_absolute_error(output, label_image)
     mse = metrics.mean_squared_error(output, label_image)
     mre = metrics.mean_relative_error(output, label_image)
-    print(f"Mean absolute error: {mae}")
-    print(f"Mean squared error: {mse}")
-    print(f"Mean relative error: {mre}%")
+    print(f"Mean absolute error: {mae:,.2f}")
+    print(f"Mean squared error: {mse:,.2f}")
+    print(f"Mean relative error: {mre:,.2f}%")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     kwargs={
         "epoch_count": 20,
         "learning_rate": 1e-7,
@@ -418,10 +412,10 @@ if __name__ == '__main__':
         "Model": Nie,
         "dataset_id": 3,
         "training_split": (0.8, 0.1, 0.1),
-        
+
         "filename_model": "model.pth",
-        "train_existing": True,
-        "test_only": False,
+        "train_existing": 1,
+        "test_only": 1,
     }
 
     main(**kwargs)

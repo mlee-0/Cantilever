@@ -37,8 +37,8 @@ def area_metric(network: np.ndarray, label: np.ndarray, max_value, plot=False) -
 
 def maximum_value(network: np.ndarray, label: np.ndarray, plot=False) -> Tuple[float, float]:
     """Plot and return the maxima along the first dimension in both inputs."""
-    max_network = np.max(network, axis=0)
-    max_label = np.max(network, axis=0)
+    max_network = np.max(network, axis=(1, 2, 3))
+    max_label = np.max(label, axis=(1, 2, 3))
 
     if plot:
         plt.figure()

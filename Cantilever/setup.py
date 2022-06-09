@@ -78,7 +78,7 @@ OUTPUT_SIZE_3D = (NODES_Y, NODES_X, NODES_Z)
 
 def plot_histogram(values: np.ndarray, title=None) -> None:
     plt.figure()
-    plt.hist(values, bins=100, rwidth=0.75, color='#0095ff')
+    plt.hist(values, bins=100, rwidth=0.75, color="#0095ff")
     if title:
         plt.title(title)
     plt.show()
@@ -211,7 +211,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     number_samples = len(samples)
     
     # Get and sort all FEA filenames.
-    filenames = glob.glob(os.path.join(folder, '*.txt'))
+    filenames = glob.glob(os.path.join(folder, "*.txt"))
     filenames = sorted(filenames)
 
     # Only use the filenames that match the specified sample numbers (filename "...000123.txt" matches sample number 123).
@@ -230,7 +230,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
         
         # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
         node_values = [
-            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(','))]
+            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(","))]
             for line in lines
         ]
         # Sort the values using the coordinates.
@@ -253,7 +253,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
             )
         
         if (i+1) % 100 == 0:
-            print(f"Reading label {i+1} / {number_samples}...", end='\r')
+            print(f"Reading label {i+1} / {number_samples}...", end="\r")
     print()
 
     return labels
@@ -263,7 +263,7 @@ def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
     number_samples = len(samples)
     
     # Get and sort all FEA filenames.
-    filenames = glob.glob(os.path.join(folder, '*.txt'))
+    filenames = glob.glob(os.path.join(folder, "*.txt"))
     filenames = sorted(filenames)
 
     # Only use the filenames that match the specified sample numbers (filename "...000123.txt" matches sample number 123).
@@ -282,7 +282,7 @@ def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
         
         # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
         node_values = [
-            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(','))]
+            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(","))]
             for line in lines
         ]
         # Sort the values using the coordinates.
@@ -299,7 +299,7 @@ def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
         )
         
         if (i+1) % 100 == 0:
-            print(f"Reading label {i+1} / {number_samples}...", end='\r')
+            print(f"Reading label {i+1} / {number_samples}...", end="\r")
     print()
 
     return labels

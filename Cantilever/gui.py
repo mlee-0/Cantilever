@@ -334,7 +334,7 @@ class MainWindow(QMainWindow):
 
     def show_about(self):
         """Show a window displaying the README file."""
-        with open("README.md", 'r') as f:
+        with open("README.md", "r") as f:
             text = f.read()
 
         text_edit = QTextEdit(readOnly=True)
@@ -354,29 +354,29 @@ class MainWindow(QMainWindow):
             axis.plot(
                 range(epochs[0] - len(previous_training_loss), epochs[0]),
                 previous_training_loss,
-                '.:', color=Colors.GRAY_LIGHT
+                ".:", color=Colors.GRAY_LIGHT
             )
         if previous_validation_loss and not self.action_toggle_loss.isChecked():
             axis.plot(
                 range(epochs[0] - len(previous_validation_loss), epochs[0]),
                 previous_validation_loss,
-                '.-', color=Colors.GRAY_LIGHT
+                ".-", color=Colors.GRAY_LIGHT
             )
         
         # Plot current losses.
         if training_loss:
-            axis.plot(epochs[:len(training_loss)], training_loss, '.:', color=Colors.ORANGE, label="Training")
+            axis.plot(epochs[:len(training_loss)], training_loss, ".:", color=Colors.ORANGE, label="Training")
             axis.annotate(f"{training_loss[-1]:,.0f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
             axis.legend()
         if validation_loss:
-            axis.plot(epochs[:len(validation_loss)], validation_loss, '.-', color=Colors.BLUE, label="Validation")
+            axis.plot(epochs[:len(validation_loss)], validation_loss, ".-", color=Colors.BLUE, label="Validation")
             axis.annotate(f"{validation_loss[-1]:,.0f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
             axis.legend()
         
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
-        axis.grid(axis='y')
+        axis.grid(axis="y")
         self.canvas_loss.draw()
     
     def plot_metrics(self):

@@ -28,21 +28,21 @@ class Nie(nn.Module):
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
             nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         self.se_1 = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, padding='same'),
+            nn.Conv2d(64, 64, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
-            nn.Conv2d(64, 64, kernel_size=3, padding='same'),
+            nn.Conv2d(64, 64, kernel_size=3, padding="same"),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.output_size_se_1 = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
@@ -122,21 +122,21 @@ class Nie3d(nn.Module):
         )
         # Reduces all 3 dimensions by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
             nn.BatchNorm3d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces all 3 dimensions by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate'),
+            nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         self.se_1 = nn.Sequential(
-            nn.Conv3d(64, 64, kernel_size=3, padding='same'),
+            nn.Conv3d(64, 64, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
-            nn.Conv3d(64, 64, kernel_size=3, padding='same'),
+            nn.Conv3d(64, 64, kernel_size=3, padding="same"),
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.output_size_se_1 = [round(_ / 2 / 2) for _ in input_size]
@@ -289,12 +289,12 @@ class AutoencoderCnn(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
+            nn.Conv2d(16, 32, kernel_size=3, stride=(2,2), padding=1, padding_mode="replicate"),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
         )
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=(2,2), padding=1, padding_mode='replicate'),
+            nn.Conv2d(32, 64, kernel_size=3, stride=(2,2), padding=1, padding_mode="replicate"),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )

@@ -60,9 +60,9 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
         plt.plot(
             [bin_edges[:-1], bin_edges[1:]],
             [required_frequencies, required_frequencies],
-            'k--'
+            "k--"
         )
-        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight='bold', horizontalalignment='center')
+        plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight="bold", horizontalalignment="center")
         plt.xticks(bin_edges, rotation=90, fontsize=6)
         plt.xlabel("Stress")
         plt.title(f"Subset contains {actual_subset_size} out of desired {subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)
