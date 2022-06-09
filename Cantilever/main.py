@@ -130,7 +130,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     # Load the samples.
-    samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES))
+    samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
     samples = samples.iloc[:30000, :]
 
     # Get the specified subset of the dataset, if provided.
@@ -399,10 +399,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     mae = metrics.mean_absolute_error(output, label_image)
     mse = metrics.mean_squared_error(output, label_image)
+    rmse = metrics.root_mean_squared_error(output, label_image)
     mre = metrics.mean_relative_error(output, label_image)
-    print(f"Mean absolute error: {mae:,.2f}")
-    print(f"Mean squared error: {mse:,.2f}")
-    print(f"Mean relative error: {mre:,.2f}%")
+    print(f"MAE: {mae:,.2f}")
+    print(f"MSE: {mse:,.2f}")
+    print(f"RMSE: {rmse:,.2f}")
+    print(f"MRE: {mre:,.2f}%")
 
 if __name__ == "__main__":
     kwargs={

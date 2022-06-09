@@ -3,9 +3,7 @@ Run this script to generate dataset files.
 """
 
 
-import math
 import os
-import pickle
 import random
 
 import numpy as np
@@ -167,17 +165,14 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         print(f'Wrote {filename}.')
 
 
-NUMBER_SAMPLES = 10000
-# Must be 1 if creating a new dataset.
-START_SAMPLE_NUMBER = 1
-# Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
-WRITE_MODE = "w"
-
-# Dataset file names.
-FILENAME_SAMPLES = "samples.csv"
-
 if __name__ == "__main__":
-    filename_sample = FILENAME_SAMPLES
+    NUMBER_SAMPLES = 10000
+    # Must be 1 if creating a new dataset.
+    START_SAMPLE_NUMBER = 1
+    # Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
+    WRITE_MODE = "w"
+
+    filename_sample = "samples.csv"
     filename_ansys = "ansys_script.lgw"
 
     if START_SAMPLE_NUMBER > 1 and WRITE_MODE == "w":
