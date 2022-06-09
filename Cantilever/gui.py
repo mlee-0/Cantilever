@@ -16,9 +16,9 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QFileDialog
 
+from helpers import Colors, FOLDER_ROOT
 import main
 import networks
-from setup import Colors, FOLDER_ROOT
 
 
 class MainWindow(QMainWindow):

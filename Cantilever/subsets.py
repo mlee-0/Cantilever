@@ -4,13 +4,12 @@ Run this script to perform stratified sampling and write text files containing s
 
 import math
 import os
-import pickle
 
 import numpy as np
 import pandas as pd
 
-from datasets import FILENAME_SAMPLES, read_samples
-from setup import *
+from datasets import read_samples
+from helpers import *
 
 
 def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
@@ -90,7 +89,7 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
 
 
 if __name__ == "__main__":
-    samples = read_samples(os.path.join(FOLDER_ROOT, FILENAME_SAMPLES))
+    samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
     filename = "subset.txt"
 
     stratified_samples = stratify_samples(samples, "Cantilever/Labels", filename, subset_size=1000, bins=15, nonuniformity=1)

@@ -3,7 +3,6 @@ Networks with different architectures.
 """
 
 import inspect
-import math
 import sys
 from typing import Tuple
 

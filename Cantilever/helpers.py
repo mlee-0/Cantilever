@@ -24,6 +24,9 @@ else:
     GOOGLE_COLAB = True
     drive.mount("/content/drive")
 
+# Folders and files.
+FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
+
 @dataclass
 class Parameter:
     """A dataclass that stores settings for a parameter."""
@@ -56,9 +59,6 @@ KEY_Z_LOAD = "Load Z"
 KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
-
-# Folders and files.
-FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
 
 # Size of input images (height, width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_SIZE = (round(height.high / height.step), round(length.high / length.step))

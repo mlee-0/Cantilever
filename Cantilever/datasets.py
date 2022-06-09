@@ -9,7 +9,7 @@ import random
 import numpy as np
 import pandas as pd
 
-from setup import *
+from helpers import *
 
 
 def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:

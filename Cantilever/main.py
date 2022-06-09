@@ -16,9 +16,9 @@ from torch import nn
 from torch.utils.data import Dataset, Subset, DataLoader
 
 from datasets import *
+from helpers import *
 import metrics
 from networks import *
-from setup import *
 
 
 # Free memory between subsequent runs.

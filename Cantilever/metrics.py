@@ -3,7 +3,7 @@ from typing import Tuple
 from matplotlib import pyplot as plt
 import numpy as np
 
-from setup import Colors
+from helpers import Colors
 
 
 def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
