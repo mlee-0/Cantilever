@@ -45,6 +45,7 @@ def maximum_value(predicted: np.ndarray, true: np.ndarray, plot=False) -> Tuple[
         plt.plot(max_true, 'o', color=Colors.RED, label="True")
         plt.plot(max_predicted, '.', color=Colors.BLUE, label="Predicted")
         plt.legend()
+        plt.show()
     
     return max_predicted, max_true
 

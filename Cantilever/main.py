@@ -8,7 +8,6 @@ import glob
 import os
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pandas as pd
 import torch
@@ -44,11 +43,17 @@ class CantileverDataset(Dataset):
             self.labels = generate_label_images(samples, folder_labels, is_3d=is_3d)
             file = os.path.join(folder_labels, f"labels.pickle")
             write_pickle(self.labels, file)
-        print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
+        print(f"Label images take up {sys.getsizeof(self.labels)/1e6:,.2f} MB.")
+
+        # The maximum value found in the entire dataset.
+        self.max_value = np.max(self.labels)
+
+        # Apply a transformation to the label values.
+        self.labels = self.transform(self.labels, inverse=False)
         
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
-        print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
+        print(f"Input images take up {sys.getsizeof(self.inputs)/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
         self.loads = (samples[load.name] - load.low) / (load.high - load.low)
@@ -67,6 +72,14 @@ class CantileverDataset(Dataset):
             (np.copy(self.inputs[index, ...]), self.loads[index]),
             np.copy(self.labels[index, ...]),
         )
+    
+    @staticmethod
+    def transform(y: np.ndarray, inverse=False) -> np.ndarray:
+        """Apply a transformation or its inverse to the data."""
+        if not inverse:
+            return y ** (1/5)
+        else:
+            return y ** 5
 
 class CantileverDataset3d(Dataset):
     """Dataset that contains input images and label images."""
@@ -86,11 +99,14 @@ class CantileverDataset3d(Dataset):
             self.labels = generate_label_images_3d(samples, folder_labels)
             file = os.path.join(folder_labels, f"labels.pickle")
             write_pickle(self.labels, file)
-        print(f"Label images take up {sys.getsizeof(self.labels)/1e9:,.2f} GB.")
+        print(f"Label images take up {sys.getsizeof(self.labels)/1e6:,.2f} MB.")
+
+        # The maximum value found in the entire dataset.
+        self.max_value = np.max(self.labels)
         
         # Create input images.
         self.inputs = generate_input_images_3d(samples)
-        print(f"Input images take up {sys.getsizeof(self.inputs)/1e9:,.2f} GB.")
+        print(f"Input images take up {sys.getsizeof(self.inputs)/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
         self.loads = (samples[load.name] - load.low) / (load.high - load.low)
@@ -155,13 +171,13 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # elif dataset_id == 3:
     #     dataset = CantileverDataset3d(samples, folder_labels)
     train_dataset = Subset(dataset, range(0, train_size))
-    validation_dataset = Subset(dataset, range(train_size, train_size+validate_size))
+    validate_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
+    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
     size_train_dataset = len(train_dataloader)
-    size_validation_dataset = len(validation_dataloader)
+    size_validate_dataset = len(validate_dataloader)
     size_test_dataset = len(test_dataloader)
 
     # Initialize the model and optimizer and load their parameters if they have been saved previously.
@@ -241,7 +257,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 if (batch) % 100 == 0:
                     print(f"Training batch {batch}/{size_train_dataset} with average loss {loss/batch:,.2f}...", end="\r")
                     if queue:
-                        info_gui["progress_batch"] = (batch, size_train_dataset+size_validation_dataset)
+                        info_gui["progress_batch"] = (batch, size_train_dataset+size_validate_dataset)
                         info_gui["training_loss"] = [*training_loss, loss/batch]
                         queue.put(info_gui)
             print()
@@ -253,15 +269,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             model.train(False)
             loss = 0
             with torch.no_grad():
-                for batch, ((input_image, load), label_image) in enumerate(validation_dataloader, 1):
+                for batch, ((input_image, load), label_image) in enumerate(validate_dataloader, 1):
                     input_image = input_image.to(device)
                     label_image = label_image.to(device)
                     output = model(input_image)
                     loss += loss_function(output, label_image.float()).item()
                     if (batch) % 100 == 0:
-                        print(f"Validating batch {batch}/{size_validation_dataset}...", end="\r")
+                        print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
                         if queue:
-                            info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validation_dataset)
+                            info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validate_dataset)
                             queue.put(info_gui)
             print()
             loss /= batch
@@ -318,9 +334,6 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             plt.grid(axis="y")
             plt.show()
 
-    # The maximum value found in the entire dataset, used to normalize values for images.
-    max_value = np.max(dataset.labels)
-
     # Test on the testing dataset.
     model.train(False)
     loss = 0
@@ -336,6 +349,10 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             # Convert to NumPy arrays for evaluation metric calculations.
             output = output.cpu().detach().numpy()
             label_image = label_image.cpu().numpy()
+
+            # Apply the inverse of the transform previously applied to the data to obtain the original units.
+            output = dataset.transform(output, inverse=True)
+            label_image = dataset.transform(label_image, inverse=True)
             
             labels.append(label_image)
             outputs.append(output)
@@ -359,7 +376,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
         ))
         write_image(
-            array_to_colormap(image, max_value),
+            array_to_colormap(image, dataset.max_value),
             os.path.join(folder_results, f"{i+1}_fea_model.png"),
             )
     print(f"Wrote {len(indices)} test images in {folder_results}.")
@@ -371,7 +388,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             ax = plt.axes(projection="3d")
             rgb = np.empty(outputs.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
             for channel in range(outputs.shape[1]):
-                rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], max_value)
+                rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], dataset.max_value)
             rgb /= 255
             # Make an array with a True region with the height, length, and width of the current sample.
             filled = labels[i, ...].transpose((2, 0, 1)) != 0
@@ -391,7 +408,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
         outputs.flatten(),
         labels.flatten(),
-        max_value,
+        dataset.max_value,
         plot=not queue,
     )
 
@@ -410,12 +427,12 @@ if __name__ == "__main__":
     kwargs={
         "epoch_count": 20,
         "learning_rate": 1e-7,
-        "batch_size": 1,
+        "batch_size": 8,
         "Model": Nie,
         "dataset_id": 3,
         "training_split": (0.8, 0.1, 0.1),
 
-        "filename_model": "model.pth",
+        "filename_model": "model_3d.pth",
         "train_existing": 1,
         "test_only": 1,
     }
