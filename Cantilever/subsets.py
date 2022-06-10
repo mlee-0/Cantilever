@@ -97,12 +97,11 @@ if __name__ == "__main__":
     )
     
     # import matplotlib.pyplot as plt
-    # labels = read_pickle(os.path.join(FOLDER_ROOT, "Labels 3D", "labels_to_50k.pickle"))
-    # y = np.max(labels, axis=(1, 2, 3))
-    # y = labels.flatten() ** (1/5)
+    # labels = read_pickle(os.path.join(FOLDER_ROOT, "Labels", "labels.pickle"))
+    # y = labels.flatten()
+    # # y = np.max(y, axis=(1, 2, 3))
+    # y = np.log(y + 1)
     # plt.figure()
     # plt.hist(y, bins=100)
-    # # plt.hist(y, bins=100)
-    # # plt.title("Natural logarithm (modified to avoid -inf): ln(y + 1)")
-    # plt.title("y ^ 1/5")
+    # # plt.title("y ^ 1/5")
     # plt.show()

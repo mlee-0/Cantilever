@@ -43,7 +43,7 @@ class CantileverDataset(Dataset):
             self.labels = generate_label_images(samples, folder_labels, is_3d=is_3d)
             file = os.path.join(folder_labels, f"labels.pickle")
             write_pickle(self.labels, file)
-        print(f"Label images take up {sys.getsizeof(self.labels)/1e6:,.2f} MB.")
+        print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
 
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
@@ -53,7 +53,7 @@ class CantileverDataset(Dataset):
         
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
-        print(f"Input images take up {sys.getsizeof(self.inputs)/1e6:,.2f} MB.")
+        print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
         self.loads = (samples[load.name] - load.low) / (load.high - load.low)
@@ -77,9 +77,9 @@ class CantileverDataset(Dataset):
     def transform(y: np.ndarray, inverse=False) -> np.ndarray:
         """Apply a transformation or its inverse to the data."""
         if not inverse:
-            return y ** (1/5)
+            return y ** (1/2)
         else:
-            return y ** 5
+            return y ** 2
 
 class CantileverDataset3d(Dataset):
     """Dataset that contains input images and label images."""
@@ -99,14 +99,14 @@ class CantileverDataset3d(Dataset):
             self.labels = generate_label_images_3d(samples, folder_labels)
             file = os.path.join(folder_labels, f"labels.pickle")
             write_pickle(self.labels, file)
-        print(f"Label images take up {sys.getsizeof(self.labels)/1e6:,.2f} MB.")
+        print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
 
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
         
         # Create input images.
         self.inputs = generate_input_images_3d(samples)
-        print(f"Input images take up {sys.getsizeof(self.inputs)/1e6:,.2f} MB.")
+        print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
         self.loads = (samples[load.name] - load.low) / (load.high - load.low)
@@ -337,6 +337,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     # Test on the testing dataset.
     model.train(False)
     loss = 0
+    inputs = []
     outputs = []
     labels = []
     with torch.no_grad():
@@ -347,6 +348,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             loss += loss_function(output, label_image.float()).item()
 
             # Convert to NumPy arrays for evaluation metric calculations.
+            input_image = input_image.cpu().detach().numpy()
             output = output.cpu().detach().numpy()
             label_image = label_image.cpu().numpy()
 
@@ -354,6 +356,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             output = dataset.transform(output, inverse=True)
             label_image = dataset.transform(label_image, inverse=True)
             
+            inputs.append(input_image)
             labels.append(label_image)
             outputs.append(output)
             
@@ -365,6 +368,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     print(f"Average testing loss: {loss:,.2f}")
     
     # Concatenate testing results from all batches into a single array.
+    inputs = np.concatenate(inputs, axis=0)
     outputs = np.concatenate(outputs, axis=0)
     labels = np.concatenate(labels, axis=0)
 
@@ -380,12 +384,20 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             os.path.join(folder_results, f"{i+1}_fea_model.png"),
             )
     print(f"Wrote {len(indices)} test images in {folder_results}.")
-    
-    # Plot 3D voxel models of the specified model outputs.
+
+    # # Write images for each channel in the specified input images.
+    # for i in (720, 1060, 2960):
+    #     for channel in range(inputs.shape[1]):
+    #         write_image(
+    #             inputs[i, channel, ...],
+    #             os.path.join(folder_results, f"input_{i+1}_channel_{channel+1}.png"),
+    #         )
+
+    # Plot 3D voxel models for corresponding model outputs and labels for the specified samples.
     if not queue and dataset_id == 3:
-        for i in {3, 14, 19}:
-            plt.figure()
-            ax = plt.axes(projection="3d")
+        for i in (720, 1060, 2960):
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 2, 1, projection="3d")
             rgb = np.empty(outputs.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
             for channel in range(outputs.shape[1]):
                 rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], dataset.max_value)
@@ -399,9 +411,30 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 linewidth=0.25,
                 edgecolors=(1, 1, 1),
             )
-            ax.set(xlabel="X", ylabel="Y", zlabel="Z")
+            ax.set(xlabel="X (Length)", ylabel="Z (Width)", zlabel="Y (Height)")
             axis_limits = [0, max(outputs.shape[1:])]
             ax.set(xlim=axis_limits, ylim=axis_limits, zlim=axis_limits)
+            ax.set_title("Predicted")
+            
+            ax = fig.add_subplot(1, 2, 2, projection="3d")
+            rgb = np.empty(labels.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
+            for channel in range(labels.shape[1]):
+                rgb[channel, :, :, :] = array_to_colormap(labels[i, channel, ...], dataset.max_value)
+            rgb /= 255
+            # Make an array with a True region with the height, length, and width of the current sample.
+            filled = labels[i, ...].transpose((2, 0, 1)) != 0
+            # Plot voxels using arrays of shape (X = length, Y = width, Z = height).
+            voxels = ax.voxels(
+                filled=filled,
+                facecolors=rgb.transpose((2, 0, 1, 3)),
+                linewidth=0.25,
+                edgecolors=(1, 1, 1),
+            )
+            ax.set(xlabel="X (Length)", ylabel="Z (Width)", zlabel="Y (Height)")
+            axis_limits = [0, max(labels.shape[1:])]
+            ax.set(xlim=axis_limits, ylim=axis_limits, zlim=axis_limits)
+            ax.set_title("True")
+            
             plt.show()
 
     # Plot or print evaluation metrics.
@@ -414,10 +447,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
+    me = metrics.mean_error(output, label_image)
     mae = metrics.mean_absolute_error(output, label_image)
     mse = metrics.mean_squared_error(output, label_image)
     rmse = metrics.root_mean_squared_error(output, label_image)
     mre = metrics.mean_relative_error(output, label_image)
+    print(f"ME: {me:,.2f}")
     print(f"MAE: {mae:,.2f}")
     print(f"MSE: {mse:,.2f}")
     print(f"RMSE: {rmse:,.2f}")

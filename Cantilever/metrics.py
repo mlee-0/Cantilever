@@ -29,8 +29,7 @@ def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) 
         plt.plot(bin_edges[1:], cdf_true, ":", color=Colors.RED, label="True")
         plt.legend()
         plt.grid(visible=True, axis="y")
-        plt.xticks([*plt.xticks()[0], max_value])
-        plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")
+        # plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")
         plt.show()
 
     return cdf_predicted, cdf_true, bin_edges, area_difference
