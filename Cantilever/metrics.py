@@ -25,9 +25,9 @@ def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) 
 
     if plot:
         plt.figure()
-        plt.plot(bin_edges[1:], cdf_predicted, "-", color=Colors.BLUE)
-        plt.plot(bin_edges[1:], cdf_true, ":", color=Colors.RED)
-        plt.legend(["CNN", "FEA"])
+        plt.plot(bin_edges[1:], cdf_predicted, "-", color=Colors.BLUE, label="Predicted")
+        plt.plot(bin_edges[1:], cdf_true, ":", color=Colors.RED, label="True")
+        plt.legend()
         plt.grid(visible=True, axis="y")
         plt.xticks([*plt.xticks()[0], max_value])
         plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")
@@ -39,12 +39,16 @@ def maximum_value(predicted: np.ndarray, true: np.ndarray, plot=False) -> Tuple[
     """Plot and return the maximum values along the first dimension in both inputs."""
     max_predicted = np.max(predicted, axis=(1, 2, 3))
     max_true = np.max(true, axis=(1, 2, 3))
+    # Sort both arrays together sorting by true values.
+    max_predicted, max_true = zip(*sorted(zip(max_predicted, max_true), key=lambda _: _[1]))
+    max_predicted, max_true = np.array(max_predicted), np.array(max_true)
 
     if plot:
         plt.figure()
-        plt.plot(max_true, 'o', color=Colors.RED, label="True")
-        plt.plot(max_predicted, '.', color=Colors.BLUE, label="Predicted")
+        plt.bar(range(len(max_true)), max_true, width=1.0, color=Colors.RED, label="True")
+        plt.bar(range(len(max_predicted)), max_predicted, width=0.5, color=Colors.BLUE, label="Predicted")
         plt.legend()
+        plt.title("Maximum Value")
         plt.show()
     
     return max_predicted, max_true

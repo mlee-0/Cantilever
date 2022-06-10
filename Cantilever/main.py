@@ -285,7 +285,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             print(f"Average validation loss: {loss:,.2f}")
 
             # Save the model parameters periodically.
-            if (epoch) % 1 == 0:
+            if (epoch) % 5 == 0:
                 save(
                     filepath_model,
                     epoch=epoch,
