@@ -82,7 +82,12 @@ class CantileverDataset(Dataset):
             return y ** 2
 
 class CantileverDataset3d(Dataset):
-    """Dataset that contains input images and label images."""
+    """
+    Dataset that contains 5D input images and label images for use with 3D convolution.
+
+    Input images have shape (batch, channel, height, length, width).
+    Label images have shape (batch, channel=1, height, length, width).
+    """
     def __init__(self, samples: pd.DataFrame):
         self.number_samples = len(samples)
 
@@ -100,6 +105,9 @@ class CantileverDataset3d(Dataset):
 
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
+
+        # Apply a transformation to the label values.
+        self.labels = self.transform(self.labels, inverse=False)
         
         # Create input images.
         self.inputs = generate_input_images_3d(samples)
@@ -143,7 +151,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device.")
     
-    assert dataset_id in {2, 3}, f"Invalid dataset ID: {dataset_id}."
+    assert dataset_id in {2, 3, 4}, f"Invalid dataset ID: {dataset_id}."
 
     # Files and folders.
     filepath_model = os.path.join(FOLDER_ROOT, filename_model)
@@ -151,7 +159,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples.iloc[:30000, :]
+    samples = samples.iloc[:50000, :]
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
@@ -169,8 +177,12 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     print(f"Split {sample_size} samples into {train_size} training / {validate_size} validation / {test_size} test.")
     
     # Create the training, validation, and testing dataloaders.
-    dataset = CantileverDataset(samples, is_3d=dataset_id == 3)
-    # dataset = CantileverDataset3d(samples)
+    if dataset_id == 2:
+        dataset = CantileverDataset(samples, is_3d=False)
+    elif dataset_id == 3:
+        dataset = CantileverDataset(samples, is_3d=True)
+    elif dataset_id == 4:
+        dataset = CantileverDataset3d(samples)
     train_dataset = Subset(dataset, range(0, train_size))
     validate_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
@@ -374,7 +386,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     labels = np.concatenate(labels, axis=0)
 
     # Concatenate corresponding model output images and label images for specified samples and write them to files.
-    indices = range(0, len(test_dataset), 20)
+    indices = range(0, len(test_dataset), 100)
     for i in indices:
         image = np.vstack((
             np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
