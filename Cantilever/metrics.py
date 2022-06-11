@@ -35,9 +35,9 @@ def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) 
     return cdf_predicted, cdf_true, bin_edges, area_difference
 
 def maximum_value(predicted: np.ndarray, true: np.ndarray, plot=False) -> Tuple[float, float]:
-    """Plot and return the maximum values along the first dimension in both inputs."""
-    max_predicted = np.max(predicted, axis=(1, 2, 3))
-    max_true = np.max(true, axis=(1, 2, 3))
+    """Plot and return the maximum values for each subarray along the first dimension in both inputs."""
+    max_predicted = np.max(predicted, axis=tuple(range(1, predicted.ndim)))
+    max_true = np.max(true, axis=tuple(range(1, true.ndim)))
     # Sort both arrays together sorting by true values.
     max_predicted, max_true = zip(*sorted(zip(max_predicted, max_true), key=lambda _: _[1]))
     max_predicted, max_true = np.array(max_predicted), np.array(max_true)
