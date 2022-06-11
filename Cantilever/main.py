@@ -408,17 +408,26 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 
     # Plot 3D voxel models for corresponding model outputs and labels for the specified samples.
     if not queue and dataset_id == 3:
-        for i in (720, 1060, 2960):
+        for i in (0,):
+            TRANSPARENCY = 1.0
+
             fig = plt.figure()
+
+            # Plot the predicted values.
             ax = fig.add_subplot(1, 2, 1, projection="3d")
-            rgb = np.empty(outputs.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
-            for channel in range(outputs.shape[1]):
-                rgb[channel, :, :, :] = array_to_colormap(outputs[i, channel, ...], dataset.max_value)
+            # Array of RGBA values with shape (channel, height, length, 4).
+            rgb = np.empty(outputs.shape[1:4] + (4,))
+            if dataset_id == 4:
+                rgb[..., :3] = array_to_colormap(outputs[i, 0, ...], dataset.max_value)
+            else:
+                rgb[..., :3] = array_to_colormap(outputs[i, ...], dataset.max_value)
             rgb /= 255
-            # Make an array with a True region with the height, length, and width of the current sample.
+            # Set the transparency value.
+            rgb[..., -1] = TRANSPARENCY
+            # Boolean array representing the region of voxels to make visible.
             filled = labels[i, ...].transpose((2, 0, 1)) != 0
-            # Plot voxels using arrays of shape (X = length, Y = width, Z = height).
-            voxels = ax.voxels(
+            # Plot the output's length on the X-axis (X in FEA), the width on the Y-axis (Z in FEA), and the height on the Z-axis (Y in FEA).
+            ax.voxels(
                 filled=filled,
                 facecolors=rgb.transpose((2, 0, 1, 3)),
                 linewidth=0.25,
@@ -429,15 +438,17 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
             ax.set(xlim=axis_limits, ylim=axis_limits, zlim=axis_limits)
             ax.set_title("Predicted")
             
+            # Plot the true values.
             ax = fig.add_subplot(1, 2, 2, projection="3d")
-            rgb = np.empty(labels.shape[1:4] + (3,))  # Shape (channel, height, length, 3)
-            for channel in range(labels.shape[1]):
-                rgb[channel, :, :, :] = array_to_colormap(labels[i, channel, ...], dataset.max_value)
+            rgb = np.empty(labels.shape[1:4] + (4,))
+            if dataset_id == 4:
+                rgb[..., :3] = array_to_colormap(labels[i, 0, ...], dataset.max_value)
+            else:
+                rgb[..., :3] = array_to_colormap(labels[i, ...], dataset.max_value)
             rgb /= 255
-            # Make an array with a True region with the height, length, and width of the current sample.
+            rgb[..., -1] = TRANSPARENCY
             filled = labels[i, ...].transpose((2, 0, 1)) != 0
-            # Plot voxels using arrays of shape (X = length, Y = width, Z = height).
-            voxels = ax.voxels(
+            ax.voxels(
                 filled=filled,
                 facecolors=rgb.transpose((2, 0, 1, 3)),
                 linewidth=0.25,
@@ -474,15 +485,15 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
 if __name__ == "__main__":
     kwargs={
         "epoch_count": 20,
-        "learning_rate": 1e-7,
+        "learning_rate": 1e-3,
         "batch_size": 8,
-        "Model": Nie,
-        "dataset_id": 3,
+        "Model": Nie3d,
+        "dataset_id": 4,
         "training_split": (0.8, 0.1, 0.1),
 
-        "filename_model": "model_3d.pth",
-        "train_existing": 1,
-        "test_only": 1,
+        "filename_model": "model.pth",
+        "train_existing": 0,
+        "test_only": 0,
     }
 
     main(**kwargs)
