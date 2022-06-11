@@ -338,8 +338,8 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 plt.plot(range(1, epochs[0]), previous_training_loss, ".:", color=Colors.GRAY_LIGHT)
             if previous_validation_loss:
                 plt.plot(range(1, epochs[0]), previous_validation_loss, ".-", color=Colors.GRAY_LIGHT)
-            plt.plot(epochs, training_loss, ".:", color=Colors.ORANGE)
-            plt.plot(epochs, validation_loss, ".-", color=Colors.BLUE)
+            plt.plot(epochs, training_loss, ".:", color=Colors.ORANGE, label="Training")
+            plt.plot(epochs, validation_loss, ".-", color=Colors.BLUE, label="Validation")
             plt.legend()
             plt.ylim(bottom=0)
             plt.xlabel("Epochs")

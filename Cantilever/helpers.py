@@ -258,6 +258,30 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
 
     return labels
 
+def plot_input_image_3d(array: np.ndarray) -> None:
+    """Show a 3D voxel plot for each channel of the given 4D array with shape (channels, height, length, width)."""
+    fig = plt.figure()
+    channels = array.shape[0]
+
+    for channel in range(channels):
+        ax = fig.add_subplot(1, channels, channel+1, projection="3d")
+        print(array[channel, ...].max())
+        filled = array[channel, ...] != 0
+        rgb = np.stack([array[channel, ...]]*3, axis=-1)
+        # rgb = np.concatenate(
+        #     (rgb, np.where(array[channel, ...] != 0, 255, 255/4)),
+        #     axis=-1,
+        # )
+        rgb = rgb / 255
+        ax.voxels(
+            filled=filled,
+            facecolors=rgb,
+            linewidth=0.25,
+            edgecolors=(0.5, 0.5, 0.5),
+        )
+    
+    plt.show()
+
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
 
@@ -280,22 +304,28 @@ def hsv_to_rgb(array: np.ndarray) -> np.ndarray:
     return array
 
 def array_to_colormap(array: np.ndarray, divide_by=None) -> np.ndarray:
-    """Scale a 2D array of values to be inside [0, 1] and convert to a 3D color image."""
-    # Make copy of array so that original array is not modified.
+    """Convert an array of values of any range to an array of RGB colors ranging from red to blue. The returned array has one more dimension than the input array: (..., 3)."""
+    # Make copy of array so that the original array is not modified.
     array = np.copy(array)
 
-    if divide_by:
+    # Scale the values.
+    if divide_by is not None:
         array /= divide_by
     else:
         array /= np.max(array)
-    # Invert the values so that red represents high stresses.
+    # Invert the values so that red represents high values.
     array = 1 - array
-    # Constrain the values so that only colors from red to blue are shown, to match standard colors used in FEA.
+    # Scale the values to the range of hues from red to blue to match standard colors used in FEA.
     array = array * (240/360)
-    # Convert the output to an RGB array.
+    # Create an array of HSV values, using the array values as hues.
     SATURATION, VALUE = 1, 2/3
-    array = np.dstack((array, SATURATION * np.ones(array.shape, float), VALUE * np.ones(array.shape, float)))
-    array = hsv_to_rgb(array)
+    array = np.stack((array, np.full(array.shape, SATURATION), np.full(array.shape, VALUE)), axis=-1)
+    # Convert the array to RGB values.
+    array_flatten = array.reshape(-1, array.shape[-1])
+    for i in range(array_flatten.shape[0]):
+        array_flatten[i, :] = colorsys.hsv_to_rgb(*array_flatten[i, :])
+    array = array_flatten.reshape(array.shape)
+    array *= 255
     
     return array
 
