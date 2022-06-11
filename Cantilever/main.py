@@ -83,22 +83,19 @@ class CantileverDataset(Dataset):
 
 class CantileverDataset3d(Dataset):
     """Dataset that contains input images and label images."""
-    def __init__(self, samples: pd.DataFrame, folder_labels: str):
+    def __init__(self, samples: pd.DataFrame):
         self.number_samples = len(samples)
+
+        folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
         
         # Load previously generated label images.
         files = glob.glob(os.path.join(folder_labels, "*.pickle"))
         files.sort()
-        if files:
-            file = files[0]
-            self.labels = read_pickle(file)
-            # Transpose dimensions to form: (samples, 1, height (Y), length (X), width (Z))
-            self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
-        # Create label images and save them as a pickle file.
-        else:
-            self.labels = generate_label_images_3d(samples, folder_labels)
-            file = os.path.join(folder_labels, f"labels.pickle")
-            write_pickle(self.labels, file)
+        assert len(files) > 0
+        file = files[0]
+        self.labels = read_pickle(file)
+        # Transpose dimensions for shape: (samples, 1, height (Y), length (X), width (Z)).
+        self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
 
         # The maximum value found in the entire dataset.
@@ -125,6 +122,13 @@ class CantileverDataset3d(Dataset):
             (np.copy(self.inputs[index, ...]), self.loads[index]),
             np.copy(self.labels[index, ...]),
         )
+    
+    @staticmethod
+    def transform(y: np.ndarray, inverse=False) -> np.ndarray:
+        if not inverse:
+            return y ** (1/2)
+        else:
+            return y ** 2
 
 def save(filepath: str, **kwargs) -> None:
     """Save model parameters to a file."""
@@ -166,10 +170,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     
     # Create the training, validation, and testing dataloaders.
     dataset = CantileverDataset(samples, is_3d=dataset_id == 3)
-    # if dataset_id == 2:
-    #     dataset = CantileverDataset(samples, folder_labels)
-    # elif dataset_id == 3:
-    #     dataset = CantileverDataset3d(samples, folder_labels)
+    # dataset = CantileverDataset3d(samples)
     train_dataset = Subset(dataset, range(0, train_size))
     validate_dataset = Subset(dataset, range(train_size, train_size+validate_size))
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
@@ -254,7 +255,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                 # Adjust model parameters.
                 optimizer.step()
 
-                if (batch) % 100 == 0:
+                if (batch) % 50 == 0:
                     print(f"Training batch {batch}/{size_train_dataset} with average loss {loss/batch:,.2f}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (batch, size_train_dataset+size_validate_dataset)
@@ -274,7 +275,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
                     label_image = label_image.to(device)
                     output = model(input_image)
                     loss += loss_function(output, label_image.float()).item()
-                    if (batch) % 100 == 0:
+                    if (batch) % 50 == 0:
                         print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
                         if queue:
                             info_gui["progress_batch"] = (size_train_dataset+batch, size_train_dataset+size_validate_dataset)

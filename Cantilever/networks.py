@@ -173,19 +173,19 @@ class Nie3d(nn.Module):
         
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
         se_1 = self.se_1(x)
         se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
 
         # Add load value.
         if value_load is not None:

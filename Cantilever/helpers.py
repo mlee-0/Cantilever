@@ -258,52 +258,6 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
 
     return labels
 
-def generate_label_images_3d(samples: pd.DataFrame, folder: str) -> np.ndarray:
-    """Return a 5D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: (samples, channels, height, width, depth)."""
-    number_samples = len(samples)
-    
-    # Get and sort all FEA filenames.
-    filenames = glob.glob(os.path.join(folder, "*.txt"))
-    filenames = sorted(filenames)
-
-    # Only use the filenames that match the specified sample numbers (filename "...000123.txt" matches sample number 123).
-    assert len(samples) <= len(filenames), f"{folder} only contains {len(filenames)} .txt files, which is less than the requested {number_samples}."
-    filenames = [_ for _ in filenames if int(re.split("_|\.", os.path.basename(_))[1]) in samples[KEY_SAMPLE_NUMBER].values]
-
-    # Store all data in a single array, initialized with a default value. The order of values in the text files is determined by ANSYS.
-    DEFAULT_VALUE = 0
-    labels = np.full(
-        (number_samples, 1, *OUTPUT_SIZE_3D),
-        DEFAULT_VALUE, dtype=float
-    )
-    for i, (index, filename) in enumerate(zip(samples.index, filenames)):
-        with open(filename, "r") as file:
-            lines = file.readlines()
-        
-        # Assume each line contains the result followed by the corresponding nodal coordinates, in the format: value, x, y, z. Round the coordinates to the specified number of digits to eliminate rounding errors from FEA.
-        node_values = [
-            [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(","))]
-            for line in lines
-        ]
-        # Sort the values using the coordinates.
-        node_values.sort(key=lambda _: (_[2], _[1], _[3]))
-
-        image_height = int(samples[KEY_NODES_HEIGHT][index])
-        image_length = int(samples[KEY_NODES_LENGTH][index])
-        image_width = int(samples[KEY_NODES_WIDTH][index])
-
-        # Insert the values into the combined array, aligned top-left.
-        labels[i, 0, :image_height, :image_length, :image_width] = np.reshape(
-            [_[0] for _ in node_values],
-            (image_height, image_length, image_width),
-        )
-        
-        if (i+1) % 100 == 0:
-            print(f"Reading label {i+1} / {number_samples}...", end="\r")
-    print()
-
-    return labels
-
 def rgb_to_hue(array: np.ndarray) -> np.ndarray:
     """Convert a 3-channel RGB array into a 1-channel hue array with values in [0, 1]."""
 
@@ -385,6 +339,5 @@ if __name__ == "__main__":
     samples = samples[:10000]
 
     folder = os.path.join(FOLDER_ROOT, "Labels 3D")
-    labels = generate_label_images_3d(samples, folder)
-    # labels = generate_label_images(samples, folder, is_3d=not True)
+    labels = generate_label_images(samples, folder, is_3d=not True)
     write_pickle(labels, os.path.join(folder, "labels_.pickle"))
