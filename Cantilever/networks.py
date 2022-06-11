@@ -37,22 +37,36 @@ class Nie(nn.Module):
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
-        self.se_1 = nn.Sequential(
+
+        # Convenience functions for returning residual blocks and squeeze-and-excitation blocks.
+        residual_block = lambda: nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.Conv2d(64, 64, kernel_size=3, padding="same"),
             nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
-        self.output_size_se_1 = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
-        self.se_2 = nn.Sequential(
-            nn.AvgPool2d(kernel_size=self.output_size_se_1),
+        se_block = lambda kernel_size: nn.Sequential(
+            nn.AvgPool2d(kernel_size=kernel_size),
             nn.Flatten(),
             nn.Linear(64, 4),
             nn.ReLU(inplace=True),
-            nn.Linear(4, self.output_size_se_1[1]),
+            nn.Linear(4, 64),
             nn.Sigmoid(),
         )
+        
+        output_size_residual = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
+        self.residual_1 = residual_block()
+        self.se_1 = se_block(output_size_residual)
+        self.residual_2 = residual_block()
+        self.se_2 = se_block(output_size_residual)
+        self.residual_3 = residual_block()
+        self.se_3 = se_block(output_size_residual)
+        self.residual_4 = residual_block()
+        self.se_4 = se_block(output_size_residual)
+        self.residual_5 = residual_block()
+        self.se_5 = se_block(output_size_residual)
+
         self.deconvolution_1 = nn.Sequential(
             nn.ConvTranspose2d(64, 32, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0)),
             nn.ReLU(inplace=True),
@@ -77,21 +91,21 @@ class Nie(nn.Module):
         conv_2 = self.convolution_2(conv_1)
         x = self.convolution_3(conv_2)
         
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, -1))
+        residual = self.residual_1(x)
+        se = self.se_1(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1))
+        residual = self.residual_2(x)
+        se = self.se_2(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1))
+        residual = self.residual_3(x)
+        se = self.se_3(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1))
+        residual = self.residual_4(x)
+        se = self.se_4(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1))
+        residual = self.residual_5(x)
+        se = self.se_5(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1))
 
         # Add load value.
         if value_load is not None:
@@ -131,22 +145,35 @@ class Nie3d(nn.Module):
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
-        self.se_1 = nn.Sequential(
+
+        output_size_residual = [round(_ / 2 / 2) for _ in input_size]
+        residual_block = lambda: nn.Sequential(
             nn.Conv3d(64, 64, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.Conv3d(64, 64, kernel_size=3, padding="same"),
             nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
-        self.output_size_se_1 = [round(_ / 2 / 2) for _ in input_size]
-        self.se_2 = nn.Sequential(
-            nn.AvgPool3d(kernel_size=self.output_size_se_1),
+        se_block = lambda kernel_size: nn.Sequential(
+            nn.AvgPool3d(kernel_size=kernel_size),
             nn.Flatten(),
             nn.Linear(64, 4),
             nn.ReLU(inplace=True),
-            nn.Linear(4, self.output_size_se_1[-1]),
+            nn.Linear(4, 64),
             nn.Sigmoid(),
         )
+        
+        self.residual_1 = residual_block()
+        self.se_1 = se_block(output_size_residual)
+        self.residual_2 = residual_block()
+        self.se_2 = se_block(output_size_residual)
+        self.residual_3 = residual_block()
+        self.se_3 = se_block(output_size_residual)
+        self.residual_4 = residual_block()
+        self.se_4 = se_block(output_size_residual)
+        self.residual_5 = residual_block()
+        self.se_5 = se_block(output_size_residual)
+
         self.deconvolution_1 = nn.Sequential(
             nn.ConvTranspose3d(64, 32, kernel_size=(4,2,4), stride=(1,2,1), padding=(0,2,0), output_padding=(0,0,0)),
             nn.ReLU(inplace=True),
@@ -171,21 +198,21 @@ class Nie3d(nn.Module):
         conv_2 = self.convolution_2(conv_1)
         x = self.convolution_3(conv_2)
         
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
-        se_1 = self.se_1(x)
-        se_2 = self.se_2(se_1)
-        x = x + se_1 * se_2.reshape((batch_size, 1, 1, 1, -1))
+        residual = self.residual_1(x)
+        se = self.se_1(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1, 1))
+        residual = self.residual_2(x)
+        se = self.se_2(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1, 1))
+        residual = self.residual_3(x)
+        se = self.se_3(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1, 1))
+        residual = self.residual_4(x)
+        se = self.se_4(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1, 1))
+        residual = self.residual_5(x)
+        se = self.se_5(residual)
+        x = x + residual * se.reshape((batch_size, -1, 1, 1, 1))
 
         # Add load value.
         if value_load is not None:
