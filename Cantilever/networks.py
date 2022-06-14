@@ -20,38 +20,41 @@ class Nie(nn.Module):
         TRACK_RUNNING_STATS = False
         MOMENTUM = 0.1
 
+        # Number of features in the output of the first layer.
+        nf = 32
+
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels, 16, kernel_size=9, stride=1, padding="same"),
-            nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same"),
+            nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
-            nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv2d(nf*1, nf*2, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
-            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv2d(nf*2, nf*4, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
 
         # Convenience functions for returning residual blocks and squeeze-and-excitation blocks.
         residual_block = lambda: nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, padding="same"),
+            nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
-            nn.Conv2d(64, 64, kernel_size=3, padding="same"),
-            nn.BatchNorm2d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
+            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         se_block = lambda kernel_size: nn.Sequential(
             nn.AvgPool2d(kernel_size=kernel_size),
             nn.Flatten(),
-            nn.Linear(64, 4),
+            nn.Linear(nf*4, nf*4//16),
             nn.ReLU(inplace=True),
-            nn.Linear(4, 64),
+            nn.Linear(nf*4//16, nf*4),
             nn.Sigmoid(),
         )
         
@@ -68,17 +71,17 @@ class Nie(nn.Module):
         self.se_5 = se_block(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0)),
+            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(32+32*0, 16, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0)),
+            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(16+16*0, output_channels, kernel_size=9, stride=1, padding="same"),
+            nn.Conv2d(nf*1, output_channels, kernel_size=9, stride=1, padding="same"),
             # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -128,38 +131,41 @@ class Nie3d(nn.Module):
         TRACK_RUNNING_STATS = False
         MOMENTUM = 0.1
 
+        # Number of features in the output of the first layer.
+        nf = 32
+
         self.convolution_1 = nn.Sequential(
-            nn.Conv3d(input_channels, 16, kernel_size=9, stride=1, padding="same"),
-            nn.BatchNorm3d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv3d(input_channels, nf*1, kernel_size=9, stride=1, padding="same"),
+            nn.BatchNorm3d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces all 3 dimensions by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
-            nn.BatchNorm3d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv3d(nf*1, nf*2, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.BatchNorm3d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces all 3 dimensions by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
-            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv3d(nf*2, nf*4, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.BatchNorm3d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
 
         output_size_residual = [round(_ / 2 / 2) for _ in input_size]
         residual_block = lambda: nn.Sequential(
-            nn.Conv3d(64, 64, kernel_size=3, padding="same"),
+            nn.Conv3d(nf*4, nf*4, kernel_size=3, padding="same"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
-            nn.Conv3d(64, 64, kernel_size=3, padding="same"),
-            nn.BatchNorm3d(64, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm3d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.Conv3d(nf*4, nf*4, kernel_size=3, padding="same"),
+            nn.BatchNorm3d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         se_block = lambda kernel_size: nn.Sequential(
             nn.AvgPool3d(kernel_size=kernel_size),
             nn.Flatten(),
-            nn.Linear(64, 4),
+            nn.Linear(nf*4, nf*4/16),
             nn.ReLU(inplace=True),
-            nn.Linear(4, 64),
+            nn.Linear(nf*4/16, nf*4),
             nn.Sigmoid(),
         )
         
@@ -175,17 +181,17 @@ class Nie3d(nn.Module):
         self.se_5 = se_block(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose3d(64, 32, kernel_size=(4,2,4), stride=(1,2,1), padding=(0,2,0), output_padding=(0,0,0)),
+            nn.ConvTranspose3d(nf*4, nf*2, kernel_size=(4,2,4), stride=(1,2,1), padding=(0,2,0), output_padding=(0,0,0)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm3d(32, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm3d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose3d(32, 16, kernel_size=(3,2,3), stride=2, padding=1, output_padding=(0,0,0)),
+            nn.ConvTranspose3d(nf*2, nf*1, kernel_size=(3,2,3), stride=2, padding=1, output_padding=(0,0,0)),
             nn.ReLU(inplace=True),
-            nn.BatchNorm3d(16, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm3d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv3d(16, output_channels, kernel_size=9, stride=1, padding="same"),
+            nn.Conv3d(nf*1, output_channels, kernel_size=9, stride=1, padding="same"),
             # nn.BatchNorm3d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -432,6 +438,71 @@ class AutoencoderCnn(nn.Module):
         # x = self.linear(x)
         # x = x.reshape((1, *OUTPUT_SIZE))
 
+        return x
+
+# GAN based on: https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
+class GanGenerator(nn.Module):
+    def __init__(self, input_channels: int, number_features: int, output_channels: int):
+        super().__init__()
+
+        self.latent_size = input_channels
+
+        self.deconvolution_1 = nn.Sequential(
+            nn.ConvTranspose2d(self.latent_size, number_features * 4, kernel_size=(2,4), stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(number_features * 4),
+            nn.ReLU(inplace=True),
+        )
+        self.deconvolution_2 = nn.Sequential(
+            nn.ConvTranspose2d(number_features * 4, number_features * 2, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 2),
+            nn.ReLU(inplace=True),
+        )
+        self.deconvolution_3 = nn.Sequential(
+            nn.ConvTranspose2d(number_features * 2, number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 1),
+            nn.ReLU(inplace=True),
+        )
+        self.deconvolution_4 = nn.Sequential(
+            nn.ConvTranspose2d(number_features * 1, output_channels, kernel_size=3, stride=2, padding=(1,2), output_padding=(0,1), bias=False),
+            nn.Tanh(),
+        )
+
+    def forward(self, x):
+        x = self.deconvolution_1(x)
+        x = self.deconvolution_2(x)
+        x = self.deconvolution_3(x)
+        x = self.deconvolution_4(x)
+        return x
+
+class GanDiscriminator(nn.Module):
+    def __init__(self, number_features: int, output_channels: int):
+        super().__init__()
+
+        self.convolution_1 = nn.Sequential(
+            nn.Conv2d(output_channels, number_features * 1, kernel_size=3, stride=2, padding=(1,2), bias=False),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+        )
+        self.convolution_2 = nn.Sequential(
+            nn.Conv2d(number_features * 1, number_features * 2, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 2),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+        )
+        self.convolution_3 = nn.Sequential(
+            nn.Conv2d(number_features * 2, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(number_features * 4),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+        )
+        # Reduces image size to (1, 1).
+        self.convolution_4 = nn.Sequential(
+            nn.Conv2d(number_features * 4, 1, kernel_size=(2,4), stride=1, padding=0, bias=False),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        x = self.convolution_1(x)
+        x = self.convolution_2(x)
+        x = self.convolution_3(x)
+        x = self.convolution_4(x)
         return x
 
 
