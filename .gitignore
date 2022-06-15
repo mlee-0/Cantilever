@@ -5,7 +5,7 @@
 *.png
 subset*.txt
 Cantilever/ansys_script.lgw
-Cantilever/Labels
+Cantilever/Labels 2D
 Cantilever/Labels 3D
 Cantilever/Results
 DED/*

@@ -26,23 +26,25 @@ if GOOGLE_COLAB:
 
 
 class CantileverDataset(Dataset):
-    """Dataset that contains input images and label images."""
+    """
+    Dataset that contains 4D input images and label images. Generates input images and loads a .pickle file of pre-generated label images.
+
+    Input images have shape (batch, channel, height, length).
+    Label images have shape (batch, channel, height, length).
+    """
+
     def __init__(self, samples: pd.DataFrame, is_3d: bool):
         self.number_samples = len(samples)
 
-        folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D" if is_3d else "Labels")
+        if is_3d:
+            folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
+            filename_labels = "labels_3d_to_50k.pickle"
+        else:
+            folder_labels = os.path.join(FOLDER_ROOT, "Labels 2D")
+            filename_labels = "labels_2d_to_50k.pickle"
         
         # Load previously generated label images.
-        files = glob.glob(os.path.join(folder_labels, "*.pickle"))
-        files.sort()
-        if files:
-            file = files[0]
-            self.labels = read_pickle(file)
-        # Create label images and save them as a pickle file.
-        else:
-            self.labels = generate_label_images(samples, folder_labels, is_3d=is_3d)
-            file = os.path.join(folder_labels, f"labels.pickle")
-            write_pickle(self.labels, file)
+        self.labels = read_pickle(os.path.join(folder_labels, filename_labels))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
 
         # The maximum value found in the entire dataset.
@@ -83,7 +85,7 @@ class CantileverDataset(Dataset):
 
 class CantileverDataset3d(Dataset):
     """
-    Dataset that contains 5D input images and label images for use with 3D convolution.
+    Dataset that contains 5D input images and label images for use with 3D convolution. Generates input images and loads a .pickle file of pre-generated label images.
 
     Input images have shape (batch, channel, height, length, width).
     Label images have shape (batch, channel=1, height, length, width).
@@ -94,11 +96,7 @@ class CantileverDataset3d(Dataset):
         folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
         
         # Load previously generated label images.
-        files = glob.glob(os.path.join(folder_labels, "*.pickle"))
-        files.sort()
-        assert len(files) > 0
-        file = files[0]
-        self.labels = read_pickle(file)
+        self.labels = read_pickle(os.path.join(folder_labels, "labels_to_50k.pickle"))
         # Transpose dimensions for shape: (samples, 1, height (Y), length (X), width (Z)).
         self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
