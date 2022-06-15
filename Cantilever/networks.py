@@ -132,7 +132,7 @@ class Nie3d(nn.Module):
         MOMENTUM = 0.1
 
         # Number of features in the output of the first layer.
-        nf = 32
+        nf = 16
 
         self.convolution_1 = nn.Sequential(
             nn.Conv3d(input_channels, nf*1, kernel_size=9, stride=1, padding="same"),
@@ -163,9 +163,9 @@ class Nie3d(nn.Module):
         se_block = lambda kernel_size: nn.Sequential(
             nn.AvgPool3d(kernel_size=kernel_size),
             nn.Flatten(),
-            nn.Linear(nf*4, nf*4/16),
+            nn.Linear(nf*4, nf*4//16),
             nn.ReLU(inplace=True),
-            nn.Linear(nf*4/16, nf*4),
+            nn.Linear(nf*4//16, nf*4),
             nn.Sigmoid(),
         )
         

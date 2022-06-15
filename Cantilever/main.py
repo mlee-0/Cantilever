@@ -188,7 +188,7 @@ def main(epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Modu
     test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=False)
     size_train_dataset = len(train_dataloader)
     size_validate_dataset = len(validate_dataloader)
     size_test_dataset = len(test_dataloader)

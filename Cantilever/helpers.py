@@ -1,5 +1,5 @@
 """
-Information about parameters and functions for reading and writing files.
+Information about parameters and functions for reading and writing files. Run this script to generate and save label images.
 """
 
 
@@ -9,6 +9,7 @@ import glob
 import os
 import pickle
 import re
+import time
 from typing import Any, List, Tuple
 
 import matplotlib.pyplot as plt
@@ -335,17 +336,21 @@ def write_image(array: np.ndarray, filename: str) -> None:
     print(f"Saved array with shape {array.shape} to {filename}.")
 
 def read_pickle(filepath: str) -> Any:
+    time_start = time.time()
     with open(filepath, "rb") as f:
         x = pickle.load(f)
-    print(f"Loaded {type(x)} from {filepath}.")
+    time_end = time.time()
+    print(f"Loaded {type(x)} from {filepath} in {time_end - time_start:.2f} seconds.")
 
     return x
 
 def write_pickle(x: object, filepath: str) -> None:
     assert filepath.endswith(".pickle")
+    time_start = time.time()
     with open(filepath, "wb") as f:
         pickle.dump(x, f)
-    print(f"Saved {type(x)} to {filepath}.")
+    time_end = time.time()
+    print(f"Saved {type(x)} to {filepath} in {time_end - time_start:.2f} seconds.")
 
 # Colors for plots.
 class Colors:
@@ -364,10 +369,11 @@ class Colors:
 
 
 if __name__ == "__main__":
-    # Convert text files to images and save them as pickles reduce runtime during training.
+    # Convert text files to an array and save them as .pickle files.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples[:10000]
+    samples = samples[70000:80000]
 
-    folder = os.path.join(FOLDER_ROOT, "Labels 3D")
+    folder = os.path.join(FOLDER_ROOT, "Labels 2D")
     labels = generate_label_images(samples, folder, is_3d=not True)
-    write_pickle(labels, os.path.join(folder, "labels_.pickle"))
+    print(labels.shape)
+    write_pickle(labels, os.path.join(folder, "labels_80k.pickle"))
