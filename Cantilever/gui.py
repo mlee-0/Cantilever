@@ -261,11 +261,11 @@ class MainWindow(QMainWindow):
     def on_start(self):
         """Start training or testing."""
         if self.sender() is self.button_train:
-            train_model = self.checkbox_train_existing.isChecked()
-            test_only = False
+            train_existing = self.checkbox_train_existing.isChecked()
+            train, test = True, True
         elif self.sender() is self.button_test:
-            train_model = False
-            test_only = True
+            train_existing = False
+            train, test = False, True
 
         self.sidebar.setEnabled(False)
         self.progress_bar.setRange(0, 0)
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
             kwargs={
                 "epoch_count": self.value_epochs.value(),
                 "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
-                "batch_size": self.value_batch.value(),
+                "batch_sizes": (self.value_batch.value(), 128, 128),
                 "Model": networks.networks[self.value_model.currentText()],
                 "dataset_id": self.buttons_dataset.checkedId(),
                 "training_split": (
@@ -284,10 +284,12 @@ class MainWindow(QMainWindow):
                     self.value_validate_split.value() / 100,
                     self.value_test_split.value() / 100,
                 ),
-                "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
                 "filename_model": self.label_filename_model.text(),
-                "train_existing": train_model,
-                "test_only": test_only,
+                "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
+                "train_existing": train_existing,
+                "train": train,
+                "test": test,
+                "evaluate": True,
                 "queue": self.queue,
                 "queue_to_main": self.queue_to_main,
             },
@@ -389,20 +391,19 @@ class MainWindow(QMainWindow):
     def check_queue(self):
         while not self.queue.empty():
             info = self.queue.get()
-            progress_epoch: Tuple[int, int] = info["progress_epoch"]
-            progress_batch: Tuple[int, int] = info["progress_batch"]
-            epochs = info["epochs"]
-            training_loss = info["training_loss"]
-            previous_training_loss = info["previous_training_loss"]
-            validation_loss = info["validation_loss"]
-            previous_validation_loss = info["previous_validation_loss"]
+            progress_epoch: Tuple[int, int] = info.get("progress_epoch", (0, 0))
+            progress_batch: Tuple[int, int] = info.get("progress_batch", (0, 0))
+            epochs = info.get("epochs", range(0))
+            training_loss = info.get("training_loss", None)
+            previous_training_loss = info.get("previous_training_loss", None)
+            validation_loss = info.get("validation_loss", None)
+            previous_validation_loss = info.get("previous_validation_loss", None)
+            values_metrics = info.get("values_metrics", {})
 
             # Update the progress label.
             strings_progress = []
-            if progress_epoch is not None:
-                strings_progress.append(f"Epoch {progress_epoch[0]}/{progress_epoch[1]}")
-            if progress_batch is not None:
-                strings_progress.append(f"Batch {progress_batch[0]}/{progress_batch[1]}")
+            strings_progress.append(f"Epoch {progress_epoch[0]}/{progress_epoch[1]}")
+            strings_progress.append(f"Batch {progress_batch[0]}/{progress_batch[1]}")
             text_progress = "\n".join(strings_progress)
             self.label_progress.setText(text_progress)
 
@@ -411,6 +412,10 @@ class MainWindow(QMainWindow):
             progress_max = progress_epoch[1] * progress_batch[1]
             self.progress_bar.setValue(progress_value)
             self.progress_bar.setMaximum(progress_max)
+
+            # Update the metrics.
+            if values_metrics:
+                pass
 
             if training_loss or previous_training_loss or validation_loss or previous_validation_loss:
                 self.plot_loss(epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss)
