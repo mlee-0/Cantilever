@@ -94,13 +94,3 @@ if __name__ == "__main__":
         bins=10,
         nonuniformity=1
     )
-    
-    # import matplotlib.pyplot as plt
-    # labels = read_pickle(os.path.join(FOLDER_ROOT, "Labels", "labels.pickle"))
-    # y = labels.flatten()
-    # # y = np.max(y, axis=(1, 2, 3))
-    # y = np.log(y + 1)
-    # plt.figure()
-    # plt.hist(y, bins=100)
-    # # plt.title("y ^ 1/5")
-    # plt.show()

@@ -25,7 +25,7 @@ def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) 
 
     if plot:
         plt.figure()
-        plt.plot(bin_edges[1:], cdf_predicted, "-", color=Colors.BLUE, label="Predicted")
+        plt.plot(bin_edges[1:], cdf_predicted, "-", color=Colors.BLUE_DARK, label="Predicted")
         plt.plot(bin_edges[1:], cdf_true, ":", color=Colors.RED, label="True")
         plt.legend()
         plt.grid(visible=True, axis="y")
@@ -45,7 +45,7 @@ def maximum_value(predicted: np.ndarray, true: np.ndarray, plot=False) -> Tuple[
     if plot:
         plt.figure()
         plt.bar(range(len(max_true)), max_true, width=1.0, color=Colors.RED, label="True")
-        plt.bar(range(len(max_predicted)), max_predicted, width=0.5, color=Colors.BLUE, label="Predicted")
+        plt.bar(range(len(max_predicted)), max_predicted, width=0.5, color=Colors.BLUE_DARK, label="Predicted")
         plt.legend()
         plt.title("Maximum Value")
         plt.show()

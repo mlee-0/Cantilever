@@ -516,7 +516,7 @@ def train_regression(
             # Adjust model parameters.
             optimizer.step()
 
-            if (batch) % 50 == 0:
+            if batch % 50 == 0:
                 print(f"Training batch {batch}/{len(train_dataloader)} with average loss {loss/batch:,.2f}...", end="\r")
                 if queue:
                     info_gui["progress_batch"] = (batch, len(train_dataloader)+len(validate_dataloader))
@@ -536,7 +536,7 @@ def train_regression(
                 label_data = label_data.to(device)
                 output_data = model(input_data)
                 loss += loss_function(output_data, label_data.float()).item()
-                if (batch) % 50 == 0:
+                if batch % 50 == 0:
                     print(f"Validating batch {batch}/{len(validate_dataloader)}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (len(train_dataloader)+batch, len(train_dataloader)+len(validate_dataloader))
@@ -624,9 +624,12 @@ def test_regression(
             labels.append(label_data)
             outputs.append(output_data)
             
-            if queue:
-                info_gui["progress_batch"] = (batch, len(test_dataloader))
-                queue.put(info_gui)
+            if batch % 1 == 0:
+                print(f"Testing batch {batch}/{len(test_dataloader)}...", end="\r")
+                if queue:
+                    info_gui["progress_batch"] = (batch, len(test_dataloader))
+                    queue.put(info_gui)
+        print()
     loss /= batch
     print(f"Average testing loss: {loss:,.2f}")
     
