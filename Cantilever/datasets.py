@@ -9,6 +9,7 @@ import random
 import numpy as np
 import pandas as pd
 import scipy as sp
+from scipy import stats
 
 from helpers import *
 
