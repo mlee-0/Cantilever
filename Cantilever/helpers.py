@@ -98,6 +98,8 @@ def read_samples(filepath: str) -> pd.DataFrame:
 
 def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: (samples, channels, height, width)."""
+    
+    time_start = time.time()
 
     DATA_TYPE = np.uint8
 
@@ -159,10 +161,15 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
     
     images = np.array(images)
 
+    time_end = time.time()
+    print(f"Generated {images.shape[0]} input images in {time_end - time_start:.2f} seconds.")
+
     return images
 
 def generate_input_images_3d(samples: pd.DataFrame) -> np.ndarray:
     """Return a 5D array of images for each of the specified sample values, with dimensions: (samples, channels, height, width, depth)."""
+
+    time_start = time.time()
 
     DATA_TYPE = np.uint8
 
@@ -205,10 +212,16 @@ def generate_input_images_3d(samples: pd.DataFrame) -> np.ndarray:
     
     images = np.array(images)
 
+    time_end = time.time()
+    print(f"Generated {images.shape[0]} input images in {time_end - time_start:.2f} seconds.")
+
     return images
 
 def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder that correspond to the given samples, with dimensions: (samples, channels, height, width)."""
+    
+    time_start = time.time()
+
     number_samples = len(samples)
     
     # Get and sort all FEA filenames.
@@ -257,7 +270,40 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
             print(f"Reading label {i+1} / {number_samples}...", end="\r")
     print()
 
+    time_end = time.time()
+    print(f"Generated {labels.shape[0]} label images in {time_end - time_start:.2f} seconds.")
+
     return labels
+
+def plot_loss(epochs: list, current_loss: List[list], previous_epochs: list = None, previous_loss: List[list] = None, labels: List[str] = None) -> None:
+    """
+    Plot loss values over epochs.
+
+    Parameters:
+    `epochs`: A sequence of epoch numbers corresponding to the current loss values.
+    `current_loss`: A list of lists of loss values, each of which are plotted separately. The nested lists must have the same length as `epochs`.
+    `previous_epochs`: A sequence of epoch numbers corresponding to the previous loss values.
+    `previous_loss`: A list of lists of loss values, each of which are plotted separately. The nested lists must have the same length as `previous_epochs`.
+    `labels`: A list of strings to include in the legend for each item in `current_loss`.
+    """
+    markers = (".:", ".-")
+    colors = (Colors.BLUE, Colors.ORANGE)
+
+    plt.figure()
+    
+    for i, loss in enumerate(current_loss):
+        plt.plot(epochs, loss, markers[i % len(markers)], color=colors[i % len(colors)], label=labels[i])
+    
+    if previous_epochs and previous_loss:
+        for i, loss in enumerate(previous_loss):
+            plt.plot(previous_epochs, loss, markers[i % len(markers)], color=Colors.GRAY_LIGHT)
+    
+    plt.legend()
+    plt.ylim(bottom=0)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.grid(axis="y")
+    plt.show()
 
 def plot_input_image_3d(array: np.ndarray) -> None:
     """Show a 3D voxel plot for each channel of the given 4D array with shape (channels, height, length, width)."""
@@ -266,7 +312,6 @@ def plot_input_image_3d(array: np.ndarray) -> None:
 
     for channel in range(channels):
         ax = fig.add_subplot(1, channels, channel+1, projection="3d")
-        print(array[channel, ...].max())
         filled = array[channel, ...] != 0
         rgb = np.stack([array[channel, ...]]*3, axis=-1)
         # rgb = np.concatenate(
@@ -280,6 +325,7 @@ def plot_input_image_3d(array: np.ndarray) -> None:
             linewidth=0.25,
             edgecolors=(0.5, 0.5, 0.5),
         )
+        ax.set_title(f"Channel {channel+1}")
     
     plt.show()
 
@@ -377,3 +423,33 @@ if __name__ == "__main__":
     labels = generate_label_images(samples, folder, is_3d=not True)
     print(labels.shape)
     write_pickle(labels, os.path.join(folder, "labels_80k.pickle"))
+
+    # p = read_pickle("Cantilever/Labels 3D/labels_3d_to_50k.pickle")[:50000, ...]
+    # max_value = np.max(p)
+
+    # normalized = p / np.expand_dims(np.max(p, axis=(1, 2, 3)), axis=(1, 2, 3))
+
+    # p = p.flatten()
+    # normalized = normalized.flatten()
+    
+    # bins = 100
+
+    # plt.figure()
+    # plt.subplot(1, 2, 1)
+    # plt.hist(p, bins=bins, label="Original")
+    # plt.title("Original")
+    # plt.subplot(1, 2, 2)
+    # plt.hist(normalized, bins=bins)
+    # plt.title("Averaged by sample")
+    # plt.show()
+
+    # plt.figure()
+    # exponents = (1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0)
+    # for i, exponent in enumerate(exponents, 1):
+    #     plt.subplot(2, 5, i)
+    #     transformed = p.flatten() ** (1/exponent)
+    #     plt.hist(normalized, bins=bins, alpha=0.5, label="Target")
+    #     plt.hist(transformed/transformed.max(), bins=bins, alpha=0.5, label="Transformed")
+    #     plt.legend()
+    #     plt.title(f"1/{exponent}")
+    # plt.show()

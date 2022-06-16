@@ -105,14 +105,15 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
 
     return values
 
-def polynomial_chaos_expansion(data: np.ndarray, target_moments: Tuple[float, float, float, float]) -> np.ndarray:
+def polynomial_chaos_expansion(data: np.ndarray, target_data: np.ndarray) -> np.ndarray:
     """Transform the given array to match the target statistical moments using polynomial chaos expansion."""
     mz1 = 0
     mz2 = lambda b: b[0]**2 + 2*b[1]**2 + 6*b[2]**2
     mz3 = lambda b: 6*b[0]**2*b[1] + 8*b[1]**3 + 36*b[0]*b[1]*b[2] + 108*b[1]*b[2]**2
     mz4 = lambda b: 3*b[0]**4 + 60*b[1]**4 + 3348*b[2]**4 + 24*b[0]**3*b[2] + 60*b[0]**2*b[1]**2 + 252*b[0]**2*b[2]**2 + 576*b[0]*b[1]**2*b[2] + 1296*b[0]*b[2]**3 + 2232*b[1]**2*b[2]**2
 
-    mx1, mx2, mx3, mx4 = target_moments
+    # Target moments.
+    mx1, mx2, mx3, mx4 = [stats.moment(target_data, i) for i in (1, 2, 3, 4)]
 
     f = lambda b: np.sum((
         (mz1 - mx1) ** 2,
@@ -126,8 +127,18 @@ def polynomial_chaos_expansion(data: np.ndarray, target_moments: Tuple[float, fl
     xi = np.random.randn(10000)
     b0, b1, b2, b3 = results.x
     z = b0 + b1*xi + b2*(xi**2 - 1) + b3*(xi**3 - 3*xi)
-    print([stats.moment(z, i) for i in (1, 2, 3, 4)])
-    print(target_moments)
+    print(*[stats.moment(z, i) for i in (1, 2, 3, 4)])
+    print(mx1, mx2, mx3, mx4)
+
+    plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.hist(z, bins=100)
+    plt.title("Transformed")
+    plt.subplot(1, 2, 2)
+    plt.hist(target_data, bins=100)
+    plt.title("Target")
+    plt.show()
+    return z
 
 def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None:
     """

@@ -98,7 +98,7 @@ class CantileverDataset3d(Dataset):
         folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
         
         # Load previously generated label images.
-        self.labels = read_pickle(os.path.join(folder_labels, "labels_to_50k.pickle"))
+        self.labels = read_pickle(os.path.join(folder_labels, "labels_3d_to_50k.pickle"))
         # Transpose dimensions for shape: (samples, 1, height (Y), length (X), width (Z)).
         self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
@@ -197,6 +197,7 @@ def load_model(filepath: str, device: str) -> dict:
     except FileNotFoundError:
         print(f"{filepath} not found.")
     else:
+        print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
         return checkpoint
 
 def train_gan(epoch_count: int, learning_rate: float, batch_size: int, train_existing: bool, test_only: bool, queue = None, queue_from_gui = None) -> None:
@@ -782,7 +783,7 @@ def main(
     
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples.iloc[:1000, :]
+    samples = samples.iloc[:50000, :]
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
