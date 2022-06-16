@@ -637,19 +637,22 @@ def test_regression(
 
     return outputs, labels, inputs
 
-def evaluate_regression(outputs, labels, inputs, dataset: Dataset, queue=None):
+def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue=None):
     """Show and plot evaluation metrics."""
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     me = metrics.mean_error(outputs, labels)
-    mae = metrics.mean_absolute_error(outputs, labels)
-    mse = metrics.mean_squared_error(outputs, labels)
-    rmse = metrics.root_mean_squared_error(outputs, labels)
+    # mae = metrics.mean_absolute_error(outputs, labels)
+    # mse = metrics.mean_squared_error(outputs, labels)
+    # rmse = metrics.root_mean_squared_error(outputs, labels)
+    nmae = metrics.normalized_mean_absolute_error(outputs, labels)
+    nmse = metrics.normalized_mean_squared_error(outputs, labels)
+    nrmse = metrics.normalized_root_mean_squared_error(outputs, labels)
     mre = metrics.mean_relative_error(outputs, labels)
     print(f"ME: {me:,.2f}")
-    print(f"MAE: {mae:,.2f}")
-    print(f"MSE: {mse:,.2f}")
-    print(f"RMSE: {rmse:,.2f}")
+    print(f"NMAE: {nmae:,.2f}")
+    print(f"NMSE: {nmse:,.2f}")
+    print(f"NRMSE: {nrmse:,.2f}")
     print(f"MRE: {mre:,.2f}%")
 
     # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.

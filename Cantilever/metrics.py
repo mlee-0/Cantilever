@@ -58,11 +58,20 @@ def mean_error(predicted: np.ndarray, true: np.ndarray) -> float:
 def mean_absolute_error(predicted: np.ndarray, true: np.ndarray) -> float:
     return np.mean(np.abs(predicted - true))
 
+def normalized_mean_absolute_error(predicted: np.ndarray, true: np.ndarray) -> float:
+    return np.mean(np.abs(predicted - true)) / np.mean(true)
+
 def mean_squared_error(predicted: np.ndarray, true: np.ndarray) -> float:
     return np.mean((predicted - true) ** 2)
 
+def normalized_mean_squared_error(predicted: np.ndarray, true: np.ndarray) -> float:
+    return np.mean((predicted - true) ** 2) / np.mean(true) ** 2
+
 def root_mean_squared_error(predicted: np.ndarray, true: np.ndarray) -> float:
     return np.sqrt(np.mean((predicted - true) ** 2))
+
+def normalized_root_mean_squared_error(predicted: np.ndarray, true: np.ndarray) -> float:
+    return np.sqrt(np.mean((predicted - true) ** 2)) / np.mean(true)
 
 def mean_relative_error(predicted: np.ndarray, true: np.ndarray) -> float:
     """Return the mean relative error as a percentage."""
