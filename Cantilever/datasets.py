@@ -8,6 +8,7 @@ import random
 
 import numpy as np
 import pandas as pd
+import scipy as sp
 
 from helpers import *
 
@@ -103,6 +104,30 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
 
     return values
 
+def polynomial_chaos_expansion(data: np.ndarray, target_moments: Tuple[float, float, float, float]) -> np.ndarray:
+    """Transform the given array to match the target statistical moments using polynomial chaos expansion."""
+    mz1 = 0
+    mz2 = lambda b: b[0]**2 + 2*b[1]**2 + 6*b[2]**2
+    mz3 = lambda b: 6*b[0]**2*b[1] + 8*b[1]**3 + 36*b[0]*b[1]*b[2] + 108*b[1]*b[2]**2
+    mz4 = lambda b: 3*b[0]**4 + 60*b[1]**4 + 3348*b[2]**4 + 24*b[0]**3*b[2] + 60*b[0]**2*b[1]**2 + 252*b[0]**2*b[2]**2 + 576*b[0]*b[1]**2*b[2] + 1296*b[0]*b[2]**3 + 2232*b[1]**2*b[2]**2
+
+    mx1, mx2, mx3, mx4 = target_moments
+
+    f = lambda b: np.sum((
+        (mz1 - mx1) ** 2,
+        (mz2(b) - mx2) ** 2,
+        (mz3(b) - mx3) ** 2,
+        (mz4(b) - mx4) ** 2,
+    ))
+    initial_guess = [0, 1, 1, 1]
+    results = sp.optimize.minimize(f, initial_guess)
+
+    xi = np.random.randn(10000)
+    b0, b1, b2, b3 = results.x
+    z = b0 + b1*xi + b2*(xi**2 - 1) + b3*(xi**3 - 3*xi)
+    print([stats.moment(z, i) for i in (1, 2, 3, 4)])
+    print(target_moments)
+
 def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None:
     """
     Write the specified sample values to a file.
@@ -192,3 +217,19 @@ if __name__ == "__main__":
 
     write_samples(samples, filename_sample, mode=WRITE_MODE)
     write_ansys_script(samples, filename_ansys)
+
+    # import numpy as np
+    # from scipy import stats
+    # def sm(data):
+    #     return [stats.moment(data, i) for i in (1, 2, 3, 4)]
+    # data1 = np.concatenate((
+    #     np.random.randn(100) * 0.1 + 0.0,
+    #     np.random.randn(100) * 0.1 + 0.1,
+    #     np.random.randn(100) * 0.1 + 0.2,
+    #     np.random.randn(100) * 1.0 + 0.5,
+    # ))
+    # data2 = np.concatenate((
+    #     np.random.randn(100) * 1 + 0.0,
+    # ))
+
+    # polynomial_chaos_expansion(data1, sm(data2))
