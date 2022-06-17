@@ -54,9 +54,11 @@ angle_2 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XZ", units
 
 # Names of quantities that are derived from randomly generated values.
 KEY_SAMPLE_NUMBER = "Sample Number"
-KEY_X_LOAD = "Load X"
-KEY_Y_LOAD = "Load Y"
-KEY_Z_LOAD = "Load Z"
+KEY_X_LOAD_2D = "Load X (2D)"
+KEY_Y_LOAD_2D = "Load Y (2D)"
+KEY_X_LOAD_3D = "Load X (3D)"
+KEY_Y_LOAD_3D = "Load Y (3D)"
+KEY_Z_LOAD_3D = "Load Z (3D)"
 KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
@@ -424,9 +426,8 @@ if __name__ == "__main__":
     print(labels.shape)
     write_pickle(labels, os.path.join(folder, "labels_80k.pickle"))
 
-    # p = read_pickle("Cantilever/Labels 3D/labels_3d_to_50k.pickle")[:50000, ...]
+    # p = read_pickle("Cantilever/Labels 2D/labels_2d_to_50k.pickle")[:50000, ...]
     # max_value = np.max(p)
-
     # normalized = p / np.expand_dims(np.max(p, axis=(1, 2, 3)), axis=(1, 2, 3))
 
     # p = p.flatten()

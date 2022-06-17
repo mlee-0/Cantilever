@@ -40,21 +40,25 @@ def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
     samples[KEY_NODES_WIDTH] = nodes_width
     
     # Calculate the x-, y-, z-components of the loads.
-    x_loads = np.round(
+    x_loads_2d = np.round(np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name], load.precision)
+    y_loads_2d = np.round(np.sin(samples[angle_1.name] * (np.pi/180)) * samples[load.name], load.precision)
+    x_loads_3d = np.round(
         np.cos(samples[angle_2.name] * (np.pi/180)) * np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
         load.precision,
     )
-    y_loads = np.round(
+    y_loads_3d = np.round(
         np.sin(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
         load.precision,
     )
-    z_loads = np.round(
+    z_loads_3d = np.round(
         np.sin(samples[angle_2.name] * (np.pi/180)) * np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name],
         load.precision,
     )
-    samples[KEY_X_LOAD] = x_loads
-    samples[KEY_Y_LOAD] = y_loads
-    samples[KEY_Z_LOAD] = z_loads
+    samples[KEY_X_LOAD_2D] = x_loads_2d
+    samples[KEY_Y_LOAD_2D] = y_loads_2d
+    samples[KEY_X_LOAD_3D] = x_loads_3d
+    samples[KEY_Y_LOAD_3D] = y_loads_3d
+    samples[KEY_Z_LOAD_3D] = z_loads_3d
 
     samples = pd.DataFrame.from_dict(samples)
     
@@ -172,10 +176,10 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         loop_variable = 'i'
         samples_variable = 'samples'
         # Add commands that define the array containing generated samples.
-        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{11},{number_samples}\n']
+        commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{13},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD][i]},{samples[KEY_Y_LOAD][i]},{samples[KEY_Z_LOAD][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
+                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD_2D][i]},{samples[KEY_Y_LOAD_2D][i]},{samples[KEY_X_LOAD_3D][i]},{samples[KEY_Y_LOAD_3D][i]},{samples[KEY_Z_LOAD_3D][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.
@@ -217,31 +221,15 @@ if __name__ == "__main__":
         print("Changed the starting sample number to 1 because generating a new dataset.")
 
     # Try to read sample values from the file if it already exists. If not, generate the samples.
-    samples_existing = read_samples(os.path.join(FOLDER_ROOT, filename_sample))
-    if samples_existing is not None:
-        overwrite_existing_samples = input(f"Overwrite {filename_sample}? [y/n] ") == "y"
+    samples = read_samples(os.path.join(FOLDER_ROOT, filename_sample))
+    if samples is not None:
+        overwrite_existing = input(f"Overwrite {filename_sample}? [y/n] ") == "y"
     else:
-        overwrite_existing_samples = False
-    if samples_existing is None or overwrite_existing_samples:
-        samples = generate_samples(NUMBER_SAMPLES, start=START_SAMPLE_NUMBER)
-        if WRITE_MODE == "a" and samples_existing is not None:
-            samples = pd.concat((samples_existing, samples), axis=0, ignore_index=True)
+        overwrite_existing = False
+    if samples is None or overwrite_existing:
+        samples_new = generate_samples(NUMBER_SAMPLES, start=START_SAMPLE_NUMBER)
+        if WRITE_MODE == "a" and samples is not None:
+            samples = pd.concat((samples, samples_new), axis=0, ignore_index=True)
 
     write_samples(samples, filename_sample, mode=WRITE_MODE)
     write_ansys_script(samples, filename_ansys)
-
-    # import numpy as np
-    # from scipy import stats
-    # def sm(data):
-    #     return [stats.moment(data, i) for i in (1, 2, 3, 4)]
-    # data1 = np.concatenate((
-    #     np.random.randn(100) * 0.1 + 0.0,
-    #     np.random.randn(100) * 0.1 + 0.1,
-    #     np.random.randn(100) * 0.1 + 0.2,
-    #     np.random.randn(100) * 1.0 + 0.5,
-    # ))
-    # data2 = np.concatenate((
-    #     np.random.randn(100) * 1 + 0.0,
-    # ))
-
-    # polynomial_chaos_expansion(data1, sm(data2))
