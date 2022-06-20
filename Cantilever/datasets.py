@@ -9,7 +9,7 @@ import random
 import numpy as np
 import pandas as pd
 import scipy as sp
-from scipy import stats
+from scipy import stats, optimize
 
 from helpers import *
 
@@ -108,6 +108,44 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
     plot_histogram(values)
 
     return values
+
+def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bounds: Tuple[float, float] = None):
+    """
+    Return the exponent that transforms the given data to a new distribution that most closely matches a target distribution. The target distribution is calculated as the CDF of the given data in which all samples are normalized to [0, 1].
+
+    Parameters:
+    `data`: Multidimensional array of values to be transformed according to: data ^ exponent. The first dimension must be the sample dimension, along which all samples in the dataset are located.
+    `initial_guess`: Initial value for the exponent that optimization starts from.
+    `bounds`: A tuple of (low, high) values that define a range in which to search for exponent values.
+    """
+
+    BINS = 100
+
+    # Calculate the target distribution.
+    non_sample_dimensions = tuple(range(1, data.ndim))
+    data_normalized = data / np.expand_dims(data.max(axis=non_sample_dimensions), axis=non_sample_dimensions)
+    pdf_target, _ = np.histogram(data_normalized, bins=BINS)
+    pdf_target = pdf_target / data_normalized.size
+
+    # Objective function to minimize. Returns the difference between two PDFs.
+    def f(exponent):
+        # Transform the data.
+        transformed = data ** exponent
+
+        # Calculate the PDF of the transformed values.
+        pdf, _ = np.histogram(transformed, bins=BINS)
+        pdf = pdf / transformed.size
+
+        # Calculate the sum of the differences between frequencies in the two PDFs.
+        difference = np.sum(np.abs(pdf - pdf_target))
+
+        return difference
+
+    result = optimize.minimize_scalar(f, bounds=bounds)
+    exponent = result.x
+    print(f"Found optimum exponent {exponent} in {result.nit} iterations.")
+
+    return exponent
 
 def polynomial_chaos_expansion(data: np.ndarray, target_data: np.ndarray) -> np.ndarray:
     """Transform the given array to match the target statistical moments using polynomial chaos expansion."""

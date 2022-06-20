@@ -52,6 +52,8 @@ class CantileverDataset(Dataset):
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
 
+        # Determine an exponent to transform the data.
+        self.transformation_exponent = optimize_transformation_exponent(self.labels, initial_guess=1/2.0, bounds=None)
         # Apply a transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
@@ -77,13 +79,12 @@ class CantileverDataset(Dataset):
             np.copy(self.labels[index, ...]),
         )
     
-    @staticmethod
-    def transform(y: np.ndarray, inverse=False) -> np.ndarray:
-        """Apply a transformation or its inverse to the data."""
+    def transform(self, y: np.ndarray, inverse=False) -> np.ndarray:
+        """Raise the given data to an exponent, or the inverse of the exponent."""
         if not inverse:
-            return y ** (1/2)
+            return y ** self.transformation_exponent
         else:
-            return y ** 2
+            return y ** (1 / self.transformation_exponent)
 
 class CantileverDataset3d(Dataset):
     """
