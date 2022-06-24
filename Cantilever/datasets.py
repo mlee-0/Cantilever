@@ -141,9 +141,9 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
 
         return difference
 
-    result = optimize.minimize_scalar(f, bounds=bounds)
+    result = optimize.minimize_scalar(f, bounds=bounds, method="bounded")
     exponent = result.x
-    print(f"Found optimum exponent {exponent} in {result.nit} iterations.")
+    print(f"Found optimum exponent {exponent}.")
 
     return exponent
 

@@ -53,7 +53,7 @@ class CantileverDataset(Dataset):
         self.max_value = np.max(self.labels)
 
         # Determine an exponent to transform the data.
-        self.transformation_exponent = optimize_transformation_exponent(self.labels, initial_guess=1/2.0, bounds=None)
+        self.transformation_exponent = optimize_transformation_exponent(self.labels, initial_guess=1/2.0, bounds=(1/3, 1))
         # Apply a transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
@@ -878,8 +878,8 @@ def main(
 if __name__ == "__main__":
     kwargs = {
         "epoch_count": 1,
-        "learning_rate": 1e-7,
-        "batch_sizes": (8, 128, 128),
+        "learning_rate": 1e-3,
+        "batch_sizes": (8, 128, 256),
         
         "Model": Nie,
         "dataset_id": 2,

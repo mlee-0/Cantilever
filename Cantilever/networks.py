@@ -87,7 +87,7 @@ class Nie(nn.Module):
         )
 
     def forward(self, x, value_load: float = None):
-        batch_size = x.size()[0]
+        batch_size = x.size(0)
 
         x = x.float()
         conv_1 = self.convolution_1(x)
@@ -197,12 +197,13 @@ class Nie3d(nn.Module):
         )
 
     def forward(self, x, value_load: float = None):
-        batch_size = x.size()[0]
+        batch_size = x.size(0)
 
         x = x.float()
         conv_1 = self.convolution_1(x)
         conv_2 = self.convolution_2(conv_1)
-        x = self.convolution_3(conv_2)
+        conv_3 = self.convolution_3(conv_2)
+        x = conv_3
         
         residual = self.residual_1(x)
         se = self.se_1(residual)
@@ -224,9 +225,9 @@ class Nie3d(nn.Module):
         if value_load is not None:
             x = x + value_load
 
-        x = self.deconvolution_1(x)
-        x = self.deconvolution_2(x)
-        x = self.deconvolution_3(x)
+        x = self.deconvolution_1(x) # + conv_3[...])
+        x = self.deconvolution_2(x) # + conv_2[..., 1:-1, 2:-2, 1:-1])
+        x = self.deconvolution_3(x) # + conv_1[..., 2:-3, 5:-5, 2:-3])
     
         return x
 
