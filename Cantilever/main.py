@@ -485,6 +485,7 @@ def train_regression(
             "previous_training_loss": previous_training_loss,
             "validation_loss": [],
             "previous_validation_loss": previous_validation_loss,
+            "metrics": {},
         }
         queue.put(info_gui)
 
@@ -531,12 +532,18 @@ def train_regression(
         # Test on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
         model.train(False)
         loss = 0
+        outputs = []
+        labels = []
         with torch.no_grad():
             for batch, ((input_data, load), label_data) in enumerate(validate_dataloader, 1):
                 input_data = input_data.to(device)
                 label_data = label_data.to(device)
                 output_data = model(input_data)
                 loss += loss_function(output_data, label_data.float()).item()
+
+                outputs.append(output_data)
+                labels.append(label_data)
+
                 if batch % 50 == 0:
                     print(f"Validating batch {batch}/{len(validate_dataloader)}...", end="\r")
                     if queue:
@@ -546,6 +553,17 @@ def train_regression(
         loss /= batch
         validation_loss.append(loss)
         print(f"Average validation loss: {loss:,.2f}")
+
+        # Calculate evaluation metrics on validation results.
+        outputs = np.concatenate(outputs, axis=0)
+        labels = np.concatenate(labels, axis=0)
+        mre = metrics.mean_relative_error(outputs, labels)
+        print(f"MRE: {mre:.3f}")
+        if queue:
+            info_gui["metrics"] = {
+                "MRE": mre,
+            }
+            queue.put(info_gui)
 
         # Save the model parameters periodically and in the last iteration of the loop.
         if epoch % 5 == 0 or epoch == epochs[-1]:
@@ -654,9 +672,9 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
     nrmse = metrics.normalized_root_mean_squared_error(outputs, labels)
     mre = metrics.mean_relative_error(outputs, labels)
     print(f"ME: {me:,.2f}")
-    print(f"NMAE: {nmae:,.2f}")
-    print(f"NMSE: {nmse:,.2f}")
-    print(f"NRMSE: {nrmse:,.2f}")
+    print(f"NMAE: {nmae:,.3f}")
+    print(f"NMSE: {nmse:,.3f}")
+    print(f"NRMSE: {nrmse:,.3f}")
     print(f"MRE: {mre:,.2f}%")
 
     # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.
@@ -790,7 +808,7 @@ def main(
     
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples.iloc[:50000, :]
+    # samples = samples.iloc[:50000, :]
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
