@@ -40,10 +40,10 @@ class CantileverDataset(Dataset):
 
         if is_3d:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
-            filename_labels = "labels_3d_to_50k.pickle"
+            filename_labels = "labels.pickle"
         else:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 2D")
-            filename_labels = "labels_2d_to_50k.pickle"
+            filename_labels = "labels.pickle"
         
         # Load previously generated label images.
         self.labels = read_pickle(os.path.join(folder_labels, filename_labels))
@@ -53,7 +53,7 @@ class CantileverDataset(Dataset):
         self.max_value = np.max(self.labels)
 
         # Determine an exponent to transform the data.
-        self.transformation_exponent = optimize_transformation_exponent(self.labels, initial_guess=1/2.0, bounds=(1/3, 1))
+        self.transformation_exponent = 0.5023404737562848 if is_3d else 0.4949464243559395
         # Apply a transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
@@ -99,7 +99,7 @@ class CantileverDataset3d(Dataset):
         folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
         
         # Load previously generated label images.
-        self.labels = read_pickle(os.path.join(folder_labels, "labels_3d_to_50k.pickle"))
+        self.labels = read_pickle(os.path.join(folder_labels, "labels.pickle"))
         # Transpose dimensions for shape: (samples, 1, height (Y), length (X), width (Z)).
         self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
@@ -108,6 +108,7 @@ class CantileverDataset3d(Dataset):
         self.max_value = np.max(self.labels)
 
         # Apply a transformation to the label values.
+        self.transformation_exponent = 0.5023404737562848
         self.labels = self.transform(self.labels, inverse=False)
         
         # Create input images.
@@ -132,12 +133,11 @@ class CantileverDataset3d(Dataset):
             np.copy(self.labels[index, ...]),
         )
     
-    @staticmethod
-    def transform(y: np.ndarray, inverse=False) -> np.ndarray:
+    def transform(self, y: np.ndarray, inverse=False) -> np.ndarray:
         if not inverse:
-            return y ** (1/2)
+            return y ** self.transformation_exponent
         else:
-            return y ** 2
+            return y ** (1 / self.transformation_exponent)
 
 class CantileverEncoderDataset(Dataset):
     """Dataset that contains input images and label images."""
