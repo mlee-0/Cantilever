@@ -127,8 +127,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
             channel[:pixel_height, :pixel_width] = 255
             channels.append(channel)
 
-        # Create a channel with a white line of pixels representing angle 1.
-        # Create a channel with a gray line of pixels representing the load magnitude and angle 1.
+        # Create a channel with a gray line of pixels representing the load magnitude and XY angle.
         channel = np.zeros((h, w), dtype=DATA_TYPE)
         r = np.arange(max(channel.shape))
         x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + w/2
@@ -140,8 +139,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         channel = np.flipud(channel)
         channels.append(channel)
         
-        # Create a channel with a white line of pixels representing angle 2.
-        # Create a channel with a gray line of pixels representing the load magnitude and angle 2.
+        # Create a channel with a gray line of pixels representing the load magnitude and XZ angle.
         if is_3d:
             channel = np.zeros((h, w), dtype=DATA_TYPE)
             r = np.arange(max(channel.shape))
@@ -202,7 +200,6 @@ def generate_input_images_3d(samples: pd.DataFrame) -> np.ndarray:
         z = z.astype(int)
         inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h) * (z >= 0) * (z < d)
         channel[y[inside_image], x[inside_image], z[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        channel = np.flipud(channel)
         channels.append(channel)
         
         # # Add two channels with vertical and horizontal indices.
@@ -224,6 +221,8 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     
     time_start = time.time()
 
+    DATA_TYPE = np.float32
+
     number_samples = len(samples)
     
     # Get and sort all FEA filenames.
@@ -238,7 +237,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     DEFAULT_VALUE = 0
     labels = np.full(
         (number_samples, NODES_Z if is_3d else 1, *OUTPUT_SIZE),
-        DEFAULT_VALUE, dtype=float
+        DEFAULT_VALUE, dtype=DATA_TYPE
     )
     for i, (index, filename) in enumerate(zip(samples.index, filenames)):
         with open(filename, "r") as file:
