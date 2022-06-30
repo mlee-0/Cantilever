@@ -566,7 +566,7 @@ def train_regression(
             queue.put(info_gui)
 
         # Save the model parameters periodically and in the last iteration of the loop.
-        if epoch % 5 == 0 or epoch == epochs[-1]:
+        if epoch % 1 == 0 or epoch == epochs[-1]:
             save_model(
                 filepath_model,
                 epoch=epoch,
@@ -607,7 +607,7 @@ def train_regression(
     return model
 
 def test_regression(
-    device: str, model: nn.Module, loss_function: nn.Module, test_dataloader: DataLoader,
+    device: str, model: nn.Module, loss_function: nn.Module, dataset: Dataset, test_dataloader: DataLoader,
     queue=None, queue_to_main=None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Test the given regression model and return its outputs and corresponding labels and inputs."""
@@ -656,6 +656,13 @@ def test_regression(
     inputs = np.concatenate(inputs, axis=0)
     outputs = np.concatenate(outputs, axis=0)
     labels = np.concatenate(labels, axis=0)
+
+    if queue:
+        info_gui["test_inputs"] = inputs
+        info_gui["test_outputs"] = outputs
+        info_gui["test_labels"] = labels
+        info_gui["test_max_value"] = dataset.max_value
+        queue.put(info_gui)
 
     return outputs, labels, inputs
 
@@ -762,6 +769,13 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
 
     max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
+    # Initialize values to send to the GUI.
+    if queue:
+        info_gui = {
+            "values_metrics": {"NMAE": nmae, "NMSE": nmse, "NRMSE": nrmse, "MRE": mre},
+        }
+        queue.put(info_gui)
+
 def main(
     train: bool, test: bool, evaluate: bool, train_existing: bool,
     epoch_count: int, learning_rate: float, batch_sizes: Tuple[int, int, int], Model: nn.Module,
@@ -859,6 +873,12 @@ def main(
     if checkpoint is not None:
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if queue:
+            queue.put({
+                "epochs": range(1, checkpoint["epoch"]+1),
+                "training_loss": checkpoint["training_loss"],
+                "validation_loss": checkpoint["validation_loss"],
+            })
 
     if train:
         model = train_regression(
@@ -880,6 +900,7 @@ def main(
             device = device,
             model = model,
             loss_function = loss_function,
+            dataset = dataset,
             test_dataloader = test_dataloader,
             queue = queue,
             queue_to_main = queue_to_main,
