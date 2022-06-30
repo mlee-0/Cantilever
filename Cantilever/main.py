@@ -591,12 +591,12 @@ def train_regression(
     # Plot the loss history.
     if not queue:
         plt.figure()
-        if previous_training_loss:
-            plt.plot(range(1, epochs[0]), previous_training_loss, ".:", color=Colors.GRAY_LIGHT)
-        if previous_validation_loss:
-            plt.plot(range(1, epochs[0]), previous_validation_loss, ".-", color=Colors.GRAY_LIGHT)
-        plt.plot(epochs, training_loss, ".:", color=Colors.ORANGE, label="Training")
-        plt.plot(epochs, validation_loss, ".-", color=Colors.BLUE, label="Validation")
+        all_training_loss = [*previous_training_loss, *training_loss]
+        all_validation_loss = [*previous_validation_loss, *validation_loss]
+        plt.plot(range(1, epochs[-1]+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
+        plt.plot(range(1, epochs[-1]+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
+        if previous_training_loss or previous_validation_loss:
+            plt.vlines(epochs[0] - 0.5, 0, max(training_loss + validation_loss), colors=(Colors.GRAY,), label="Current session starts")
         plt.legend()
         plt.ylim(bottom=0)
         plt.xlabel("Epochs")

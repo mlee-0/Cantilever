@@ -415,30 +415,19 @@ class MainWindow(QMainWindow):
         self.figure_loss.clear()
         axis = self.figure_loss.add_subplot(1, 1, 1)  # Number of rows, number of columns, index
         
-        # Plot previous losses.
-        if previous_training_loss and not self.action_toggle_loss.isChecked():
-            axis.plot(
-                range(epochs[0] - len(previous_training_loss), epochs[0]),
-                previous_training_loss,
-                ".:", color=Colors.GRAY_LIGHT
-            )
-        if previous_validation_loss and not self.action_toggle_loss.isChecked():
-            axis.plot(
-                range(epochs[0] - len(previous_validation_loss), epochs[0]),
-                previous_validation_loss,
-                ".-", color=Colors.GRAY_LIGHT
-            )
-        
-        # Plot current losses.
+        all_training_loss = [*previous_training_loss, *training_loss]
+        all_validation_loss = [*previous_validation_loss, *validation_loss]
         if training_loss:
-            axis.plot(epochs[:len(training_loss)], training_loss, ".:", color=Colors.ORANGE, label="Training")
+            axis.plot(range(1, len(all_training_loss)+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
             axis.annotate(f"{training_loss[-1]:,.0f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
-            axis.legend()
         if validation_loss:
-            axis.plot(epochs[:len(validation_loss)], validation_loss, ".-", color=Colors.BLUE, label="Validation")
+            axis.plot(range(1, len(all_validation_loss)+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
             axis.annotate(f"{validation_loss[-1]:,.0f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
-            axis.legend()
+
+        if previous_training_loss or previous_validation_loss:
+            axis.vlines(epochs[0] - 0.5, 0, max(training_loss + validation_loss), colors=(Colors.GRAY,), label="Current session starts")
         
+        axis.legend()
         axis.set_ylim(bottom=0)
         axis.set_xlabel("Epochs")
         axis.set_ylabel("Loss")
@@ -454,7 +443,7 @@ class MainWindow(QMainWindow):
     
     def show_test_outputs(self, value=1):
         """Display images of the testing results."""
-        
+
         if self.sender == self.value_test_index:
             self.test_index = value - 1
         elif self.sender == self.value_test_channel:
@@ -487,10 +476,10 @@ class MainWindow(QMainWindow):
             progress_epoch: Tuple[int, int] = info.get("progress_epoch", (0, 0))
             progress_batch: Tuple[int, int] = info.get("progress_batch", (0, 0))
             epochs = info.get("epochs", range(0))
-            training_loss = info.get("training_loss", None)
-            previous_training_loss = info.get("previous_training_loss", None)
-            validation_loss = info.get("validation_loss", None)
-            previous_validation_loss = info.get("previous_validation_loss", None)
+            training_loss = info.get("training_loss", [])
+            previous_training_loss = info.get("previous_training_loss", [])
+            validation_loss = info.get("validation_loss", [])
+            previous_validation_loss = info.get("previous_validation_loss", [])
             values_metrics = info.get("values_metrics", {})
 
             # self.test_inputs = info.get("test_inputs", self.test_inputs)
