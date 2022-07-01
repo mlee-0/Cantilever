@@ -12,10 +12,10 @@ from typing import Tuple
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import numpy as np
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QFileDialog
 
 from helpers import Colors, FOLDER_ROOT, array_to_colormap
 import main
@@ -316,9 +316,13 @@ class MainWindow(QMainWindow):
         self.show_test_outputs()
 
         # Label that shows evaluation metrics.
-        self.label_metrics = QLabel()
-        self.label_metrics.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.label_metrics)
+        self.table_metrics = QTableWidget(0, 2)
+        self.table_metrics.horizontalHeader().hide()
+        self.table_metrics.verticalHeader().hide()
+        self.table_metrics.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # Fill available horizontal space
+        layout.addWidget(self.table_metrics)
+
+        layout.addStretch(1)
 
         return widget
 
@@ -334,6 +338,7 @@ class MainWindow(QMainWindow):
         self.sidebar.setEnabled(False)
         self.progress_bar.setRange(0, 0)
         self.button_stop.setEnabled(True)
+        self.table_metrics.clear()
 
         self.thread = threading.Thread(
             target=main.main,
@@ -419,10 +424,10 @@ class MainWindow(QMainWindow):
         all_validation_loss = [*previous_validation_loss, *validation_loss]
         if training_loss:
             axis.plot(range(1, len(all_training_loss)+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
-            axis.annotate(f"{training_loss[-1]:,.0f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
+            axis.annotate(f"{training_loss[-1]:,.2f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
         if validation_loss:
             axis.plot(range(1, len(all_validation_loss)+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
-            axis.annotate(f"{validation_loss[-1]:,.0f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
+            axis.annotate(f"{validation_loss[-1]:,.2f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
 
         if previous_training_loss or previous_validation_loss:
             axis.vlines(epochs[0] - 0.5, 0, max(training_loss + validation_loss), colors=(Colors.GRAY,), label="Current session starts")
@@ -506,10 +511,15 @@ class MainWindow(QMainWindow):
 
             # Update the metrics.
             if values_metrics:
-                text = "\n".join(
-                    [f"{key}: {value}" for key, value in values_metrics.items()]
-                )
-                self.label_metrics.setText(text)
+                for metric, value in values_metrics.items():
+                    if metric in [_.text() for _ in self.table_metrics.findItems(metric, Qt.MatchExactly)]:
+                        continue
+                    row = self.table_metrics.rowCount()
+                    self.table_metrics.insertRow(row)
+                    self.table_metrics.setItem(row, 0, QTableWidgetItem(metric))
+                    self.table_metrics.setItem(row, 1, QTableWidgetItem(str(value)))
+                self.table_metrics.resizeRowsToContents()
+                self.table_metrics.resizeColumnsToContents()
 
             if training_loss or previous_training_loss or validation_loss or previous_validation_loss:
                 self.plot_loss(epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss)

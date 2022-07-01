@@ -485,7 +485,7 @@ def train_regression(
             "previous_training_loss": previous_training_loss,
             "validation_loss": [],
             "previous_validation_loss": previous_validation_loss,
-            "metrics": {},
+            "values_metrics": {},
         }
         queue.put(info_gui)
 
@@ -495,7 +495,7 @@ def train_regression(
 
     # Main training-validation loop.
     for epoch in epochs:
-        print(f"\nEpoch {epoch} ({time.strftime('%I:%M:%S %p')})")
+        print(f"\nEpoch {epoch} / {epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
         
         # Train on the training dataset.
         model.train(True)
@@ -541,6 +541,10 @@ def train_regression(
                 output_data = model(input_data)
                 loss += loss_function(output_data, label_data.float()).item()
 
+                # Convert to NumPy arrays for evaluation metric calculations.
+                output_data = output_data.cpu().numpy()
+                label_data = label_data.cpu().numpy()
+
                 outputs.append(output_data)
                 labels.append(label_data)
 
@@ -559,11 +563,11 @@ def train_regression(
         labels = np.concatenate(labels, axis=0)
         mre = metrics.mean_relative_error(outputs, labels)
         print(f"MRE: {mre:.3f}")
-        if queue:
-            info_gui["metrics"] = {
-                "MRE": mre,
-            }
-            queue.put(info_gui)
+        # if queue:
+        #     info_gui["values_metrics"] = {
+        #         "MRE (Validation)": mre,
+        #     }
+        #     queue.put(info_gui)
 
         # Save the model parameters periodically and in the last iteration of the loop.
         if epoch % 1 == 0 or epoch == epochs[-1]:
@@ -658,6 +662,7 @@ def test_regression(
     labels = np.concatenate(labels, axis=0)
 
     if queue:
+        info_gui["values_metrics"] = {f"Loss ({loss_function})": loss}
         info_gui["test_inputs"] = inputs
         info_gui["test_outputs"] = outputs
         info_gui["test_labels"] = labels
