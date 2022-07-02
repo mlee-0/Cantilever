@@ -13,9 +13,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import numpy as np
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QFileDialog
 
 from helpers import Colors, FOLDER_ROOT, array_to_colormap
 import main
@@ -31,25 +31,31 @@ class MainWindow(QMainWindow):
         self.queue_to_main = Queue()
 
         # Font objects.
-        font_small = QFont()
-        font_small.setPointSize(10)
+        self.font_small = QFont()
+        self.font_small.setPointSize(10)
+
+        # Margin objects.
+        self.margins_small = QMargins(5, 5, 5, 5)
 
         # Menu bar.
         menu_bar = self.menuBar()
         menu_view = menu_bar.addMenu("View")
         menu_help = menu_bar.addMenu("Help")
-        self.action_toggle_status_bar = menu_view.addAction("Show Status Bar", self.toggle_status_bar)
-        self.action_toggle_status_bar.setCheckable(True)
-        self.action_toggle_status_bar.setChecked(True)
+        self.action_toggle_console = menu_view.addAction("Show Console", self.toggle_console)
+        self.action_toggle_console.setCheckable(True)
+        self.action_toggle_console.setChecked(False)
+        # self.action_toggle_status_bar = menu_view.addAction("Show Status Bar", self.toggle_status_bar)
+        # self.action_toggle_status_bar.setCheckable(True)
+        # self.action_toggle_status_bar.setChecked(True)
         menu_view.addSeparator()
         self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
         self.action_toggle_loss.setCheckable(True)
         menu_help.addAction("About...", self.show_about)
 
-        # Status bar.
-        self.status_bar = self.statusBar()
-        self.label_status = QLabel()
-        self.status_bar.addWidget(self.label_status)
+        # # Status bar.
+        # self.status_bar = self.statusBar()
+        # self.label_status = QLabel()
+        # self.status_bar.addWidget(self.label_status)
 
         # Automatically send console messages to the status bar.
         # https://stackoverflow.com/questions/44432276/print-out-python-console-output-to-qtextedit
@@ -57,18 +63,25 @@ class MainWindow(QMainWindow):
             newText = QtCore.pyqtSignal(str)
             def write(self, text):
                 self.newText.emit(str(text))
-        sys.stdout = Stream(newText=self.update_status_bar)
+        sys.stdout = Stream(newText=self.update_console)
 
         # Central widget.
         main_widget = QWidget()
-        main_layout = QHBoxLayout(main_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout = QGridLayout(main_widget)
+        # main_layout.setContentsMargins(0, 0, 0, 0)
         self.setCentralWidget(main_widget)
         
         self.sidebar = self._sidebar()
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.sidebar)
         scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        # Console.
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setFont(self.font_small)
+        self.console.setVisible(False)
 
         tabs = QTabWidget()
         tabs.addTab(self._plots(), "Training")
@@ -78,8 +91,12 @@ class MainWindow(QMainWindow):
         layout_results.addWidget(self._progress_bar())
         layout_results.addWidget(tabs)
 
-        main_layout.addWidget(scroll_area)
-        main_layout.addLayout(layout_results, stretch=1)
+        main_layout.addWidget(scroll_area, 0, 0)
+        main_layout.addWidget(self.console, 1, 0)
+        main_layout.addLayout(layout_results, 0, 1, 2, 1) #, stretch=1)
+        main_layout.setRowStretch(0, 5)
+        main_layout.setRowStretch(1, 0)
+        main_layout.setColumnStretch(1, 1)
         
         # divider = QFrame()
         # divider.setFrameShape(QFrame.HLine)
@@ -93,6 +110,7 @@ class MainWindow(QMainWindow):
     def _sidebar(self) -> QWidget:
         """Return a widget containing fields for adjusting settings."""
         layout_sidebar = QVBoxLayout()
+        layout_sidebar.setContentsMargins(0, 0, 0, 0)
         layout_sidebar.setAlignment(Qt.AlignTop)
         widget = QWidget()
         widget.setLayout(layout_sidebar)
@@ -107,120 +125,125 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.button_test)
         layout_sidebar.addLayout(layout)
 
-        # Checkbox for toggling continuing training a previously saved model.
-        self.checkbox_train_existing = QCheckBox("Train Existing")
-        self.checkbox_train_existing.setChecked(True)
-        self.label_filename_model = QLineEdit("model.pth")
-        self.label_filename_model.setAlignment(Qt.AlignRight)
-        # self.button_browse_model = QPushButton("model.pth")
-        # self.button_browse_model.clicked.connect(self.open_dialog_model)
-        layout = QHBoxLayout()
-        layout.addWidget(self.checkbox_train_existing)
-        layout.addWidget(self.label_filename_model)
-        layout_sidebar.addLayout(layout)
+        # Continuing training of previously saved model settings.
+        box = QGroupBox("Model")
+        layout_box = QFormLayout(box)
+        layout_box.setContentsMargins(self.margins_small)
+        layout_sidebar.addWidget(box)
 
-        # Settings.
+        self.field_filename_model = QLineEdit("model.pth")
+        self.button_browse_model = QToolButton()
+        self.button_browse_model.setIcon(QtWidgets.QFileIconProvider().icon(QtWidgets.QFileIconProvider.File))
+        self.button_browse_model.clicked.connect(self.open_dialog_model)
+        layout = QHBoxLayout()
+        layout.addWidget(self.field_filename_model)
+        layout.addWidget(self.button_browse_model)
+        layout_box.addRow("Filename:", layout)
+        
+        self.checkbox_train_existing = QCheckBox("Keep Training")
+        self.checkbox_train_existing.setChecked(True)
+        layout_box.addRow("", self.checkbox_train_existing)
+
+        self.value_save_every = QSpinBox()
+        self.value_save_every.setMinimum(1)
+        self.value_save_every.setSuffix(" epochs")
+        layout_box.addRow("Save Every:", self.value_save_every)
+
+        # Training hyperparameter settings.
+        box = QGroupBox("Training")
+        layout_box = QFormLayout(box)
+        layout_box.setContentsMargins(self.margins_small)
+        layout_sidebar.addWidget(box)
+
         self.value_epochs = QSpinBox()
         self.value_epochs.setRange(1, 1_000_000)
         self.value_epochs.setSingleStep(10)
         self.value_epochs.setValue(10)
-        self.value_epochs.setAlignment(Qt.AlignRight)
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel("Epochs:"))
-        layout.addWidget(self.value_epochs)
-        layout_sidebar.addLayout(layout)
+        layout_box.addRow("Epochs:", self.value_epochs)
         
         self.value_learning_digit = QSpinBox()
         self.value_learning_digit.setRange(1, 9)
-        self.value_learning_digit.setAlignment(Qt.AlignRight)
         self.value_learning_exponent = QSpinBox()
         self.value_learning_exponent.setRange(1, 10)
         self.value_learning_exponent.setValue(3)
         self.value_learning_exponent.setPrefix("-")
-        self.value_learning_exponent.setAlignment(Qt.AlignRight)
         layout = QHBoxLayout()
         layout.setSpacing(0)
-        layout.addWidget(QLabel("Learning Rate:"))
-        layout.addStretch(1)
         layout.addWidget(self.value_learning_digit)
         layout.addWidget(QLabel("e"))
         layout.addWidget(self.value_learning_exponent)
-        layout_sidebar.addLayout(layout)
+        layout_box.addRow("Learning Rate:", layout)
 
-        self.value_batch = QSpinBox()
-        self.value_batch.setMinimum(1)
-        self.value_batch.setValue(1)
-        self.value_batch.setAlignment(Qt.AlignRight)
+        self.checkbox_decay_learning_rate = QCheckBox("Decay")
+        self.checkbox_decay_learning_rate.setChecked(True)
+        layout_box.addRow("", self.checkbox_decay_learning_rate)
+
+        self.value_batch_train = QSpinBox()
+        self.value_batch_train.setRange(1, 256)
+        self.value_batch_train.setValue(1)
+        self.value_batch_train.setToolTip("Training batch size")
+        self.value_batch_validate = QSpinBox()
+        self.value_batch_validate.setRange(1, 256)
+        self.value_batch_validate.setValue(128)
+        self.value_batch_validate.setToolTip("Validation batch size")
+        self.value_batch_test = QSpinBox()
+        self.value_batch_test.setRange(1, 256)
+        self.value_batch_test.setValue(128)
+        self.value_batch_test.setToolTip("Testing batch size")
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("Batch Size:"))
-        layout.addWidget(self.value_batch)
-        layout_sidebar.addLayout(layout)
+        layout.setSpacing(0)
+        layout.addWidget(self.value_batch_train)
+        layout.addWidget(self.value_batch_validate)
+        layout.addWidget(self.value_batch_test)
+        layout_box.addRow("Batch Size:", layout)
 
         self.value_train_split = QSpinBox()
         self.value_train_split.setRange(1, 99)
         self.value_train_split.setValue(80)
-        self.value_train_split.setAlignment(Qt.AlignRight)
         self.value_train_split.setToolTip("Training split")
         self.value_validate_split = QSpinBox()
         self.value_validate_split.setRange(1, 99)
         self.value_validate_split.setValue(10)
-        self.value_validate_split.setAlignment(Qt.AlignRight)
         self.value_train_split.setToolTip("Validation split")
         self.value_test_split = QSpinBox()
         self.value_test_split.setRange(1, 99)
         self.value_test_split.setValue(10)
-        self.value_test_split.setAlignment(Qt.AlignRight)
         self.value_train_split.setToolTip("Testing split")
         layout = QHBoxLayout()
         layout.setSpacing(0)
-        layout.addWidget(QLabel("Split:"))
-        layout.addStretch(1)
         layout.addWidget(self.value_train_split)
         layout.addWidget(self.value_validate_split)
         layout.addWidget(self.value_test_split)
-        layout_sidebar.addLayout(layout)
+        layout_box.addRow("Split:", layout)
 
         self.value_model = QComboBox()
         self.value_model.addItems(networks.networks.keys())
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("Model:"))
-        layout.addWidget(self.value_model)
-        layout_sidebar.addLayout(layout)
+        layout_box.addRow("Model:", self.value_model)
+
+        # Dataset settings.
+        box = QGroupBox("Dataset")
+        layout_box = QFormLayout(box)
+        layout_box.setContentsMargins(self.margins_small)
+        layout_sidebar.addWidget(box)
 
         layout = QHBoxLayout()
-        layout.addWidget(QLabel("Dataset:"))
-        layout.addStretch(1)
         self.buttons_dataset = QButtonGroup()
         buttons = {2: QRadioButton("2D"), 3: QRadioButton("3D")}
         for id in buttons:
             self.buttons_dataset.addButton(buttons[id], id=id)
             layout.addWidget(buttons[id])
         buttons[2].setChecked(True)
-        layout_sidebar.addLayout(layout)
+        layout_box.addRow("Dataset:", layout)
 
-        # Settings for selecting a subset.
-        fields_subset = self._fields_subset()
-        layout_sidebar.addWidget(fields_subset)
-        self.update_button_browse_subset(self.checkbox_use_subset.isChecked())
-
-        return widget
-
-    def _fields_subset(self) -> QWidget:
-        """Return a widget containing fields for selecting subset files."""
-        widget = QWidget()
-        main_layout = QVBoxLayout(widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-
-        layout = QHBoxLayout()
         self.checkbox_use_subset = QCheckBox("Use Subset")
         self.checkbox_use_subset.setChecked(False)
         self.checkbox_use_subset.stateChanged.connect(self.update_button_browse_subset)
-        layout.addWidget(self.checkbox_use_subset)
         self.button_browse_subset = QPushButton()
         self.button_browse_subset.clicked.connect(self.open_dialog_subset)
-        layout.addWidget(self.button_browse_subset)
-
-        main_layout.addLayout(layout)
+        layout_box.addRow("", self.checkbox_use_subset)
+        layout_box.addRow("", self.button_browse_subset)
+        self.update_button_browse_subset(self.checkbox_use_subset.isChecked())
 
         return widget
 
@@ -247,19 +270,27 @@ class MainWindow(QMainWindow):
     def _plots(self) -> QWidget:
         """Return a widget with plots."""
         widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0 ,0)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(self.margins_small)
 
         self.figure_loss = Figure()
         self.canvas_loss = FigureCanvasQTAgg(self.figure_loss)
-        layout.addWidget(self.canvas_loss)
+        layout.addWidget(self.canvas_loss, stretch=4)
 
         self.figure_metrics = Figure()
         self.canvas_metrics = FigureCanvasQTAgg(self.figure_metrics)
         # layout.addWidget(self.canvas_metrics)
 
+        self.table_training = QTableWidget(0, 2)
+        self.table_training.horizontalHeader().hide()
+        self.table_training.verticalHeader().hide()
+        self.table_training.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # Fill available horizontal space
+        self.table_training.setFont(self.font_small)
+        layout.addWidget(self.table_training, stretch=1)
+
         # scroll_area = QScrollArea()
         # scroll_area.setWidget(widget)
+        # scroll_area.setFrameShape(QFrame.NoFrame)
 
         return widget
     
@@ -267,6 +298,7 @@ class MainWindow(QMainWindow):
         """Return a widget containing testing results."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        layout.setContentsMargins(self.margins_small)
         layout.setAlignment(Qt.AlignTop)
 
         # Arrays storing the test inputs, outputs, and labels.
@@ -336,8 +368,12 @@ class MainWindow(QMainWindow):
             train, test = False, True
 
         self.sidebar.setEnabled(False)
+        self.console.clear()
         self.progress_bar.setRange(0, 0)
         self.button_stop.setEnabled(True)
+        self.table_training.setRowCount(0)
+        self.table_training.clear()
+        self.table_metrics.setRowCount(0)
         self.table_metrics.clear()
 
         self.thread = threading.Thread(
@@ -345,7 +381,8 @@ class MainWindow(QMainWindow):
             kwargs={
                 "epoch_count": self.value_epochs.value(),
                 "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
-                "batch_sizes": (self.value_batch.value(), 128, 128),
+                "decay_learning_rate": self.checkbox_decay_learning_rate.isChecked(),
+                "batch_sizes": (self.value_batch_train.value(), self.value_batch_validate.value(), self.value_batch_test.value()),
                 "Model": networks.networks[self.value_model.currentText()],
                 "dataset_id": self.buttons_dataset.checkedId(),
                 "training_split": (
@@ -353,8 +390,9 @@ class MainWindow(QMainWindow):
                     self.value_validate_split.value() / 100,
                     self.value_test_split.value() / 100,
                 ),
-                "filename_model": self.label_filename_model.text(),
+                "filename_model": self.field_filename_model.text(),
                 "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
+                "save_model_every": self.value_save_every.value(),
                 "train_existing": train_existing,
                 "train": train,
                 "test": test,
@@ -376,15 +414,20 @@ class MainWindow(QMainWindow):
         if not state:
             self.button_browse_subset.setText("Browse...")
 
-    def update_status_bar(self, text):
-        """Display text in the status bar."""
+    def update_console(self, text):
+        """Display text in the console box."""
         if text.isprintable():
-            self.label_status.setText(text)
+            self.console.insertPlainText(text)
+            self.console.insertPlainText("\n")
 
     def toggle_status_bar(self):
         """Toggle visibility of status bar."""
         self.status_bar.setVisible(self.action_toggle_status_bar.isChecked())
     
+    def toggle_console(self):
+        """Toggle visibility of console."""
+        self.console.setVisible(self.action_toggle_console.isChecked())
+
     def open_dialog_model(self):
         """Show a file dialog to choose an existing model file or specify a new model file name."""
         dialog = QFileDialog(self, directory=FOLDER_ROOT, filter="(*.pth)")
@@ -393,7 +436,7 @@ class MainWindow(QMainWindow):
             files = dialog.selectedFiles()
             file = os.path.basename(files[0])
             if file:
-                self.button_browse_model.setText(file)
+                self.field_filename_model.setText(file)
 
     def open_dialog_subset(self):
         """Show a file dialog to choose an existing subset file."""
@@ -430,7 +473,7 @@ class MainWindow(QMainWindow):
             axis.annotate(f"{validation_loss[-1]:,.2f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
 
         if previous_training_loss or previous_validation_loss:
-            axis.vlines(epochs[0] - 0.5, 0, max(training_loss + validation_loss), colors=(Colors.GRAY,), label="Current session starts")
+            axis.vlines(epochs[0] - 0.5, 0, max(previous_training_loss + previous_validation_loss), colors=(Colors.GRAY,), label="Current session starts")
         
         axis.legend()
         axis.set_ylim(bottom=0)
@@ -485,7 +528,8 @@ class MainWindow(QMainWindow):
             previous_training_loss = info.get("previous_training_loss", [])
             validation_loss = info.get("validation_loss", [])
             previous_validation_loss = info.get("previous_validation_loss", [])
-            values_metrics = info.get("values_metrics", {})
+            info_training = info.get("info_training", {})
+            info_metrics = info.get("info_metrics", {})
 
             # self.test_inputs = info.get("test_inputs", self.test_inputs)
             self.test_outputs = info.get("test_outputs", self.test_outputs)
@@ -509,9 +553,19 @@ class MainWindow(QMainWindow):
             self.progress_bar.setValue(progress_value)
             self.progress_bar.setMaximum(progress_max)
 
+            # Update training information.
+            if info_training:
+                for key, value in info_training.items():
+                    if key in [_.text() for _ in self.table_training.findItems(key, Qt.MatchExactly)]:
+                        continue
+                    row = self.table_training.rowCount()
+                    self.table_training.insertRow(row)
+                    self.table_training.setItem(row, 0, QTableWidgetItem(key))
+                    self.table_training.setItem(row, 1, QTableWidgetItem(str(value)))
+
             # Update the metrics.
-            if values_metrics:
-                for metric, value in values_metrics.items():
+            if info_metrics:
+                for metric, value in info_metrics.items():
                     if metric in [_.text() for _ in self.table_metrics.findItems(metric, Qt.MatchExactly)]:
                         continue
                     row = self.table_metrics.rowCount()

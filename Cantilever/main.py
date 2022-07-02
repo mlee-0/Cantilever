@@ -457,10 +457,11 @@ def train_cnn_encoder(epoch_count: int, learning_rate: float, batch_size: int, t
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
 def train_regression(
-    device: str, epoch_count: int, checkpoint: dict, filepath_model: str,
+    device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
     train_dataloader: DataLoader, validate_dataloader: DataLoader,
-    queue=None, queue_to_main=None,
+    scheduler = None,
+    queue=None, queue_to_main=None, info_gui: dict=None,
 ) -> nn.Module:
     """Train and validate the given regression model. Return the model after finishing training."""
 
@@ -477,16 +478,13 @@ def train_regression(
 
     # Initialize values to send to the GUI, to be updated throughout training.
     if queue:
-        info_gui = {
-            "progress_epoch": (epoch, epochs[-1]),
-            "progress_batch": (0, 0),
-            "epochs": epochs,
-            "training_loss": [],
-            "previous_training_loss": previous_training_loss,
-            "validation_loss": [],
-            "previous_validation_loss": previous_validation_loss,
-            "values_metrics": {},
-        }
+        info_gui["progress_epoch"] = (epoch, epochs[-1])
+        info_gui["progress_batch"] = (0, 0)
+        info_gui["epochs"] = epochs
+        info_gui["training_loss"] = []
+        info_gui["previous_training_loss"] = previous_training_loss
+        info_gui["validation_loss"] = []
+        info_gui["previous_validation_loss"] = previous_validation_loss
         queue.put(info_gui)
 
     # Initialize the loss values for the current training session.
@@ -495,7 +493,7 @@ def train_regression(
 
     # Main training-validation loop.
     for epoch in epochs:
-        print(f"\nEpoch {epoch} / {epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
+        print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
         
         # Train on the training dataset.
         model.train(True)
@@ -528,6 +526,14 @@ def train_regression(
         loss /= batch
         training_loss.append(loss)
         print(f"Average training loss: {loss:,.2f}")
+
+        # Adjust the learning rate if a scheduler is used.
+        if scheduler:
+            scheduler.step(training_loss[-1])
+            learning_rate = optimizer.param_groups[0]["lr"]
+            print(f"Learning rate: {learning_rate}")
+            if queue:
+                info_gui["info_training"]["Learning Rate"] = learning_rate
 
         # Test on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
         model.train(False)
@@ -564,20 +570,21 @@ def train_regression(
         mre = metrics.mean_relative_error(outputs, labels)
         print(f"MRE: {mre:.3f}")
         # if queue:
-        #     info_gui["values_metrics"] = {
+        #     info_gui["info_training"] = {
         #         "MRE (Validation)": mre,
         #     }
         #     queue.put(info_gui)
 
         # Save the model parameters periodically and in the last iteration of the loop.
-        if epoch % 1 == 0 or epoch == epochs[-1]:
+        if epoch % save_model_every == 0 or epoch == epochs[-1]:
             save_model(
                 filepath_model,
-                epoch=epoch,
-                model_state_dict=model.state_dict(),
-                optimizer_state_dict=optimizer.state_dict(),
-                training_loss=[*previous_training_loss, *training_loss],
-                validation_loss=[*previous_validation_loss, *validation_loss],
+                epoch = epoch,
+                model_state_dict = model.state_dict(),
+                optimizer_state_dict = optimizer.state_dict(),
+                learning_rate = optimizer.param_groups[0]["lr"],
+                training_loss = [*previous_training_loss, *training_loss],
+                validation_loss = [*previous_validation_loss, *validation_loss],
             )
         
         if queue:
@@ -600,7 +607,7 @@ def train_regression(
         plt.plot(range(1, epochs[-1]+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
         plt.plot(range(1, epochs[-1]+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
         if previous_training_loss or previous_validation_loss:
-            plt.vlines(epochs[0] - 0.5, 0, max(training_loss + validation_loss), colors=(Colors.GRAY,), label="Current session starts")
+            plt.vlines(epochs[0] - 0.5, 0, max(previous_training_loss + previous_validation_loss), colors=(Colors.GRAY,), label="Current session starts")
         plt.legend()
         plt.ylim(bottom=0)
         plt.xlabel("Epochs")
@@ -612,16 +619,14 @@ def train_regression(
 
 def test_regression(
     device: str, model: nn.Module, loss_function: nn.Module, dataset: Dataset, test_dataloader: DataLoader,
-    queue=None, queue_to_main=None,
+    queue=None, queue_to_main=None, info_gui: dict=None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Test the given regression model and return its outputs and corresponding labels and inputs."""
 
     # Initialize values to send to the GUI.
     if queue:
-        info_gui = {
-            "progress_batch": (0, 0),
-            "values_metrics": {},
-        }
+        info_gui["progress_batch"] = (0, 0)
+        info_gui["info_metrics"] = {}
         queue.put(info_gui)
 
     model.train(False)
@@ -662,7 +667,7 @@ def test_regression(
     labels = np.concatenate(labels, axis=0)
 
     if queue:
-        info_gui["values_metrics"] = {f"Loss ({loss_function})": loss}
+        info_gui["info_metrics"] = {f"Loss ({loss_function})": loss}
         info_gui["test_inputs"] = inputs
         info_gui["test_outputs"] = outputs
         info_gui["test_labels"] = labels
@@ -671,7 +676,7 @@ def test_regression(
 
     return outputs, labels, inputs
 
-def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue=None):
+def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue=None, info_gui: dict=None):
     """Show and plot evaluation metrics."""
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
@@ -689,18 +694,18 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
     print(f"NRMSE: {nrmse:,.3f}")
     print(f"MRE: {mre:,.2f}%")
 
-    # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.
-    indices = range(0, labels.shape[0], 100)
-    for i in indices:
-        image = np.vstack((
-            np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
-            np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
-        ))
-        write_image(
-            array_to_colormap(image, dataset.max_value),
-            os.path.join(folder_results, f"{i+1}_fea_model.png"),
-            )
-    print(f"Wrote {len(indices)} test images in {folder_results}.")
+    # # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.
+    # indices = range(0, labels.shape[0], 100)
+    # for i in indices:
+    #     image = np.vstack((
+    #         np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
+    #         np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
+    #     ))
+    #     write_image(
+    #         array_to_colormap(image, dataset.max_value),
+    #         os.path.join(folder_results, f"{i+1}_fea_model.png"),
+    #         )
+    # print(f"Wrote {len(indices)} test images in {folder_results}.")
 
     # # Write images for each channel in the specified input images.
     # for i in (720, 1060, 2960):
@@ -765,26 +770,26 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
             
             plt.show()
 
-    cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
-        outputs.flatten(),
-        labels.flatten(),
-        dataset.max_value,
-        plot=not queue,
-    )
+    # cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
+    #     outputs.flatten(),
+    #     labels.flatten(),
+    #     dataset.max_value,
+    #     plot=not queue,
+    # )
 
-    max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
+    # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
     # Initialize values to send to the GUI.
     if queue:
-        info_gui = {
-            "values_metrics": {"NMAE": nmae, "NMSE": nmse, "NRMSE": nrmse, "MRE": mre},
+        info_gui["info_metrics"] = {
+            "NMAE": nmae, "NMSE": nmse, "NRMSE": nrmse, "MRE": mre
         }
         queue.put(info_gui)
 
 def main(
     train: bool, test: bool, evaluate: bool, train_existing: bool,
-    epoch_count: int, learning_rate: float, batch_sizes: Tuple[int, int, int], Model: nn.Module,
-    dataset_id: int, training_split: Tuple[float, float, float], filename_model: str, filename_subset: str,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], Model: nn.Module,
+    dataset_id: int, training_split: Tuple[float, float, float], filename_model: str, filename_subset: str, save_model_every: int,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
@@ -816,10 +821,20 @@ def main(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device.")
 
+    # Initialize values to send to the GUI.
+    info_gui = {
+        "info_training": {},
+        "info_metrics": {},
+    } if queue else None
+    
     filepath_model = os.path.join(FOLDER_ROOT, filename_model)
 
     if (test and not train) or (train and train_existing):
         checkpoint = load_model(filepath=filepath_model, device=device)
+        # Load the last learning rate used.
+        if checkpoint and decay_learning_rate:
+            learning_rate = checkpoint["learning_rate"]
+            print(f"Using last learning rate {learning_rate}.")
     else:
         checkpoint = None
 
@@ -872,6 +887,7 @@ def main(
     model = Model(*args[Model])
     model.to(device)
     optimizer = Optimizer(model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=10) if decay_learning_rate else None
     loss_function = Loss()
 
     # Load previously saved model and optimizer parameters.
@@ -884,6 +900,13 @@ def main(
                 "training_loss": checkpoint["training_loss"],
                 "validation_loss": checkpoint["validation_loss"],
             })
+    
+    if queue:
+        info_gui["info_training"]["Training Size"] = train_size
+        info_gui["info_training"]["Validation Size"] = validate_size
+        info_gui["info_training"]["Testing Size"] = test_size
+        info_gui["info_training"]["Learning Rate"] = learning_rate
+        queue.put(info_gui)
 
     if train:
         model = train_regression(
@@ -891,13 +914,16 @@ def main(
             epoch_count = epoch_count,
             checkpoint = checkpoint,
             filepath_model = filepath_model,
+            save_model_every = save_model_every,
             model = model,
             optimizer = optimizer,
             loss_function = loss_function,
             train_dataloader = train_dataloader,
             validate_dataloader = validate_dataloader,
+            scheduler = scheduler,
             queue = queue,
             queue_to_main = queue_to_main,
+            info_gui = info_gui,
             )
     
     if test:
@@ -909,6 +935,7 @@ def main(
             test_dataloader = test_dataloader,
             queue = queue,
             queue_to_main = queue_to_main,
+            info_gui = info_gui,
         )
 
         # Transform values back to original range.
@@ -916,20 +943,22 @@ def main(
         labels = dataset.transform(labels, inverse=True)
 
         if evaluate:
-            evaluate_regression(outputs, labels, inputs, dataset, queue=queue)
+            evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
 
 
 if __name__ == "__main__":
     kwargs = {
         "epoch_count": 1,
         "learning_rate": 1e-3,
-        "batch_sizes": (8, 128, 256),
+        "decay_learning_rate": True,
+        "batch_sizes": (16, 128, 256),
         
         "Model": Nie,
         "dataset_id": 2,
         "training_split": (0.8, 0.1, 0.1),
         "filename_model": "model.pth",
         "filename_subset": None,
+        "save_model_every": 1,
 
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
