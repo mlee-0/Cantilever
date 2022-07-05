@@ -23,7 +23,7 @@ else:
 
 # Size of output images (channel-height-width) produced by the network.
 OUTPUT_CHANNELS = 1
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 64, 64)  # Make dimensions divisible by 4 for convenience in the se_2 layer
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 128, 128)
 # Size of input images (channel-height-width).
 INPUT_CHANNELS = 3
 INPUT_SIZE = (INPUT_CHANNELS, *OUTPUT_SIZE[1:])
@@ -151,8 +151,8 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
     labels = []
     for i, filename in enumerate(filenames):
         with Image.open(filename) as image:
-            # # Resize image.
-            # image = image.resize((OUTPUT_SIZE[2], OUTPUT_SIZE[1]))
+            # Resize image.
+            image = image.resize((OUTPUT_SIZE[2], OUTPUT_SIZE[1]))
 
             # # Blur to reduce noise.
             # image = image.filter(ImageFilter.GaussianBlur(radius=15.0))
@@ -164,7 +164,7 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
             else:
                 array = np.asarray(image, dtype=np.uint8).transpose((2, 0, 1))
                 # Convert to grayscale.
-                array = np.mean(array, axis=0)
+                array = np.mean(array, axis=0).astype(np.uint8)
             
             # # Perform k-means clustering.
             # k = 3
@@ -180,10 +180,11 @@ def read_labels(folder: str, sample_indices: List[int] = None) -> List[np.ndarra
 
             # array = array * 255
 
-            # # Scale values to [-1, 1]. Required for use with GAN, where the generator outputs images in [-1, 1].
-            # array = array / 255 * 2 - 1
+            # Scale values to [-1, 1]. Required for use with GAN, where the generator outputs images in [-1, 1].
+            array = array / 255 * 2 - 1
 
-            # labels.append(array.reshape(OUTPUT_SIZE))
+            array = array.reshape(OUTPUT_SIZE)
+
             labels.append(array)
         
         print(f"Reading label {i+1}...", end="\r")
@@ -218,10 +219,22 @@ def k_means(array: np.ndarray, k: int, centroids: list) ->  np.ndarray:
     
     return clusters
 
+def crop_resize_experiment2():
+    from PIL import Image as im
+    import glob
+
+    files = glob.glob("DED/Exp#2_(sheet#2)/*.jpg")
+    files = sorted(files)
+    for file in files[2:]:
+        image = im.open(file, "r")
+        image = image.crop((560, 200, 2320, 1960))
+        image = image.resize((1024, 1024))
+        image.save(file)
+        print(file)
+
 def write_image(array: np.ndarray, filename: str) -> None:
     with Image.fromarray(array.astype(np.uint8)) as image:
         image.save(filename)
-
 # with Image.open("DED/Exp#1_(sheet#1)/01.jpg") as image:
 #     # Resize.
 #     image = image.resize((OUTPUT_SIZE[2], OUTPUT_SIZE[1]))
