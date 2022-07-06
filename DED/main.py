@@ -6,6 +6,7 @@ Train and test the model.
 import os
 import pickle
 import random
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -61,18 +62,25 @@ class DedDataset(Dataset):
             # print(f"Saved label images to {file}.")
 
         # Perform data augmentation.
-        print(f"Augmenting dataset from {len(self.labels)} to {2*len(self.labels)}...")
-        augmented_labels = []
-        for label in self.labels:
-            flipped_label = label.copy()
-            flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
-            augmented_labels.append(flipped_label)
-        # Insert the augmented labels and corresponding inputs.
-        self.inputs = np.repeat(self.inputs, 2)
-        index = 1
-        for augmented_label in augmented_labels:
-            self.labels.insert(index, augmented_label)
-            index += 2
+        augment_data = True
+        if augment_data:
+            augment_functions = (lambda label: label[:, :, ::-1], lambda label: label + np.random.normal(0, 0.1, label.shape))
+            dataset_size_default = len(self.labels)
+
+            for function in augment_functions:
+                augmented_labels = []
+                for label in self.labels:
+                    augmented_label = function(label.copy())
+                    augmented_labels.append(augmented_label)
+                
+                # Insert the augmented labels and corresponding inputs.
+                self.inputs = np.repeat(self.inputs, 2)
+                index = 1
+                for augmented_label in augmented_labels:
+                    self.labels.insert(index, augmented_label)
+                    index += 2
+                
+            print(f"Augmented dataset from size {dataset_size_default} to {len(self.labels)}.")
         
         assert len(self.inputs) == len(self.labels), f"Number of inputs {len(self.inputs)} does not match number of labels {len(self.labels)}"
         self.number_samples = len(self.labels)
@@ -195,7 +203,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
 
     # Main training-validation loop.
     for epoch in epochs:
-        print(f"\nEpoch {epoch}/{epochs[-1]}")
+        print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
 
         model_generator.train(True)
         model_discriminator.train(True)

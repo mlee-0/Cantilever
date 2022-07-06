@@ -91,17 +91,17 @@ class GanGenerator(nn.Module):
         self.embedding_size = embedding_size
 
         self.layers = nn.Sequential(
-            nn.ConvTranspose2d(self.latent_size, number_features * 16, kernel_size=4, stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(number_features * 16),
+            nn.ConvTranspose2d(self.latent_size, number_features * 8, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(number_features * 8),
             nn.ReLU(inplace=True),
 
             # nn.ConvTranspose2d(number_features * 32, number_features * 16, kernel_size=4, stride=2, padding=1, bias=False),
             # nn.BatchNorm2d(number_features * 16),
             # nn.ReLU(inplace=True),
             
-            nn.ConvTranspose2d(number_features * 16, number_features * 8, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(number_features * 8),
-            nn.ReLU(inplace=True),
+            # nn.ConvTranspose2d(number_features * 16, number_features * 8, kernel_size=4, stride=2, padding=1, bias=False),
+            # nn.BatchNorm2d(number_features * 8),
+            # nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(number_features * 8, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(number_features * 4),
@@ -147,15 +147,15 @@ class GanDiscriminator(nn.Module):
             nn.BatchNorm2d(number_features * 8),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             
-            nn.Conv2d(number_features * 8, number_features * 16, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(number_features * 16),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            # nn.Conv2d(number_features * 8, number_features * 16, kernel_size=4, stride=2, padding=1, bias=False),
+            # nn.BatchNorm2d(number_features * 16),
+            # nn.LeakyReLU(negative_slope=0.2, inplace=True),
             
             # nn.Conv2d(number_features * 16, number_features * 32, kernel_size=4, stride=2, padding=1, bias=False),
             # nn.BatchNorm2d(number_features * 32),
             # nn.LeakyReLU(negative_slope=0.2, inplace=True),
             
-            nn.Conv2d(number_features * 16, 1, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.Conv2d(number_features * 8, 1, kernel_size=4, stride=1, padding=0, bias=False),
             nn.Sigmoid(),
         )
 
