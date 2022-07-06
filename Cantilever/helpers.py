@@ -27,6 +27,7 @@ else:
 
 # Folders and files.
 FOLDER_ROOT = "Cantilever" if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
+FOLDER_CHECKPOINTS = os.path.join(FOLDER_ROOT, "Checkpoints")
 
 @dataclass
 class Parameter:

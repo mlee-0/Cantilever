@@ -17,7 +17,7 @@ from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QFileDialog
 
-from helpers import Colors, FOLDER_ROOT, array_to_colormap
+from helpers import Colors, FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap, plot_loss
 import main
 import networks
 
@@ -430,7 +430,7 @@ class MainWindow(QMainWindow):
 
     def open_dialog_model(self):
         """Show a file dialog to choose an existing model file or specify a new model file name."""
-        dialog = QFileDialog(self, directory=FOLDER_ROOT, filter="(*.pth)")
+        dialog = QFileDialog(self, directory=FOLDER_CHECKPOINTS, filter="(*.pth)")
         dialog.setFileMode(QFileDialog.AnyFile)
         if dialog.exec_():
             files = dialog.selectedFiles()
