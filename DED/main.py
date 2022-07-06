@@ -32,22 +32,15 @@ class DedDataset(Dataset):
             folder_labels = os.path.join(FOLDER_ROOT, "Exp#1_(sheet#1)")
             total_samples = 81
             sheet_index = 0
-            validate_indices = range(0, total_samples, 3)
             # Number of unique sets of input parameters (product of numbers of unique values for each individual parameter found in the dataset).
             self.embedding_size = 4 * 3 * 4
         elif experiment_number == 2:
             folder_labels = os.path.join(FOLDER_ROOT, "Exp#2_(sheet#2)")
             total_samples = 192
             sheet_index = 1
-            validate_indices = range(0, total_samples, 4)
             self.embedding_size = 4 * 4 * 3
 
-        if dataset == "train":
-            sample_indices = [_ for _ in range(total_samples) if _ not in validate_indices]
-        elif dataset == "validate":
-            sample_indices = [_ for _ in range(total_samples) if _ in validate_indices] 
-        else:
-            print(f"Invalid dataset name: {dataset}")
+        sample_indices = range(total_samples)
         
         self.inputs = read_inputs("Dataset_experiments_031722.xlsx", sheet_index=sheet_index, sample_indices=sample_indices)
 
@@ -67,19 +60,19 @@ class DedDataset(Dataset):
             #     pickle.dump(self.labels, f)
             # print(f"Saved label images to {file}.")
 
-        # # Perform data augmentation.
-        # print(f"Augmenting dataset from {len(self.labels)} to {2*len(self.labels)}...")
-        # augmented_labels = []
-        # for label in self.labels:
-        #     flipped_label = label.copy()
-        #     flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
-        #     augmented_labels.append(flipped_label)
-        # # Insert the augmented labels and corresponding inputs.
-        # self.inputs = np.repeat(self.inputs, 2)
-        # index = 1
-        # for augmented_label in augmented_labels:
-        #     self.labels.insert(index, augmented_label)
-        #     index += 2
+        # Perform data augmentation.
+        print(f"Augmenting dataset from {len(self.labels)} to {2*len(self.labels)}...")
+        augmented_labels = []
+        for label in self.labels:
+            flipped_label = label.copy()
+            flipped_label[0, ...] = np.fliplr(flipped_label[0, ...])
+            augmented_labels.append(flipped_label)
+        # Insert the augmented labels and corresponding inputs.
+        self.inputs = np.repeat(self.inputs, 2)
+        index = 1
+        for augmented_label in augmented_labels:
+            self.labels.insert(index, augmented_label)
+            index += 2
         
         assert len(self.inputs) == len(self.labels), f"Number of inputs {len(self.inputs)} does not match number of labels {len(self.labels)}"
         self.number_samples = len(self.labels)
@@ -159,11 +152,10 @@ def initialize_weights(model: nn.Module):
         nn.init.normal_(model.weight.data, 1.0, 0.02)
         nn.init.constant_(model.bias.data, 0)
 
-def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.Module, learning_rate: float, epoch_count: int, train_dataloader: DataLoader, validate_dataloader: DataLoader, train_existing: bool, test_only: bool, queue = None, queue_from_gui = None) -> None:
+def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.Module, learning_rate: float, epoch_count: int, train_dataloader: DataLoader, train_existing: bool, test_only: bool, queue = None, queue_from_gui = None) -> None:
     """Train a network consisting of a CNN and a GAN on the given training and validation datasets."""
 
     size_train_dataset = len(train_dataloader)
-    size_validate_dataset = len(validate_dataloader)
 
     # Initialize the optimizers and loss function.
     optimizer_generator = torch.optim.Adam(params=model_generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
@@ -172,9 +164,8 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
 
     # Load their parameters if they have been saved previously.
     epoch = 1
-    previous_validation_losses_cnn = []
-    previous_validation_losses_generator = []
-    previous_validation_losses_discriminator = []
+    previous_losses_generator = []
+    previous_losses_discriminator = []
     if os.path.exists(FILEPATH_MODEL):
         if not test_only:
             if train_existing is None:
@@ -188,7 +179,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
                 device,
                 (model_generator, model_discriminator),
                 (optimizer_generator, optimizer_discriminator),
-                (previous_validation_losses_generator, previous_validation_losses_discriminator),
+                (previous_losses_generator, previous_losses_discriminator),
             )
     else:
         train_existing = False
@@ -199,8 +190,8 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
         queue.put([(epochs[0]-1, epochs[-1]), None, None, None, None])
     
     # Initialize the validation losses.
-    validation_losses_generator = []
-    validation_losses_discriminator = []
+    losses_generator = []
+    losses_discriminator = []
 
     # Main training-validation loop.
     for epoch in epochs:
@@ -209,14 +200,17 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
         model_generator.train(True)
         model_discriminator.train(True)
 
+        loss_generator = 0
+        loss_discriminator = 0
+
         # Train on the training dataset.
         for batch, (data, label) in enumerate(train_dataloader, 1):
-            # # Add random noise to label images for the first # epochs to improve stability of GAN training.
-            # EPOCHS_RANDOM_NOISE = 50
-            # if epoch <= EPOCHS_RANDOM_NOISE:
-            #     std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
-            #     mean = 0.0
-            #     label = label + torch.randn(label.size(), device=device) * std + mean
+            # Add random noise to label images for the first # epochs to improve stability of GAN training.
+            EPOCHS_RANDOM_NOISE = 50
+            if epoch <= EPOCHS_RANDOM_NOISE:
+                std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
+                mean = 0.0
+                label = label + torch.randn(label.size(), device=device) * std + mean
             
             data = data.to(device)
             label = label.to(device)
@@ -249,7 +243,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
             loss_fake.backward()
 
             # Calculate total loss of discriminator by summing real and fake losses.
-            loss_discriminator = loss_real + loss_fake
+            loss_current_discriminator = loss_real + loss_fake
             # Update discriminator.
             optimizer_discriminator.step()
 
@@ -259,53 +253,25 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
             output_discriminator = model_discriminator(output_generator, data).view(-1)
             # Calculate the loss of the generator, assuming images are real in order to calculate loss correctly.
             label_discriminator[:] = LABEL_REAL
-            loss_generator = loss_function(output_discriminator, label_discriminator)
+            loss_current_generator = loss_function(output_discriminator, label_discriminator)
             # Calculate gradients.
-            loss_generator.backward()
+            loss_current_generator.backward()
             # Update generator.
             optimizer_generator.step()
+
+            loss_generator += loss_current_generator.item()
+            loss_discriminator += loss_current_discriminator.item()
 
             # Periodically display progress.
             if batch % 1 == 0:
                 print(f"Training batch {batch}/{size_train_dataset}...", end="\r")
                 if queue:
-                    queue.put([None, (batch, size_train_dataset+size_validate_dataset), None, None, None])
+                    queue.put([None, (batch, size_train_dataset), None, None, None])
         
-        model_generator.train(False)
-        model_discriminator.train(False)
-        
-        # Test on the validation dataset.
-        cumulative_loss_generator = 0
-        cumulative_loss_discriminator = 0
-        with torch.no_grad():
-            for batch, (data, label) in enumerate(validate_dataloader, 1):
-                data = data.to(device)
-                label = label.to(device)
-                label = label.float()
-
-                output_generator = model_generator(torch.randn(label.size(0), 100, 1, 1, device=device), data)
-                
-                output_discriminator_real = model_discriminator(label, data).view(-1)
-                output_discriminator_fake = model_discriminator(output_generator, data).view(-1)
-                label_discriminator_real = torch.full((label.size(0),), LABEL_REAL, dtype=torch.float, device=device)
-                label_discriminator_fake = torch.full((label.size(0),), LABEL_FAKE, dtype=torch.float, device=device)
-
-                loss_generator = loss_function(output_discriminator_fake, label_discriminator_real)
-                loss_discriminator = loss_function(output_discriminator_real, label_discriminator_real) + loss_function(output_discriminator_fake, label_discriminator_fake)
-
-                cumulative_loss_generator += loss_generator
-                cumulative_loss_discriminator += loss_discriminator
-
-                if batch % 5 == 0:
-                    print(f"Validating batch {batch}/{size_validate_dataset}...", end="\r")
-                    if queue:
-                        queue.put([None, (size_train_dataset+batch, size_train_dataset+size_validate_dataset), None, None, None])
-        print()
-
-        loss_generator = cumulative_loss_generator / size_validate_dataset
-        loss_discriminator = cumulative_loss_discriminator / size_validate_dataset
-        validation_losses_generator.append(loss_generator)
-        validation_losses_discriminator.append(loss_discriminator)
+        loss_generator /= batch
+        loss_discriminator /= batch
+        losses_generator.append(loss_generator)
+        losses_discriminator.append(loss_discriminator)
         print(f"Average loss: {loss_generator:,.2f} (generator), {loss_discriminator:,.2f} (discriminator)")
 
         # Save the model parameters periodically.
@@ -316,8 +282,8 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
                 [model_generator, model_discriminator],
                 [optimizer_generator, optimizer_discriminator],
                 [
-                    [*previous_validation_losses_generator, *validation_losses_generator],
-                    [*previous_validation_losses_discriminator, *validation_losses_discriminator],
+                    [*previous_losses_generator, *losses_generator],
+                    [*previous_losses_discriminator, *losses_discriminator],
                 ],
             )
         
@@ -334,11 +300,11 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
     # Plot the loss history.
     if not queue:
         plt.figure()
-        if previous_validation_losses_cnn and previous_validation_losses_generator and previous_validation_losses_discriminator:
-            plt.plot(range(1, epochs[0]), previous_validation_losses_generator, 'o', color=Colors.GRAY_LIGHT)
-            plt.plot(range(1, epochs[0]), previous_validation_losses_discriminator, '*', color=Colors.GRAY_LIGHT)
-        plt.plot(epochs, validation_losses_generator, '-o', color=Colors.BLUE, label="Generator")
-        plt.plot(epochs, validation_losses_discriminator, '-*', color=Colors.ORANGE, label="Discriminator")
+        if previous_losses_generator and previous_losses_discriminator:
+            plt.plot(range(1, epochs[0]), previous_losses_generator, 'o', color=Colors.GRAY_LIGHT)
+            plt.plot(range(1, epochs[0]), previous_losses_discriminator, '*', color=Colors.GRAY_LIGHT)
+        plt.plot(epochs, losses_generator, '-o', color=Colors.BLUE, label="Generator")
+        plt.plot(epochs, losses_discriminator, '-*', color=Colors.ORANGE, label="Discriminator")
         plt.legend()
         plt.ylim(bottom=0)
         plt.xlabel('Epochs')
@@ -540,11 +506,8 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
     print(f'Using {device} device.')
 
     # Create the datasets.
-    if not test_only:
-        train_dataset = DedDataset("train", experiment_number)
-        validate_dataset = DedDataset("validate", experiment_number)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size, shuffle=True)
+    train_dataset = DedDataset("train", experiment_number)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize the models.
     LATENT_SIZE = 100
@@ -562,7 +525,7 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
 
     # Train on the training and validation datasets.
     if not test_only:
-        train_gan(device, model_generator, model_discriminator, learning_rate, epoch_count, train_dataloader, validate_dataloader, train_existing, test_only, queue, queue_from_gui)
+        train_gan(device, model_generator, model_discriminator, learning_rate, epoch_count, train_dataloader, train_existing, test_only, queue, queue_from_gui)
 
     model_generator.train(False)
     model_discriminator.train(False)
@@ -603,7 +566,7 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
 if __name__ == '__main__':
     # Training hyperparameters.
     EPOCHS = 10
-    LEARNING_RATE = 1e-6  #1e-3
+    LEARNING_RATE = 1e-3  #1e-6
     BATCH_SIZE = 1
     Model = None
 
@@ -612,5 +575,5 @@ if __name__ == '__main__':
     dataset = DedDataset
     experiment_number = 2
 
-    # main(dataset, experiment_number, EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)
-    train_classifier(Model=ClassifierCnn, learning_rate=LEARNING_RATE, batch_size=BATCH_SIZE, epoch_count=EPOCHS, train_existing=False, test_only=False)
+    main(dataset, experiment_number, EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)
+    # train_classifier(Model=ClassifierCnn, learning_rate=LEARNING_RATE, batch_size=BATCH_SIZE, epoch_count=EPOCHS, train_existing=False, test_only=False)
