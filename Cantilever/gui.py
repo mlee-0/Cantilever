@@ -15,7 +15,7 @@ import numpy as np
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QSplitter, QFileDialog
 
 from helpers import Colors, FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap, plot_loss
 import main
@@ -47,10 +47,10 @@ class MainWindow(QMainWindow):
         # self.action_toggle_status_bar = menu_view.addAction("Show Status Bar", self.toggle_status_bar)
         # self.action_toggle_status_bar.setCheckable(True)
         # self.action_toggle_status_bar.setChecked(True)
-        menu_view.addSeparator()
-        self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
-        self.action_toggle_loss.setCheckable(True)
-        menu_help.addAction("About...", self.show_about)
+        # menu_view.addSeparator()
+        # self.action_toggle_loss = menu_view.addAction("Show Current Loss Only")
+        # self.action_toggle_loss.setCheckable(True)
+        # menu_help.addAction("About...", self.show_about)
 
         # # Status bar.
         # self.status_bar = self.statusBar()
@@ -68,7 +68,6 @@ class MainWindow(QMainWindow):
         # Central widget.
         main_widget = QWidget()
         main_layout = QGridLayout(main_widget)
-        # main_layout.setContentsMargins(0, 0, 0, 0)
         self.setCentralWidget(main_widget)
         
         self.sidebar = self._sidebar()
@@ -84,8 +83,8 @@ class MainWindow(QMainWindow):
         self.console.setVisible(False)
 
         tabs = QTabWidget()
-        tabs.addTab(self._plots(), "Training")
-        tabs.addTab(self._evaluation(), "Testing")
+        tabs.addTab(self._training_tab(), "Training")
+        tabs.addTab(self._testing_tab(), "Testing")
         
         layout_results = QVBoxLayout()
         layout_results.addWidget(self._progress_bar())
@@ -180,7 +179,7 @@ class MainWindow(QMainWindow):
 
         self.value_batch_train = QSpinBox()
         self.value_batch_train.setRange(1, 256)
-        self.value_batch_train.setValue(1)
+        self.value_batch_train.setValue(32)
         self.value_batch_train.setToolTip("Training batch size")
         self.value_batch_validate = QSpinBox()
         self.value_batch_validate.setRange(1, 256)
@@ -267,15 +266,15 @@ class MainWindow(QMainWindow):
 
         return widget
 
-    def _plots(self) -> QWidget:
-        """Return a widget with plots."""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-        layout.setContentsMargins(self.margins_small)
+    def _training_tab(self) -> QWidget:
+        """Return a widget to be used as the training tab."""
+        widget = QSplitter()
+        widget.setContentsMargins(self.margins_small)
+        widget.setOpaqueResize(False)
 
         self.figure_loss = Figure()
         self.canvas_loss = FigureCanvasQTAgg(self.figure_loss)
-        layout.addWidget(self.canvas_loss, stretch=4)
+        widget.addWidget(self.canvas_loss)
 
         self.figure_metrics = Figure()
         self.canvas_metrics = FigureCanvasQTAgg(self.figure_metrics)
@@ -286,65 +285,23 @@ class MainWindow(QMainWindow):
         self.table_training.verticalHeader().hide()
         self.table_training.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # Fill available horizontal space
         self.table_training.setFont(self.font_small)
-        layout.addWidget(self.table_training, stretch=1)
-
-        # scroll_area = QScrollArea()
-        # scroll_area.setWidget(widget)
-        # scroll_area.setFrameShape(QFrame.NoFrame)
+        widget.addWidget(self.table_training)
+        
+        widget.setStretchFactor(0, 4)
+        widget.setStretchFactor(1, 1)
+        
+        widget.setCollapsible(0, False)
 
         return widget
     
-    def _evaluation(self) -> QWidget:
-        """Return a widget containing testing results."""
+    def _testing_tab(self) -> QWidget:
+        """Return a widget to be used as the testing tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(self.margins_small)
         layout.setAlignment(Qt.AlignTop)
 
-        # Arrays storing the test inputs, outputs, and labels.
-        # self.test_inputs = np.empty((0, 0))
-        self.test_outputs = np.empty((0, 0))
-        self.test_labels = np.empty((0, 0))
-        # Maximum value of dataset, used to determine range for colormap images.
-        self.test_max_value = None
-
-        # Labels that show an input, output, and label.
-        layout_samples = QGridLayout()
-        self.label_test_input = QLabel()
-        self.label_test_output = QLabel()
-        self.label_test_label = QLabel()
-        # layout_samples.addWidget(QLabel("Input"), 0, 0, alignment=Qt.AlignCenter)
-        layout_samples.addWidget(QLabel("Output"), 0, 0, alignment=Qt.AlignCenter)
-        layout_samples.addWidget(QLabel("Label"), 0, 1, alignment=Qt.AlignCenter)
-        # layout_samples.addWidget(self.label_test_input, 1, 0, alignment=Qt.AlignCenter)
-        layout_samples.addWidget(self.label_test_output, 1, 0, alignment=Qt.AlignCenter)
-        layout_samples.addWidget(self.label_test_label, 1, 1, alignment=Qt.AlignCenter)
-        layout.addLayout(layout_samples)
-
-        # Controls for showing different samples.
-        self.test_index = 0
-        self.test_channel = 0
-        self.value_test_index = QSpinBox()
-        self.value_test_index.setRange(1, 1)
-        self.value_test_index.valueChanged.connect(self.show_test_outputs)
-        self.value_test_channel = QSpinBox()
-        self.value_test_channel.setRange(1, 1)
-        self.value_test_channel.valueChanged.connect(self.show_test_outputs)
-        self.value_test_scaling = QDoubleSpinBox()
-        self.value_test_scaling.setRange(0.1, 10.0)
-        self.value_test_scaling.setValue(1.0)
-        self.value_test_scaling.valueChanged.connect(self.show_test_outputs)
-        layout_controls = QHBoxLayout()
-        layout_controls.addStretch(1)
-        layout_controls.addWidget(QLabel("Sample:"))
-        layout_controls.addWidget(self.value_test_index)
-        layout_controls.addWidget(QLabel("Channel:"))
-        layout_controls.addWidget(self.value_test_channel)
-        layout_controls.addWidget(QLabel("Size:"))
-        layout_controls.addWidget(self.value_test_scaling)
-        layout_controls.addStretch(1)
-        layout.addLayout(layout_controls)
-
+        layout.addWidget(self._test_images())
         self.show_test_outputs()
 
         # Label that shows evaluation metrics.
@@ -355,6 +312,70 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.table_metrics)
 
         layout.addStretch(1)
+
+        return widget
+    
+    def _test_images(self) -> QWidget:
+        """Return a widget displaying test results and controls for selecting samples and channels."""
+        widget = QWidget()
+        layout = QGridLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Arrays storing the test inputs, outputs, and labels.
+        self.test_inputs = np.empty((0, 0))
+        self.test_outputs = np.empty((0, 0))
+        self.test_labels = np.empty((0, 0))
+        # Maximum value of dataset, used to determine range for colormap images.
+        self.test_max_value = None
+
+        # Labels that show an input, output, and label.
+        self.label_test_input = QLabel()
+        self.label_test_output = QLabel()
+        self.label_test_label = QLabel()
+        # Controls for showing different samples.
+        self.test_index = 0
+        self.test_channel_input = 0
+        self.test_channel_output = 0
+        self.value_test_index = QSpinBox()
+        self.value_test_index.setRange(1, 1)
+        self.value_test_index.valueChanged.connect(self.show_test_outputs)
+        self.value_test_scaling = QDoubleSpinBox()
+        self.value_test_scaling.setRange(0.1, 10.0)
+        self.value_test_scaling.setValue(1.0)
+        self.value_test_scaling.valueChanged.connect(self.show_test_outputs)
+        self.value_test_input_channel = QSpinBox()
+        self.value_test_input_channel.setRange(1, 1)
+        self.value_test_input_channel.valueChanged.connect(self.show_test_outputs)
+        self.value_test_output_channel = QSpinBox()
+        self.value_test_output_channel.setRange(1, 1)
+        self.value_test_output_channel.valueChanged.connect(self.show_test_outputs)
+
+        # Controls for selecting the sample and the image scaling.
+        layout_sample = QHBoxLayout()
+        layout_sample.addWidget(QLabel("Sample:"))
+        layout_sample.addWidget(self.value_test_index)
+        layout_sample.addWidget(QLabel("Size:"))
+        layout_sample.addWidget(self.value_test_scaling)
+
+        # Controls for selecting the input image channel.
+        layout_input_channel = QHBoxLayout()
+        layout_input_channel.addWidget(QLabel("Channel:"))
+        layout_input_channel.addWidget(self.value_test_input_channel)
+        
+        # Controls for selecting the output image channel.
+        layout_output_channel = QHBoxLayout()
+        layout_output_channel.addWidget(QLabel("Channel:"))
+        layout_output_channel.addWidget(self.value_test_output_channel)
+
+        layout.addWidget(QLabel("Input"), 0, 0, alignment=Qt.AlignCenter)
+        layout.addWidget(QLabel("Output"), 0, 1, alignment=Qt.AlignCenter)
+        layout.addWidget(QLabel("Label"), 0, 2, alignment=Qt.AlignCenter)
+        layout.addWidget(self.label_test_input, 1, 0, alignment=Qt.AlignCenter)
+        layout.addWidget(self.label_test_output, 1, 1, alignment=Qt.AlignCenter)
+        layout.addWidget(self.label_test_label, 1, 2, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_sample, 2, 0, 1, 3, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_input_channel, 3, 0, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_output_channel, 3, 1, 1, 2, alignment=Qt.AlignCenter)
 
         return widget
 
@@ -492,29 +513,37 @@ class MainWindow(QMainWindow):
     def show_test_outputs(self, value=1):
         """Display images of the testing results."""
 
-        if self.sender == self.value_test_index:
+        if self.sender() == self.value_test_index:
             self.test_index = value - 1
-        elif self.sender == self.value_test_channel:
-            self.test_channel = value - 1
+        elif self.sender() == self.value_test_input_channel:
+            self.test_channel_input = value - 1
+        elif self.sender() == self.value_test_output_channel:
+            self.test_channel_output = value - 1
 
         if 0 not in self.test_outputs.shape:
-            # input = self.test_inputs[self.test_index, self.test_channel, ...]
-            output = self.test_outputs[self.test_index, self.test_channel, ...]
-            label = self.test_labels[self.test_index, self.test_channel, ...]
+            input = self.test_inputs[self.test_index, self.test_channel_input, ...]
+            output = self.test_outputs[self.test_index, self.test_channel_output, ...]
+            label = self.test_labels[self.test_index, self.test_channel_output, ...]
+            input_image = QImage(
+                input.astype(np.uint8),
+                input.shape[1], input.shape[0], QImage.Format_Grayscale8,
+            )
             output_image = QImage(
-                array_to_colormap(output.T, self.test_max_value).astype(np.int16),
+                array_to_colormap(output.T, self.test_max_value).astype(np.uint16),
                 output.shape[1], output.shape[0], QImage.Format_RGB16,
             )
             label_image = QImage(
-                array_to_colormap(label.T, self.test_max_value).astype(np.int16),
+                array_to_colormap(label.T, self.test_max_value).astype(np.uint16),
                 label.shape[1], label.shape[0], QImage.Format_RGB16,
             )
 
             scaling = self.value_test_scaling.value()
             if scaling != 1:
+                input_image = input_image.scaled(int(scaling * input.shape[1]), int(scaling * input.shape[0]), Qt.IgnoreAspectRatio)
                 output_image = output_image.scaled(int(scaling * output.shape[1]), int(scaling * output.shape[0]), Qt.IgnoreAspectRatio)
                 label_image = label_image.scaled(int(scaling * label.shape[1]), int(scaling * label.shape[0]), Qt.IgnoreAspectRatio)
 
+            self.label_test_input.setPixmap(QPixmap(input_image))
             self.label_test_output.setPixmap(QPixmap(output_image))
             self.label_test_label.setPixmap(QPixmap(label_image))
 
@@ -531,13 +560,14 @@ class MainWindow(QMainWindow):
             info_training = info.get("info_training", {})
             info_metrics = info.get("info_metrics", {})
 
-            # self.test_inputs = info.get("test_inputs", self.test_inputs)
+            self.test_inputs = info.get("test_inputs", self.test_inputs)
             self.test_outputs = info.get("test_outputs", self.test_outputs)
             self.test_labels = info.get("test_labels", self.test_labels)
             self.test_max_value = info.get("test_max_value", self.test_max_value)
             if 0 not in self.test_outputs.shape:
                 self.value_test_index.setMaximum(self.test_outputs.shape[0])
-                self.value_test_channel.setMaximum(self.test_outputs.shape[1])
+                self.value_test_input_channel.setMaximum(self.test_inputs.shape[1])
+                self.value_test_output_channel.setMaximum(self.test_outputs.shape[1])
                 self.show_test_outputs()
 
             # Update the progress label.
@@ -576,7 +606,18 @@ class MainWindow(QMainWindow):
                 self.table_metrics.resizeColumnsToContents()
 
             if training_loss or previous_training_loss or validation_loss or previous_validation_loss:
-                self.plot_loss(epochs, training_loss, previous_training_loss, validation_loss, previous_validation_loss)
+                all_training_loss = [*previous_training_loss, *training_loss]
+                all_validation_loss = [*previous_validation_loss, *validation_loss]
+                all_epochs = [*range(1, epochs[0]), *epochs[:len(training_loss)]]
+                plot_loss(
+                    figure = self.figure_loss,
+                    epochs = all_epochs,
+                    loss = [all_training_loss, all_validation_loss],
+                    labels = ("Training", "Validation"),
+                    start_epoch = epochs[0] if previous_training_loss else None,
+                    )
+                self.canvas_loss.draw()
+                
         # Thread has stopped.
         if not self.thread.is_alive():
             self.sidebar.setEnabled(True)

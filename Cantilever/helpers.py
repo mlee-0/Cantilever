@@ -12,6 +12,7 @@ import re
 import time
 from typing import Any, List, Tuple
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -96,7 +97,7 @@ def read_samples(filepath: str) -> pd.DataFrame:
         print(f'"{filepath}" not found.')
         return None
     else:
-        print(f"Found {len(samples)} samples in {filepath}.")
+        print(f"Found {len(samples):,} samples in {filepath}.")
         return samples
 
 def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
@@ -163,7 +164,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
     images = np.array(images)
 
     time_end = time.time()
-    print(f"Generated {images.shape[0]} input images in {time_end - time_start:.2f} seconds.")
+    print(f"Generated {images.shape[0]:,} input images in {time_end - time_start:.2f} seconds.")
 
     return images
 
@@ -273,39 +274,44 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
     print()
 
     time_end = time.time()
-    print(f"Generated {labels.shape[0]} label images in {time_end - time_start:.2f} seconds.")
+    print(f"Generated {labels.shape[0]:,} label images in {time_end - time_start:.2f} seconds.")
 
     return labels
 
-def plot_loss(epochs: list, current_loss: List[list], previous_epochs: list = None, previous_loss: List[list] = None, labels: List[str] = None) -> None:
+def plot_loss(figure: matplotlib.figure.Figure, epochs: list, loss: List[list], labels: List[str], start_epoch: int = None) -> None:
     """
-    Plot loss values over epochs.
+    Plot loss values over epochs on the given figure.
 
     Parameters:
-    `epochs`: A sequence of epoch numbers corresponding to the current loss values.
-    `current_loss`: A list of lists of loss values, each of which are plotted separately. The nested lists must have the same length as `epochs`.
-    `previous_epochs`: A sequence of epoch numbers corresponding to the previous loss values.
-    `previous_loss`: A list of lists of loss values, each of which are plotted separately. The nested lists must have the same length as `previous_epochs`.
-    `labels`: A list of strings to include in the legend for each item in `current_loss`.
+    `figure`: A figure to plot on.
+    `epochs`: A sequence of epoch numbers.
+    `loss`: A list of lists of loss values, each of which are plotted as separate lines. Each nested list must have the same length as `epochs`.
+    `labels`: A list of strings to display in the legend for each item in `loss`.
+    `start_epoch`: The epoch number at which to display a horizontal line to indicate the start of the current training session.
     """
-    markers = (".:", ".-")
+    figure.clear()
+    axis = figure.add_subplot(1, 1, 1)  # Number of rows, number of columns, index
+    
+    # markers = (".:", ".-")
     colors = (Colors.BLUE, Colors.ORANGE)
 
-    plt.figure()
+    # Plot each set of loss values.
+    for i, loss_i in enumerate(loss):
+        if not len(loss_i):
+            continue
+        color = colors[i % len(colors)]
+        axis.plot(epochs[:len(loss_i)], loss_i, ".-", color=color, label=labels[i])
+        axis.annotate(f"{loss_i[-1]:,.2f}", (epochs[-1 - (len(epochs)-len(loss_i))], loss_i[-1]), color=color, fontsize=10)
     
-    for i, loss in enumerate(current_loss):
-        plt.plot(epochs, loss, markers[i % len(markers)], color=colors[i % len(colors)], label=labels[i])
+    # Plot a vertical line indicating when the current training session began.
+    if start_epoch:
+        axis.vlines(start_epoch - 0.5, 0, max([max(_) for _ in loss]), colors=(Colors.GRAY,), label="Current session starts")
     
-    if previous_epochs and previous_loss:
-        for i, loss in enumerate(previous_loss):
-            plt.plot(previous_epochs, loss, markers[i % len(markers)], color=Colors.GRAY_LIGHT)
-    
-    plt.legend()
-    plt.ylim(bottom=0)
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.grid(axis="y")
-    plt.show()
+    axis.legend()
+    axis.set_ylim(bottom=0)
+    axis.set_xlabel("Epochs")
+    axis.set_ylabel("Loss")
+    axis.grid(axis="y")
 
 def plot_input_image_3d(array: np.ndarray) -> None:
     """Show a 3D voxel plot for each channel of the given 4D array with shape (channels, height, length, width)."""

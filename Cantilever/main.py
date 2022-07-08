@@ -192,6 +192,7 @@ def train_regression(
     # Main training-validation loop.
     for epoch in epochs:
         print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
+        time_start = time.time()
         
         # Train on the training dataset.
         model.train(True)
@@ -214,7 +215,7 @@ def train_regression(
             # Adjust model parameters.
             optimizer.step()
 
-            if batch % 50 == 0:
+            if batch % 10 == 0:
                 print(f"Training batch {batch}/{len(train_dataloader)} with average loss {loss/batch:,.2f}...", end="\r")
                 if queue:
                     info_gui["progress_batch"] = (batch, len(train_dataloader)+len(validate_dataloader))
@@ -227,7 +228,7 @@ def train_regression(
 
         # Adjust the learning rate if a scheduler is used.
         if scheduler:
-            scheduler.step(training_loss[-1])
+            scheduler.step()
             learning_rate = optimizer.param_groups[0]["lr"]
             print(f"Learning rate: {learning_rate}")
             if queue:
@@ -285,10 +286,20 @@ def train_regression(
                 validation_loss = [*previous_validation_loss, *validation_loss],
             )
         
+        # Show the elapsed time during the epoch.
+        time_end = time.time()
+        duration = time_end - time_start
+        if duration >= 60:
+            duration_text = f"{duration/60:.1f} minutes"
+        else:
+            duration_text = f"{duration:.1f} seconds"
+        print(f"Finished epoch {epoch} in {duration_text}.")
+
         if queue:
             info_gui["progress_epoch"] = (epoch, epochs[-1])
             info_gui["training_loss"] = training_loss
             info_gui["validation_loss"] = validation_loss
+            info_gui["info_training"]["Epoch Runtime"] = duration_text
             queue.put(info_gui)
         
         # Stop if the user stopped training from the GUI.
@@ -299,18 +310,12 @@ def train_regression(
     
     # Plot the loss history.
     if not queue:
-        plt.figure()
+        figure = plt.figure()
+        
         all_training_loss = [*previous_training_loss, *training_loss]
         all_validation_loss = [*previous_validation_loss, *validation_loss]
-        plt.plot(range(1, epochs[-1]+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
-        plt.plot(range(1, epochs[-1]+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
-        if previous_training_loss or previous_validation_loss:
-            plt.vlines(epochs[0] - 0.5, 0, max(previous_training_loss + previous_validation_loss), colors=(Colors.GRAY,), label="Current session starts")
-        plt.legend()
-        plt.ylim(bottom=0)
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        plt.grid(axis="y")
+        plot_loss(figure, range(1, epochs[-1]+1), [all_training_loss, all_validation_loss], ["Training", "Validation"], start_epoch=epochs[0])
+
         plt.show()
     
     return model
@@ -558,7 +563,7 @@ def main(
     sample_size = len(samples)
     train_size, validate_size, test_size = [int(split * sample_size) for split in training_split]
     assert train_size + validate_size + test_size == sample_size
-    print(f"Split {sample_size} samples into {train_size} training / {validate_size} validation / {test_size} test.")
+    print(f"Split {sample_size:,} samples into {train_size:,} training / {validate_size:,} validation / {test_size:,} test.")
     
     # Create the Dataset containing all data.
     if dataset_id == 2:
@@ -588,7 +593,10 @@ def main(
     model = Model(*args[Model])
     model.to(device)
     optimizer = Optimizer(model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=10) if decay_learning_rate else None
+    if decay_learning_rate:
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    else:
+        scheduler = None
     loss_function = Loss()
 
     # Load previously saved model and optimizer parameters.
@@ -652,7 +660,7 @@ if __name__ == "__main__":
         "epoch_count": 1,
         "learning_rate": 1e-3,
         "decay_learning_rate": True,
-        "batch_sizes": (16, 128, 256),
+        "batch_sizes": (32, 128, 256),
         
         "Model": Nie,
         "dataset_id": 2,
