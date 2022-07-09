@@ -24,19 +24,19 @@ class Nie(nn.Module):
         nf = 32
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same"),
+            nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
             nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(nf*1, nf*2, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.Conv2d(nf*1, nf*2, kernel_size=4, stride=2, padding=1, padding_mode="zeros"),
             nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(nf*2, nf*4, kernel_size=4, stride=2, padding=1, padding_mode="replicate"),
+            nn.Conv2d(nf*2, nf*4, kernel_size=4, stride=2, padding=1, padding_mode="zeros"),
             nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -71,17 +71,17 @@ class Nie(nn.Module):
         self.se_5 = se_block(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0)),
+            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0), padding_mode="zeros"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0)),
+            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0), padding_mode="zeros"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(nf*1, output_channels, kernel_size=9, stride=1, padding="same"),
+            nn.Conv2d(nf*1, output_channels, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
             # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
