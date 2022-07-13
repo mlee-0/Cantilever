@@ -235,6 +235,10 @@ class MainWindow(QMainWindow):
         buttons[2].setChecked(True)
         layout_box.addRow("Dataset:", layout)
 
+        self.checkbox_k_fold = QCheckBox("k-Fold Cross Validation")
+        self.checkbox_k_fold.setChecked(False)
+        layout_box.addRow("", self.checkbox_k_fold)
+
         self.checkbox_use_subset = QCheckBox("Use Subset")
         self.checkbox_use_subset.setChecked(False)
         self.checkbox_use_subset.stateChanged.connect(self.update_button_browse_subset)
@@ -373,9 +377,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.label_test_input, 1, 0, alignment=Qt.AlignCenter)
         layout.addWidget(self.label_test_output, 1, 1, alignment=Qt.AlignCenter)
         layout.addWidget(self.label_test_label, 1, 2, alignment=Qt.AlignCenter)
-        layout.addLayout(layout_sample, 2, 0, 1, 3, alignment=Qt.AlignCenter)
-        layout.addLayout(layout_input_channel, 3, 0, alignment=Qt.AlignCenter)
-        layout.addLayout(layout_output_channel, 3, 1, 1, 2, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_input_channel, 2, 0, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_output_channel, 2, 1, 1, 2, alignment=Qt.AlignCenter)
+        layout.addLayout(layout_sample, 3, 0, 1, 3, alignment=Qt.AlignCenter)
 
         return widget
 
@@ -414,6 +418,7 @@ class MainWindow(QMainWindow):
                 "filename_model": self.field_filename_model.text(),
                 "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
                 "save_model_every": self.value_save_every.value(),
+                "k_fold": self.checkbox_k_fold.isChecked(),
                 "train_existing": train_existing,
                 "train": train,
                 "test": test,
@@ -565,8 +570,11 @@ class MainWindow(QMainWindow):
             self.test_labels = info.get("test_labels", self.test_labels)
             self.test_max_value = info.get("test_max_value", self.test_max_value)
             if 0 not in self.test_outputs.shape:
+                self.value_test_index.setSuffix(f"/{self.test_outputs.shape[0]}")
                 self.value_test_index.setMaximum(self.test_outputs.shape[0])
+                self.value_test_input_channel.setSuffix(f"/{self.test_inputs.shape[1]}")
                 self.value_test_input_channel.setMaximum(self.test_inputs.shape[1])
+                self.value_test_output_channel.setSuffix(f"/{self.test_outputs.shape[1]}")
                 self.value_test_output_channel.setMaximum(self.test_outputs.shape[1])
                 self.show_test_outputs()
 

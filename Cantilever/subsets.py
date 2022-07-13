@@ -11,22 +11,16 @@ import pandas as pd
 from helpers import *
 
 
-def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
+def stratify_samples(labels: np.ndarray, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
     """
-    Write a text file containing indices of the given samples that form a subset in which the same number of maximum values exists in each bin. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
+    Find a subset within the given array in which the same number of maximum values exists in each bin, and write a text file containing index numbers for the subset. For a given dataset, the same samples will be included in the subset because the first n samples are selected from each histogram bin rather than being randomly selected. The order of the samples in the subset is randomized.
 
-    `samples`: DataFrame of samples of entire dataset.
-    `folder`: Folder in which labels are read.
+    `labels`: An array in which the first dimension is the sample dimension.
+    `filename`: Name of file to which the subset is written.
     `subset_size`: The number of samples to put in the subset. The actual subset size may not exactly match this number.
     `bins`: The number of bins to use in the histogram of maximum values.
     `nonuniformity`: How much larger than the smallest bin the largest bin is. For example, a value of 1 results in a uniform distribution, in which the largest bin has as many samples as the smallest bin. A value of 2 results in the largest bin having twice as many samples as the smallest bin.
     """
-
-    # Load the label images.
-    files = glob.glob(os.path.join(folder, "*.pickle"))
-    assert len(files), f"A .pickle file must exist in {folder}."
-    file = files[0]
-    labels = read_pickle(file)
 
     # Get the maximum values in each label.
     maxima = np.array([np.max(_) for _ in labels])
@@ -81,16 +75,18 @@ def stratify_samples(folder: str, filename: str, subset_size: int, bins: int, no
     np.random.shuffle(sample_indices)
 
     # Write the sample indices to a text file.
-    with open(filename, "w") as f:
-        f.writelines([str(_) for _ in sample_indices])
-        print(f"Wrote subset of {len(sample_indices)} samples to {filename}.")
+    filepath = os.path.join(FOLDER_ROOT, filename)
+    with open(filepath, "w") as f:
+        f.writelines("\n".join([str(_) for _ in sample_indices]))
+        print(f"Wrote subset of {len(sample_indices)} samples to {filepath}.")
 
 
 if __name__ == "__main__":
+    labels = read_pickle("Cantilever/Labels 2D/labels.pickle")
     stratify_samples(
-        "Cantilever/Labels 3D",
+        labels,
         "subset_2d_500.txt",
         subset_size=500,
         bins=10,
-        nonuniformity=1
+        nonuniformity=1,
     )

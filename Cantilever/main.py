@@ -54,6 +54,7 @@ class CantileverDataset(Dataset):
 
         # Determine an exponent to transform the data.
         self.transformation_exponent = 0.5023404737562848 if is_3d else 0.4949464243559395
+        print(f"Using transformation exponent: {self.transformation_exponent}.")
         # Apply a transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
@@ -233,6 +234,7 @@ def train_regression(
             print(f"Learning rate: {learning_rate}")
             if queue:
                 info_gui["info_training"]["Learning Rate"] = learning_rate
+                queue.put(info_gui)
 
         # Test on the validation dataset. Set model to evaluation mode, which is required if it contains batch normalization layers, dropout layers, and other layers that behave differently during training and evaluation.
         model.train(False)
@@ -497,6 +499,7 @@ def main(
     epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], Model: nn.Module,
     dataset_id: int, training_split: Tuple[float, float, float], filename_model: str, filename_subset: str, save_model_every: int,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
+    k_fold: bool = False,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
@@ -519,6 +522,7 @@ def main(
     `training_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
     `filename_model`: Name of the .pth file to load and save to during training.
     `filename_subset`: Name of the .txt file that contains a subset of the entire dataset to use.
+    `k_fold`: Use k-fold cross-validation, with k automatically calculated from the specified training/validation/testing split.
     
     `queue`: A Queue used to send information to the GUI.
     `queue_to_main`: A Queue used to receive information from the GUI.
@@ -554,9 +558,10 @@ def main(
     if filename_subset is not None:
         filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
         with open(filepath_subset, "r") as f:
-            sample_indices = [int(_) - 1 for _ in f.readlines()]
+            sample_indices = [int(_) for _ in f.readlines()]
         
-        samples = samples.iloc[sample_indices]
+        samples = samples.iloc[sample_indices, :]
+        samples = samples.reset_index()
         print(f"Using a subset with {len(samples)} samples loaded from {filepath_subset}.")
 
     # Calculate the dataset split sizes.
@@ -572,87 +577,111 @@ def main(
         dataset = CantileverDataset(samples, is_3d=True)
     elif dataset_id == 4:
         dataset = CantileverDataset3d(samples)
-    
-    # Split the dataset into training, validation, and testing.
-    batch_size_train, batch_size_validate, batch_size_test = batch_sizes
-    train_dataset = Subset(dataset, range(0, train_size))
-    validate_dataset = Subset(dataset, range(train_size, train_size+validate_size))
-    test_dataset = Subset(dataset, range(train_size+validate_size, train_size+validate_size+test_size))
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
-    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
-    
-    # Initialize the model, optimizer, and loss function.
-    args = {
-        Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
-        Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
-        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
-        UNetCnn: [dataset.input_channels, dataset.output_channels],
-        AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
-    }
-    model = Model(*args[Model])
-    model.to(device)
-    optimizer = Optimizer(model.parameters(), lr=learning_rate)
-    if decay_learning_rate:
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+
+    # Divide the dataset into k folds.
+    if k_fold:
+        indices_folds = np.arange(0, len(dataset)+1, validate_size+test_size)
+        print(indices_folds)
+
+        # List of tuples: (training indices, validation indices, testing indices).
+        folds = []
+        for i, j in zip(indices_folds[:-1], indices_folds[1:]):
+            folds.append((
+                [*range(0, i), *range(j, len(dataset))],
+                range(i, i+int((j-i)/2)),
+                range(i+int((j-i)/2), j),
+            ))
     else:
-        scheduler = None
-    loss_function = Loss()
+        folds = [(
+            range(0, train_size),
+            range(train_size, train_size+validate_size),
+            range(train_size+validate_size, train_size+validate_size+test_size),
+        )]
+    
+    for k, (indices_train, indices_validate, indices_test) in enumerate(folds, 1):
+        if k_fold:
+            print(f"\nPerforming {len(folds)}-fold cross-validation on fold {k}.")
 
-    # Load previously saved model and optimizer parameters.
-    if checkpoint is not None:
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # Split the dataset into training, validation, and testing.
+        batch_size_train, batch_size_validate, batch_size_test = batch_sizes
+        train_dataset = Subset(dataset, indices_train)
+        validate_dataset = Subset(dataset, indices_validate)
+        test_dataset = Subset(dataset, indices_test)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
+        validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
+        
+        # Initialize the model, optimizer, and loss function.
+        args = {
+            Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
+            Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
+            FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
+            UNetCnn: [dataset.input_channels, dataset.output_channels],
+            AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
+        }
+        model = Model(*args[Model])
+        model.to(device)
+        optimizer = Optimizer(model.parameters(), lr=learning_rate)
+        if decay_learning_rate:
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+        else:
+            scheduler = None
+        loss_function = Loss()
+
+        # Load previously saved model and optimizer parameters.
+        if checkpoint is not None:
+            model.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            if queue:
+                queue.put({
+                    "epochs": range(1, checkpoint["epoch"]+1),
+                    "training_loss": checkpoint["training_loss"],
+                    "validation_loss": checkpoint["validation_loss"],
+                })
+        
         if queue:
-            queue.put({
-                "epochs": range(1, checkpoint["epoch"]+1),
-                "training_loss": checkpoint["training_loss"],
-                "validation_loss": checkpoint["validation_loss"],
-            })
-    
-    if queue:
-        info_gui["info_training"]["Training Size"] = train_size
-        info_gui["info_training"]["Validation Size"] = validate_size
-        info_gui["info_training"]["Testing Size"] = test_size
-        info_gui["info_training"]["Learning Rate"] = learning_rate
-        queue.put(info_gui)
+            info_gui["info_training"]["Training Size"] = train_size
+            info_gui["info_training"]["Validation Size"] = validate_size
+            info_gui["info_training"]["Testing Size"] = test_size
+            info_gui["info_training"]["Learning Rate"] = learning_rate
+            queue.put(info_gui)
 
-    if train:
-        model = train_regression(
-            device = device,
-            epoch_count = epoch_count,
-            checkpoint = checkpoint,
-            filepath_model = filepath_model,
-            save_model_every = save_model_every,
-            model = model,
-            optimizer = optimizer,
-            loss_function = loss_function,
-            train_dataloader = train_dataloader,
-            validate_dataloader = validate_dataloader,
-            scheduler = scheduler,
-            queue = queue,
-            queue_to_main = queue_to_main,
-            info_gui = info_gui,
+        if train:
+            model = train_regression(
+                device = device,
+                epoch_count = epoch_count,
+                checkpoint = checkpoint,
+                filepath_model = filepath_model,
+                save_model_every = save_model_every,
+                model = model,
+                optimizer = optimizer,
+                loss_function = loss_function,
+                train_dataloader = train_dataloader,
+                validate_dataloader = validate_dataloader,
+                scheduler = scheduler,
+                queue = queue,
+                queue_to_main = queue_to_main,
+                info_gui = info_gui,
+                )
+        
+        if test:
+            outputs, labels, inputs = test_regression(
+                device = device,
+                model = model,
+                loss_function = loss_function,
+                dataset = dataset,
+                test_dataloader = test_dataloader,
+                queue = queue,
+                queue_to_main = queue_to_main,
+                info_gui = info_gui,
             )
-    
-    if test:
-        outputs, labels, inputs = test_regression(
-            device = device,
-            model = model,
-            loss_function = loss_function,
-            dataset = dataset,
-            test_dataloader = test_dataloader,
-            queue = queue,
-            queue_to_main = queue_to_main,
-            info_gui = info_gui,
-        )
 
-        # Transform values back to original range.
-        outputs = dataset.transform(outputs, inverse=True)
-        labels = dataset.transform(labels, inverse=True)
+            # Transform values back to original range.
+            outputs = dataset.transform(outputs, inverse=True)
+            labels = dataset.transform(labels, inverse=True)
 
-        if evaluate:
-            evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
+            if evaluate:
+                evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
 
 
 if __name__ == "__main__":
@@ -668,6 +697,7 @@ if __name__ == "__main__":
         "filename_model": "model.pth",
         "filename_subset": None,
         "save_model_every": 1,
+        "k_fold": not True,
 
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
@@ -679,3 +709,42 @@ if __name__ == "__main__":
     }
 
     main(**kwargs)
+    
+    # plt.figure()
+    # x = (1/2.3, 1/2.2, 1/2.1, 1/2.02, 1/1.9, 1/1.8, 1/1.7, 1/1.5, 1/1.25, 1)
+    # x_text = "1/2.3,1/2.2,1/2.1,1/2.02,1/1.9,1/1.8,1/1.7,1/1.5,1/1.25,1".split(",")
+    # nmae = np.array([0.051, 0.050, 0.049, 0.048, 0.048, 0.048, 0.048, 0.048, 0.048, 0.067])
+    # nmse = np.array([0.018, 0.018, 0.018, 0.018, 0.017, 0.017, 0.017, 0.017, 0.017, 0.024])
+    # nrmse = np.array([0.134, 0.134, 0.133, 0.133, 0.132, 0.131, 0.132, 0.131, 0.132, 0.154])
+    # mre = np.array([2.81, 2.70, 2.58, 2.48, 2.43, 2.45, 2.48, 2.54, 2.76, 8.90])
+    # scale = lambda x: (x - x.min()) / (x.max() - x.min())
+    # plt.plot(x, scale(nmae), ".-", label="NMAE")
+    # plt.plot(x, scale(nmse), ".-", label="NMSE")
+    # plt.plot(x, scale(nrmse), ".-", label="NRMSE")
+    # plt.plot(x, scale(mre), ".-", label="MRE")
+    # plt.axvspan(1/2.04, 1/2.0, color="#ffbf00", alpha=0.25)
+    # plt.axvspan(1/1.01, 1/0.99, color="#000", alpha=0.1)
+    # plt.xticks(x, labels=x_text, rotation=90)
+    # plt.yticks([])
+    # plt.legend()
+    # plt.show()
+
+    # plt.figure()
+    # lr = (1e-5, 1e-4, 5e-4, 1e-3, 5e-3)
+    # x = np.array([
+    #     [19.30, 0.258, 0.519, 0.720, 16.21],
+    #     [1.78, 0.086, 0.052, 0.228, 4.26],
+    #     [1.08, 0.068, 0.039, 0.198, 2.87],
+    #     [1.00, 0.067, 0.037, 0.192, 2.79],
+    #     [1.15, 0.071, 0.042, 0.205, 2.99],
+    # ])
+    # plt.plot(lr, x[:, 0] / 10, ".-", label="Loss (* 1/10)")
+    # plt.plot(lr, x[:, 1], ".-", label="NMAE")
+    # plt.plot(lr, x[:, 2], ".-", label="NMSE")
+    # plt.plot(lr, x[:, 3], ".-", label="NRMSE")
+    # plt.plot(lr, x[:, 4] / 10, ".-", label="MRE (* 1/10)")
+    # plt.xlabel("Learning Rate")
+    # plt.ylabel("Loss (MSE)")
+    # plt.xscale("log")
+    # plt.legend()
+    # plt.show()
