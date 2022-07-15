@@ -35,8 +35,10 @@ class CantileverDataset(Dataset):
     Label images have shape (batch, channel, height, length).
     """
 
-    def __init__(self, samples: pd.DataFrame, is_3d: bool):
+    def __init__(self, samples: pd.DataFrame, is_3d: bool, transformation_exponent: float = 1):
         self.number_samples = len(samples)
+        self.transformation_exponent = transformation_exponent
+        print(f"Using transformation exponent: {self.transformation_exponent}.")
 
         if is_3d:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
@@ -52,10 +54,7 @@ class CantileverDataset(Dataset):
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
 
-        # Determine an exponent to transform the data.
-        self.transformation_exponent = 0.5023404737562848 if is_3d else 0.4949464243559395
-        print(f"Using transformation exponent: {self.transformation_exponent}.")
-        # Apply a transformation to the label values.
+        # Apply the transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
         # Create input images.
@@ -94,8 +93,10 @@ class CantileverDataset3d(Dataset):
     Input images have shape (batch, channel, height, length, width).
     Label images have shape (batch, channel=1, height, length, width).
     """
-    def __init__(self, samples: pd.DataFrame):
+    def __init__(self, samples: pd.DataFrame, transformation_exponent: float = 1):
         self.number_samples = len(samples)
+        self.transformation_exponent = transformation_exponent
+        print(f"Using transformation exponent: {self.transformation_exponent}.")
 
         folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
         
@@ -108,8 +109,7 @@ class CantileverDataset3d(Dataset):
         # The maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
 
-        # Apply a transformation to the label values.
-        self.transformation_exponent = 0.5023404737562848
+        # Apply the transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
         
         # Create input images.
@@ -382,25 +382,21 @@ def test_regression(
     return outputs, labels, inputs
 
 def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue=None, info_gui: dict=None):
-    """Show and plot evaluation metrics."""
+    """Calculate and return evaluation metrics."""
     folder_results = os.path.join(FOLDER_ROOT, "Results")
 
-    me = metrics.mean_error(outputs, labels)
-    mae = metrics.mean_absolute_error(outputs, labels)
-    mse = metrics.mean_squared_error(outputs, labels)
-    rmse = metrics.root_mean_squared_error(outputs, labels)
-    nmae = metrics.normalized_mean_absolute_error(outputs, labels)
-    nmse = metrics.normalized_mean_squared_error(outputs, labels)
-    nrmse = metrics.normalized_root_mean_squared_error(outputs, labels)
-    mre = metrics.mean_relative_error(outputs, labels)
-    print(f"ME: {me:,.2f}")
-    print(f"MAE: {mae:,.3f}")
-    print(f"MSE: {mse:,.3f}")
-    print(f"RMSE: {rmse:,.3f}")
-    print(f"NMAE: {nmae:,.3f}")
-    print(f"NMSE: {nmse:,.3f}")
-    print(f"NRMSE: {nrmse:,.3f}")
-    print(f"MRE: {mre:,.2f}%")
+    results = {
+        "ME": metrics.mean_error(outputs, labels),
+        "MAE": metrics.mean_absolute_error(outputs, labels),
+        "MSE": metrics.mean_squared_error(outputs, labels),
+        "RMSE": metrics.root_mean_squared_error(outputs, labels),
+        "NMAE": metrics.normalized_mean_absolute_error(outputs, labels),
+        "NMSE": metrics.normalized_mean_squared_error(outputs, labels),
+        "NRMSE": metrics.normalized_root_mean_squared_error(outputs, labels),
+        "MRE": metrics.mean_relative_error(outputs, labels),
+    }
+    for metric, value in results.items():
+        print(f"{metric}: {value:,.3f}")
 
     # # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.
     # indices = range(0, labels.shape[0], 100)
@@ -489,17 +485,18 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
 
     # Initialize values to send to the GUI.
     if queue:
-        info_gui["info_metrics"] = {
-            "MAE": mae, "MSE": mse, "RMSE": rmse, "NMAE": nmae, "NMSE": nmse, "NRMSE": nrmse, "MRE": mre
-        }
+        info_gui["info_metrics"] = results
         queue.put(info_gui)
+    
+    return results
 
 def main(
-    train: bool, test: bool, evaluate: bool, train_existing: bool,
-    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], Model: nn.Module,
-    dataset_id: int, training_split: Tuple[float, float, float], filename_model: str, filename_subset: str, save_model_every: int,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], training_split: Tuple[float, float, float], k_fold: bool, Model: nn.Module,
+    filename_model: str, train_existing: bool, save_model_every: int,
+    dataset_id: int, filename_subset: str,
+    train: bool, test: bool, evaluate: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
-    k_fold: bool = False,
+    transformation_exponent: float = None,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
@@ -572,16 +569,21 @@ def main(
     
     # Create the Dataset containing all data.
     if dataset_id == 2:
-        dataset = CantileverDataset(samples, is_3d=False)
+        if transformation_exponent is None:
+            transformation_exponent = 0.4949464243559395
+        dataset = CantileverDataset(samples, is_3d=False, transformation_exponent=transformation_exponent)
     elif dataset_id == 3:
-        dataset = CantileverDataset(samples, is_3d=True)
+        if transformation_exponent is None:
+            transformation_exponent = 0.5023404737562848
+        dataset = CantileverDataset(samples, is_3d=True, transformation_exponent=transformation_exponent)
     elif dataset_id == 4:
-        dataset = CantileverDataset3d(samples)
+        if transformation_exponent is None:
+            transformation_exponent = 0.5023404737562848
+        dataset = CantileverDataset3d(samples, transformation_exponent=transformation_exponent)
 
     # Divide the dataset into k folds.
     if k_fold:
         indices_folds = np.arange(0, len(dataset)+1, validate_size+test_size)
-        print(indices_folds)
 
         # List of tuples: (training indices, validation indices, testing indices).
         folds = []
@@ -598,6 +600,7 @@ def main(
             range(train_size+validate_size, train_size+validate_size+test_size),
         )]
     
+    results = []
     for k, (indices_train, indices_validate, indices_test) in enumerate(folds, 1):
         if k_fold:
             print(f"\nPerforming {len(folds)}-fold cross-validation on fold {k}.")
@@ -681,70 +684,40 @@ def main(
             labels = dataset.transform(labels, inverse=True)
 
             if evaluate:
-                evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
-
+                results.append(
+                    evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
+                )
+    
+    # Average and display the results from k-fold cross-validation.
+    if k_fold:
+        print("\nAveraged evaluation metrics:")
+        averaged_results = {key: np.mean([result[key] for result in results]) for key in results[0].keys()}
+        for key, value in averaged_results.items():
+            print(f"{key}: {value:,.3f}")
 
 if __name__ == "__main__":
     kwargs = {
-        "epoch_count": 1,
-        "learning_rate": 1e-3,
-        "decay_learning_rate": True,
-        "batch_sizes": (32, 128, 256),
-        
-        "Model": Nie,
-        "dataset_id": 2,
-        "training_split": (0.8, 0.1, 0.1),
         "filename_model": "model.pth",
-        "filename_subset": None,
-        "save_model_every": 1,
-        "k_fold": not True,
+        "train_existing": not True,
+        "save_model_every": 10,
 
+        "epoch_count": 20,
+        "learning_rate": 1e-7,
+        "decay_learning_rate": not True,
+        "batch_sizes": (32, 128, 128),
+        "training_split": (0.8, 0.1, 0.1),
+        "k_fold": not True,
+        "Model": Nie,
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
         
-        "train_existing": not True,
+        "dataset_id": 2,
+        "transformation_exponent": 1,  # None
+        "filename_subset": "subset_2d_1bin_100.txt",
+        
         "train": True,
         "test": True,
         "evaluate": True,
     }
 
-    main(**kwargs)
-    
-    # plt.figure()
-    # x = (1/2.3, 1/2.2, 1/2.1, 1/2.02, 1/1.9, 1/1.8, 1/1.7, 1/1.5, 1/1.25, 1)
-    # x_text = "1/2.3,1/2.2,1/2.1,1/2.02,1/1.9,1/1.8,1/1.7,1/1.5,1/1.25,1".split(",")
-    # nmae = np.array([0.051, 0.050, 0.049, 0.048, 0.048, 0.048, 0.048, 0.048, 0.048, 0.067])
-    # nmse = np.array([0.018, 0.018, 0.018, 0.018, 0.017, 0.017, 0.017, 0.017, 0.017, 0.024])
-    # nrmse = np.array([0.134, 0.134, 0.133, 0.133, 0.132, 0.131, 0.132, 0.131, 0.132, 0.154])
-    # mre = np.array([2.81, 2.70, 2.58, 2.48, 2.43, 2.45, 2.48, 2.54, 2.76, 8.90])
-    # scale = lambda x: (x - x.min()) / (x.max() - x.min())
-    # plt.plot(x, scale(nmae), ".-", label="NMAE")
-    # plt.plot(x, scale(nmse), ".-", label="NMSE")
-    # plt.plot(x, scale(nrmse), ".-", label="NRMSE")
-    # plt.plot(x, scale(mre), ".-", label="MRE")
-    # plt.axvspan(1/2.04, 1/2.0, color="#ffbf00", alpha=0.25)
-    # plt.axvspan(1/1.01, 1/0.99, color="#000", alpha=0.1)
-    # plt.xticks(x, labels=x_text, rotation=90)
-    # plt.yticks([])
-    # plt.legend()
-    # plt.show()
-
-    # plt.figure()
-    # lr = (1e-5, 1e-4, 5e-4, 1e-3, 5e-3)
-    # x = np.array([
-    #     [19.30, 0.258, 0.519, 0.720, 16.21],
-    #     [1.78, 0.086, 0.052, 0.228, 4.26],
-    #     [1.08, 0.068, 0.039, 0.198, 2.87],
-    #     [1.00, 0.067, 0.037, 0.192, 2.79],
-    #     [1.15, 0.071, 0.042, 0.205, 2.99],
-    # ])
-    # plt.plot(lr, x[:, 0] / 10, ".-", label="Loss (* 1/10)")
-    # plt.plot(lr, x[:, 1], ".-", label="NMAE")
-    # plt.plot(lr, x[:, 2], ".-", label="NMSE")
-    # plt.plot(lr, x[:, 3], ".-", label="NRMSE")
-    # plt.plot(lr, x[:, 4] / 10, ".-", label="MRE (* 1/10)")
-    # plt.xlabel("Learning Rate")
-    # plt.ylabel("Loss (MSE)")
-    # plt.xscale("log")
-    # plt.legend()
-    # plt.show()
+    results = main(**kwargs)

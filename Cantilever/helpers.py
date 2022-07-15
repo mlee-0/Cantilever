@@ -435,9 +435,9 @@ if __name__ == "__main__":
     print(labels.shape)
     write_pickle(labels, os.path.join(folder, "labels_80k.pickle"))
 
-    # p = read_pickle("Cantilever/Labels 2D/labels_2d_to_50k.pickle")[:50000, ...]
+    # p = read_pickle("Cantilever/Labels 3D/labels.pickle")[:1000, ...]
     # max_value = np.max(p)
-    # normalized = p / np.expand_dims(np.max(p, axis=(1, 2, 3)), axis=(1, 2, 3))
+    # normalized = p / np.max(p, axis=(1, 2, 3), keepdims=True)
 
     # p = p.flatten()
     # normalized = normalized.flatten()
@@ -454,12 +454,13 @@ if __name__ == "__main__":
     # plt.show()
 
     # plt.figure()
-    # exponents = (1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0)
-    # for i, exponent in enumerate(exponents, 1):
-    #     plt.subplot(2, 5, i)
-    #     transformed = p.flatten() ** (1/exponent)
+    # exponents = (1/2.2, 1/2.1, 0.5023404737562848, 1/1.9, 1/1.8, 1/1.7, 1/1.6, 1/1.5, 1)
+    # titles = ('1/2.2', '1/2.1', '1/1.99', '1/1.9', '1/1.8', '1/1.7', '1/1.6', '1/1.5', '1')
+    # for i, exponent in enumerate(exponents):
+    #     plt.subplot(2, 5, i+1)
+    #     transformed = p.flatten() ** exponent
     #     plt.hist(normalized, bins=bins, alpha=0.5, label="Target")
     #     plt.hist(transformed/transformed.max(), bins=bins, alpha=0.5, label="Transformed")
     #     plt.legend()
-    #     plt.title(f"1/{exponent}")
+    #     plt.title(titles[i])
     # plt.show()

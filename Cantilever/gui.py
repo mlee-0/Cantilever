@@ -215,6 +215,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.value_test_split)
         layout_box.addRow("Split:", layout)
 
+        self.checkbox_k_fold = QCheckBox("k-Fold")
+        self.checkbox_k_fold.setChecked(False)
+        layout_box.addRow("", self.checkbox_k_fold)
+
         self.value_model = QComboBox()
         self.value_model.addItems(networks.networks.keys())
         layout = QHBoxLayout()
@@ -234,10 +238,11 @@ class MainWindow(QMainWindow):
             layout.addWidget(buttons[id])
         buttons[2].setChecked(True)
         layout_box.addRow("Dataset:", layout)
-
-        self.checkbox_k_fold = QCheckBox("k-Fold Cross Validation")
-        self.checkbox_k_fold.setChecked(False)
-        layout_box.addRow("", self.checkbox_k_fold)
+        
+        self.value_transformation = QDoubleSpinBox()
+        self.value_transformation.setRange(0, 10)
+        self.value_transformation.setValue(1)
+        layout_box.addRow("Transform:", self.value_transformation)
 
         self.checkbox_use_subset = QCheckBox("Use Subset")
         self.checkbox_use_subset.setChecked(False)
@@ -404,25 +409,30 @@ class MainWindow(QMainWindow):
         self.thread = threading.Thread(
             target=main.main,
             kwargs={
+                "filename_model": self.field_filename_model.text(),
+                "train_existing": train_existing,
+                "save_model_every": self.value_save_every.value(),
+
                 "epoch_count": self.value_epochs.value(),
                 "learning_rate": self.value_learning_digit.value() * 10 ** -self.value_learning_exponent.value(),
                 "decay_learning_rate": self.checkbox_decay_learning_rate.isChecked(),
                 "batch_sizes": (self.value_batch_train.value(), self.value_batch_validate.value(), self.value_batch_test.value()),
-                "Model": networks.networks[self.value_model.currentText()],
-                "dataset_id": self.buttons_dataset.checkedId(),
                 "training_split": (
                     self.value_train_split.value() / 100,
                     self.value_validate_split.value() / 100,
                     self.value_test_split.value() / 100,
                 ),
-                "filename_model": self.field_filename_model.text(),
-                "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
-                "save_model_every": self.value_save_every.value(),
                 "k_fold": self.checkbox_k_fold.isChecked(),
-                "train_existing": train_existing,
+                "Model": networks.networks[self.value_model.currentText()],
+                
+                "dataset_id": self.buttons_dataset.checkedId(),
+                "transformation_exponent": self.value_transformation.value(),
+                "filename_subset": self.button_browse_subset.text() if self.checkbox_use_subset.isChecked() else None,
+                
                 "train": train,
                 "test": test,
                 "evaluate": True,
+                
                 "queue": self.queue,
                 "queue_to_main": self.queue_to_main,
             },
@@ -594,20 +604,24 @@ class MainWindow(QMainWindow):
             # Update training information.
             if info_training:
                 for key, value in info_training.items():
-                    if key in [_.text() for _ in self.table_training.findItems(key, Qt.MatchExactly)]:
-                        continue
-                    row = self.table_training.rowCount()
-                    self.table_training.insertRow(row)
+                    items = self.table_training.findItems(key, Qt.MatchExactly)
+                    if items:
+                        row = self.table_training.row(items[0])
+                    else:
+                        row = self.table_training.rowCount()
+                        self.table_training.insertRow(row)
                     self.table_training.setItem(row, 0, QTableWidgetItem(key))
                     self.table_training.setItem(row, 1, QTableWidgetItem(str(value)))
 
             # Update the metrics.
             if info_metrics:
                 for metric, value in info_metrics.items():
-                    if metric in [_.text() for _ in self.table_metrics.findItems(metric, Qt.MatchExactly)]:
-                        continue
-                    row = self.table_metrics.rowCount()
-                    self.table_metrics.insertRow(row)
+                    items = self.table_metrics.findItems(metric, Qt.MatchExactly)
+                    if items:
+                        row = self.table_metrics.row(items[0])
+                    else:
+                        row = self.table_metrics.rowCount()
+                        self.table_metrics.insertRow(row)
                     self.table_metrics.setItem(row, 0, QTableWidgetItem(metric))
                     self.table_metrics.setItem(row, 1, QTableWidgetItem(str(value)))
                 self.table_metrics.resizeRowsToContents()
