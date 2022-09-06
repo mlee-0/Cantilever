@@ -23,7 +23,7 @@ else:
 
 # Size of output images (channel-height-width) produced by the network.
 OUTPUT_CHANNELS = 1
-OUTPUT_SIZE = (OUTPUT_CHANNELS, 128, 128)
+OUTPUT_SIZE = (OUTPUT_CHANNELS, 64, 64)
 # Size of input images (channel-height-width).
 INPUT_CHANNELS = 3
 INPUT_SIZE = (INPUT_CHANNELS, *OUTPUT_SIZE[1:])

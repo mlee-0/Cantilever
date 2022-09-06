@@ -84,7 +84,7 @@ class ClassifierCnn(nn.Module):
 # GAN based on: https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
 
 class GanGenerator(nn.Module):
-    def __init__(self, input_channels: int, number_features: int, output_channels: int, embedding_size: int):
+    def __init__(self, input_channels: int, number_features: int, output_channels: int, embedding_size: int=None):
         super().__init__()
 
         self.latent_size = input_channels
@@ -94,14 +94,6 @@ class GanGenerator(nn.Module):
             nn.ConvTranspose2d(self.latent_size, number_features * 8, kernel_size=4, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(number_features * 8),
             nn.ReLU(inplace=True),
-
-            # nn.ConvTranspose2d(number_features * 32, number_features * 16, kernel_size=4, stride=2, padding=1, bias=False),
-            # nn.BatchNorm2d(number_features * 16),
-            # nn.ReLU(inplace=True),
-            
-            # nn.ConvTranspose2d(number_features * 16, number_features * 8, kernel_size=4, stride=2, padding=1, bias=False),
-            # nn.BatchNorm2d(number_features * 8),
-            # nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(number_features * 8, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(number_features * 4),
@@ -120,51 +112,46 @@ class GanGenerator(nn.Module):
         )
 
     def forward(self, x, label):
-        label_embedding = nn.Embedding(self.embedding_size, self.latent_size)(label.flatten())
-        return self.layers(x * label_embedding.reshape((*label_embedding.shape, 1, 1)))
-        # return self.layers(x)
+        if self.embedding_size is not None:
+            label_embedding = nn.Embedding(self.embedding_size, self.latent_size)(label.flatten())
+            return self.layers(x * label_embedding.reshape((*label_embedding.shape, 1, 1)))
+        else:
+            return self.layers(x)
 
 class GanDiscriminator(nn.Module):
-    def __init__(self, number_features: int, output_channels: int, embedding_size: int):
+    def __init__(self, number_features: int, output_channels: int, embedding_size: int=None):
         super().__init__()
 
         self.embedding_size = embedding_size
 
         self.layers = nn.Sequential(
-            # nn.Conv2d(output_channels, number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.Conv2d(output_channels + 1, number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),  # Add 1 to account for label channel
+            nn.Conv2d(output_channels + (0 if self.embedding_size is None else 1), number_features * 1, kernel_size=4, stride=2, padding=1, bias=False),  # Add 1 to account for label channel
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
 
             nn.Conv2d(number_features * 1, number_features * 2, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(number_features * 2),
+            # nn.BatchNorm2d(number_features * 2),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
 
             nn.Conv2d(number_features * 2, number_features * 4, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(number_features * 4),
+            # nn.BatchNorm2d(number_features * 4),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
 
             nn.Conv2d(number_features * 4, number_features * 8, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(number_features * 8),
+            # nn.BatchNorm2d(number_features * 8),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             
-            # nn.Conv2d(number_features * 8, number_features * 16, kernel_size=4, stride=2, padding=1, bias=False),
-            # nn.BatchNorm2d(number_features * 16),
-            # nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            
-            # nn.Conv2d(number_features * 16, number_features * 32, kernel_size=4, stride=2, padding=1, bias=False),
-            # nn.BatchNorm2d(number_features * 32),
-            # nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            
             nn.Conv2d(number_features * 8, 1, kernel_size=4, stride=1, padding=0, bias=False),
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
         )
 
     def forward(self, x, label: int):
-        label_embedding = nn.Embedding(self.embedding_size, np.prod(x.size()[2:]))(label)
-        label_embedding = torch.reshape(label_embedding.flatten(), (x.shape[0], 1, *x.shape[2:4]))
-        # Concatenate along the channel dimension.
-        return self.layers(torch.cat((x, label_embedding), axis=1))
-        # return self.layers(x)
+        if self.embedding_size is not None:
+            label_embedding = nn.Embedding(self.embedding_size, np.prod(x.size()[2:]))(label)
+            label_embedding = torch.reshape(label_embedding.flatten(), (x.shape[0], 1, *x.shape[2:4]))
+            # Concatenate along the channel dimension.
+            return self.layers(torch.cat((x, label_embedding), axis=1))
+        else:
+            return self.layers(x)
 
 
 # Store all classes defined in this module in a dictionary.

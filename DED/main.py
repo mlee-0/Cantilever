@@ -14,7 +14,6 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, Subset, DataLoader
 
-import metrics
 from networks import *
 from setup import *
 
@@ -148,6 +147,8 @@ def load(filepath: str, device: str, models: list, optimizers: list, loss_histor
         loss.extend(checkpoint[key])
     
     epoch = checkpoint["epoch"] + 1
+
+    print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
     
     return epoch
 
@@ -160,17 +161,38 @@ def initialize_weights(model: nn.Module):
         nn.init.normal_(model.weight.data, 1.0, 0.02)
         nn.init.constant_(model.bias.data, 0)
 
-def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.Module, learning_rate: float, epoch_count: int, train_dataloader: DataLoader, train_existing: bool, test_only: bool, queue = None, queue_from_gui = None) -> None:
+def train_gan(device: str, generator: nn.Module, discriminator: nn.Module, learning_rate: float, epoch_count: int, loss: str, train_dataloader: DataLoader, train_existing: bool, test_only: bool, queue = None, queue_from_gui = None) -> None:
     """Train a network consisting of a CNN and a GAN on the given training and validation datasets."""
+
+    assert loss in ("gan", "wgan", "wgan-gp")
 
     size_train_dataset = len(train_dataloader)
 
-    # Initialize the optimizers and loss function.
-    optimizer_generator = torch.optim.Adam(params=model_generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    optimizer_discriminator = torch.optim.Adam(params=model_discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    loss_function = nn.BCELoss()
+    # Create the loss functions.
+    if loss in ("wgan", "wgan-gp"):
+        loss_function_discriminator = lambda real_output, fake_output: -1 * torch.mean(real_output) + 1 * torch.mean(fake_output)
+        loss_function_generator = lambda fake_output: -torch.mean(fake_output)
+    elif loss == "gan":
+        bce = nn.BCELoss()
+        loss_function_discriminator = lambda real_output, fake_output: bce(torch.ones_like(real_output), real_output) + bce(torch.zeros_like(fake_output), fake_output)
+        loss_function_generator = lambda fake_output: bce(torch.ones_like(fake_output), fake_output)
 
-    # Load their parameters if they have been saved previously.
+    # Create the optimizers.
+    if loss == "wgan-gp":
+        if learning_rate != 1e-4:
+            print(f"A learning rate of 1e-4 is recommended for {loss}.")
+        optimizer_generator = torch.optim.Adam(params=generator.parameters(), lr=learning_rate, betas=(0.0, 0.999))
+        optimizer_discriminator = torch.optim.Adam(params=discriminator.parameters(), lr=learning_rate, betas=(0.0, 0.999))
+    elif loss == "wgan":
+        if learning_rate != 5e-5:
+            print(f"A learning rate of 5e-5 is recommended for {loss}.")
+        optimizer_generator = torch.optim.RMSprop(params=generator.parameters(), lr=learning_rate)
+        optimizer_discriminator = torch.optim.RMSprop(params=discriminator.parameters(), lr=learning_rate)
+    elif loss == "gan":
+        optimizer_generator = torch.optim.Adam(params=generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+        optimizer_discriminator = torch.optim.Adam(params=discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+
+    # Load the model and optimizer if saved previously.
     epoch = 1
     previous_losses_generator = []
     previous_losses_discriminator = []
@@ -185,7 +207,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
             epoch = load(
                 FILEPATH_MODEL,
                 device,
-                (model_generator, model_discriminator),
+                (generator, discriminator),
                 (optimizer_generator, optimizer_discriminator),
                 (previous_losses_generator, previous_losses_discriminator),
             )
@@ -205,63 +227,96 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
     for epoch in epochs:
         print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
 
-        model_generator.train(True)
-        model_discriminator.train(True)
+        generator.train(True)
+        discriminator.train(True)
 
         loss_generator = 0
         loss_discriminator = 0
 
         # Train on the training dataset.
-        for batch, (data, label) in enumerate(train_dataloader, 1):
-            # Add random noise to label images for the first # epochs to improve stability of GAN training.
+        for batch, (data, real_data) in enumerate(train_dataloader, 1):
+            # Add random noise to images for the first # epochs to improve stability of GAN training.
             EPOCHS_RANDOM_NOISE = 50
             if epoch <= EPOCHS_RANDOM_NOISE:
-                std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly from 1.0 to 0.0
+                std = 0.1 * max([1 - epoch/EPOCHS_RANDOM_NOISE, 0])  # Decays linearly to 0.0
                 mean = 0.0
-                label = label + torch.randn(label.size(), device=device) * std + mean
+                real_data = real_data + torch.randn(real_data.size(), device=device) * std + mean
             
             data = data.to(device)
-            label = label.to(device)
-            label = label.float()
+            real_data = real_data.to(device)
+            real_data = real_data.float()
 
             # # Reset gradients.
-            # optimizer_cnn.zero_grad()
             # optimizer_generator.zero_grad()
             # optimizer_discriminator.zero_grad()
 
-            # Train the discriminator with an all-real batch.
-            model_discriminator.zero_grad()
-            # Create a tensor of labels for each image in the batch.
-            label_discriminator = torch.full((label.size(0),), LABEL_REAL, dtype=torch.float, device=device)
-            # Forward pass real images through the discriminator.
-            output_discriminator_real = model_discriminator(label, data).view(-1)
-            # Calculate the loss of the discriminator.
-            loss_real = loss_function(output_discriminator_real, label_discriminator)
-            # Calculate gradients.
-            loss_real.backward()
+            # Number of weight updates for the discriminator for every 1 weight update for the generator.
+            if loss in ("wgan", "wgan-gp"):
+                d_updates_per_g = 5
+            else:
+                d_updates_per_g = 1
+            
+            # generator.requires_grad_(False)
+            # discriminator.requires_grad_(True)
 
-            # Train the discriminator with an all-fake batch.
-            output_generator = model_generator(torch.randn(label.size(0), 100, 1, 1, device=device), data)
-            # Forward pass fake images through the discriminator.
-            output_discriminator_fake = model_discriminator(output_generator.detach(), data).view(-1)
-            # Calculate the loss of the discriminator.
-            label_discriminator[:] = LABEL_FAKE
-            loss_fake = loss_function(output_discriminator_fake, label_discriminator)
-            # Calculate gradients.
-            loss_fake.backward()
+            for _ in range(d_updates_per_g):
+                # Train the discriminator with real images.
+                discriminator.zero_grad()
+                real_output = discriminator(real_data, data).view(-1)
+                # # Calculate the loss of the discriminator.
+                # loss_real = -real_output.mean()
+                # # loss_real = loss_function(real_output, label_discriminator)
+                # # Calculate gradients.
+                # loss_real.backward()
 
-            # Calculate total loss of discriminator by summing real and fake losses.
-            loss_current_discriminator = loss_real + loss_fake
-            # Update discriminator.
-            optimizer_discriminator.step()
+                # Train the discriminator with fake images.
+                fake_data = generator(torch.randn(real_data.size(0), 100, 1, 1, device=device), data)
+                fake_output = discriminator(fake_data.detach(), data).view(-1)
+                # # Calculate the loss of the discriminator.
+                # loss_fake = +fake_output.mean()
+                # # label_discriminator[:] = LABEL_FAKE
+                # # loss_fake = loss_function(fake_output, label_discriminator)
+                # # Calculate gradients.
+                # loss_fake.backward()
 
+                # Calculate total loss of discriminator by summing real and fake losses.
+                loss_current_discriminator = loss_function_discriminator(real_output, fake_output)
+                loss_current_discriminator.backward()
+                # loss_current_discriminator = loss_real + loss_fake
+
+                # Add gradient penalty for WGAN-GP.
+                if loss == "wgan-gp":
+                    LAMBDA = 10
+                    alpha = torch.rand(real_data.size())
+                    interpolates = real_data + alpha * (fake_data - real_data)
+                    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
+                    discriminator.zero_grad()
+                    gp_output = discriminator(interpolates, data)
+                    
+                    gradients = torch.autograd.grad(outputs=gp_output, inputs=interpolates, grad_outputs=torch.ones(gp_output.size(), device=device), create_graph=True)[0]  # retain_graph=True)[0]
+                    gp = LAMBDA * ((gradients.norm(2, dim=[1,2,3]) - 1) ** 2).mean()
+                    gp.backward()
+                    loss_current_discriminator += gp
+
+                # Update discriminator.
+                optimizer_discriminator.step()
+
+                # Clip the weights of the discriminator.
+                if loss == "wgan":
+                    with torch.no_grad():
+                        for parameter in discriminator.parameters():
+                            parameter.copy_(torch.clip(parameter, -0.01, +0.01))
+
+            # generator.requires_grad_(True)
+            # discriminator.requires_grad_(False)
+            
             # Train the generator.
-            model_generator.zero_grad()
+            generator.zero_grad()
             # Forward pass fake images through the discriminator.
-            output_discriminator = model_discriminator(output_generator, data).view(-1)
+            fake_data = generator(torch.randn(real_data.size(0), 100, 1, 1, device=device), data)
+            fake_output = discriminator(fake_data, data).view(-1)
             # Calculate the loss of the generator, assuming images are real in order to calculate loss correctly.
-            label_discriminator[:] = LABEL_REAL
-            loss_current_generator = loss_function(output_discriminator, label_discriminator)
+            loss_current_generator = loss_function_generator(fake_output)
             # Calculate gradients.
             loss_current_generator.backward()
             # Update generator.
@@ -272,7 +327,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
 
             # Periodically display progress.
             if batch % 1 == 0:
-                print(f"Training batch {batch}/{size_train_dataset}...", end="\r")
+                print(f"Batch {batch}/{size_train_dataset}: {loss_generator/batch:.2e} (generator), {loss_discriminator/batch:.2e} (discriminator)", end="\r")
                 if queue:
                     queue.put([None, (batch, size_train_dataset), None, None, None])
         
@@ -280,14 +335,14 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
         loss_discriminator /= batch
         losses_generator.append(loss_generator)
         losses_discriminator.append(loss_discriminator)
-        print(f"Average loss: {loss_generator:,.2f} (generator), {loss_discriminator:,.2f} (discriminator)")
+        print(f"Average loss: {loss_generator:,.2e} (generator), {loss_discriminator:,.2e} (discriminator)")
 
         # Save the model parameters periodically.
         if epoch % 1 == 0 or epoch == epochs[-1]:
             save(
                 FILEPATH_MODEL,
                 epoch,
-                [model_generator, model_discriminator],
+                [generator, discriminator],
                 [optimizer_generator, optimizer_discriminator],
                 [
                     [*previous_losses_generator, *losses_generator],
@@ -314,7 +369,7 @@ def train_gan(device: str, model_generator: nn.Module, model_discriminator: nn.M
         plt.plot(epochs, losses_generator, '-o', color=Colors.BLUE, label="Generator")
         plt.plot(epochs, losses_discriminator, '-*', color=Colors.ORANGE, label="Discriminator")
         plt.legend()
-        plt.ylim(bottom=0)
+        # plt.ylim(bottom=0)
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.grid(axis='y')
@@ -507,7 +562,7 @@ def train_classifier(Model: nn.Module, learning_rate: float, batch_size: int, ep
     print(f"Average testing accuracy over {k_folds} folds: {100 * np.mean(test_accuracies)}%")
     print(f"Average testing loss over {k_folds} folds: {np.mean(test_losses)}")
 
-def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_rate: float, batch_size: int, Model: nn.Module, training_split: float, train_existing=None, test_only=False, queue=None, queue_from_gui=None):
+def main(experiment_number: int, epoch_count: int, learning_rate: float, batch_size: int, loss: str, model_size: int, train_existing=None, test_only=False, queue=None, queue_from_gui=None):
     """Train and test the model."""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -519,24 +574,22 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
 
     # Initialize the models.
     LATENT_SIZE = 100
-    GENERATOR_FEATURES = 64
-    DISCRIMINATOR_FEATURES = 64
 
-    model_generator = GanGenerator(input_channels=LATENT_SIZE, number_features=GENERATOR_FEATURES, output_channels=OUTPUT_CHANNELS, embedding_size=train_dataset.embedding_size)
-    model_discriminator = GanDiscriminator(number_features=DISCRIMINATOR_FEATURES, output_channels=OUTPUT_CHANNELS, embedding_size=train_dataset.embedding_size)
+    generator = GanGenerator(input_channels=LATENT_SIZE, number_features=model_size, output_channels=OUTPUT_CHANNELS)  #, embedding_size=train_dataset.embedding_size)
+    discriminator = GanDiscriminator(number_features=model_size, output_channels=OUTPUT_CHANNELS)  #, embedding_size=train_dataset.embedding_size)
 
-    model_generator.to(device)
-    model_discriminator.to(device)
+    generator.to(device)
+    discriminator.to(device)
 
-    model_generator.apply(initialize_weights)
-    model_discriminator.apply(initialize_weights)
+    generator.apply(initialize_weights)
+    discriminator.apply(initialize_weights)
 
     # Train on the training and validation datasets.
     if not test_only:
-        train_gan(device, model_generator, model_discriminator, learning_rate, epoch_count, train_dataloader, train_existing, test_only, queue, queue_from_gui)
+        train_gan(device, generator, discriminator, learning_rate, epoch_count, loss, train_dataloader, train_existing, test_only, queue, queue_from_gui)
 
-    model_generator.train(False)
-    model_discriminator.train(False)
+    generator.train(False)
+    discriminator.train(False)
 
     # Test by generating images for the specified classes.
     test_outputs = []
@@ -545,10 +598,10 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
         classes = np.arange(train_dataset.embedding_size)
         classes = np.repeat(classes, SAMPLES_PER_CLASS)
         for batch, data in enumerate(classes, 1):
-            data = torch.tensor([data], dtype=int)
+            data = torch.tensor([data], dtype=int, device=device)
             latent = torch.randn(1, LATENT_SIZE, 1, 1, device=device)
 
-            test_output = model_generator(latent, data)
+            test_output = generator(latent, data)
             test_output = test_output[0, :, ...].cpu().detach().numpy()
             test_outputs.append(test_output)
 
@@ -572,16 +625,18 @@ def main(dataset: Dataset, experiment_number: int, epoch_count: int, learning_ra
 
 
 if __name__ == '__main__':
-    # Training hyperparameters.
-    EPOCHS = 10
-    LEARNING_RATE = 1e-3  #1e-6
-    BATCH_SIZE = 1
-    Model = None
+    kwargs = {
+        "experiment_number": 2,
 
-    TRAINING_SPLIT = 0.8
+        "epoch_count": 10,
+        "learning_rate": 1e-4,
+        "batch_size": 8,
+        "loss": "wgan-gp",
+        "model_size": 64,
 
-    dataset = DedDataset
-    experiment_number = 2
+        "train_existing": not True,
+        "test_only": False,
+    }
 
-    main(dataset, experiment_number, EPOCHS, LEARNING_RATE, BATCH_SIZE, Model, TRAINING_SPLIT, train_existing=not True, test_only=not True)
+    main(**kwargs)
     # train_classifier(Model=ClassifierCnn, learning_rate=LEARNING_RATE, batch_size=BATCH_SIZE, epoch_count=EPOCHS, train_existing=False, test_only=False)
