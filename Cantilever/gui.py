@@ -92,15 +92,11 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(scroll_area, 0, 0)
         main_layout.addWidget(self.console, 1, 0)
-        main_layout.addLayout(layout_results, 0, 1, 2, 1) #, stretch=1)
+        main_layout.addLayout(layout_results, 0, 1, 2, 1)
         main_layout.setRowStretch(0, 5)
         main_layout.setRowStretch(1, 0)
         main_layout.setColumnStretch(1, 1)
         
-        # divider = QFrame()
-        # divider.setFrameShape(QFrame.HLine)
-        # layout_sidebar.addWidget(divider)
-
         # Timer that checkes the queue for information from main thread.
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_queue)
@@ -165,7 +161,7 @@ class MainWindow(QMainWindow):
         self.value_learning_exponent = QSpinBox()
         self.value_learning_exponent.setRange(1, 10)
         self.value_learning_exponent.setValue(3)
-        self.value_learning_exponent.setPrefix("-")
+        self.value_learning_exponent.setPrefix("−")
         layout = QHBoxLayout()
         layout.setSpacing(0)
         layout.addWidget(self.value_learning_digit)

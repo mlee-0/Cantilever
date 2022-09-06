@@ -47,15 +47,20 @@ class CantileverDataset(Dataset):
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 2D")
             filename_labels = "labels.pickle"
         
-        # Load previously generated label images.
+        # Load previously generated labels.
         self.labels = read_pickle(os.path.join(folder_labels, filename_labels))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
 
-        # The maximum value found in the entire dataset.
+        # The raw maximum value found in the entire dataset.
         self.max_value = np.max(self.labels)
 
         # Apply the transformation to the label values.
         self.labels = self.transform(self.labels, inverse=False)
+        
+        # The raw maximum value found in the entire dataset, after scaling and transformation has been applied.
+        self.scaled_max_value = np.max(self.labels)
+        # Scale the transformed labels so that the maximum value is 1.
+        self.labels = self.scale(self.labels)
         
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
@@ -85,6 +90,12 @@ class CantileverDataset(Dataset):
             return y ** self.transformation_exponent
         else:
             return y ** (1 / self.transformation_exponent)
+    
+    def scale(self, y: np.ndarray, inverse=False) -> np.ndarray:
+        if not inverse:
+            return y / self.scaled_max_value
+        else:
+            return y * self.scaled_max_value
 
 class CantileverDataset3d(Dataset):
     """
@@ -208,6 +219,10 @@ def train_regression(
             loss_current = loss_function(output_data, label_data.float())
             # Update the cumulative loss.
             loss += loss_current.item()
+
+            if loss_current is torch.nan:
+                print(f"Stopping due to nan loss.")
+                break
             
             # Reset gradients of model parameters.
             optimizer.zero_grad()
@@ -217,15 +232,19 @@ def train_regression(
             optimizer.step()
 
             if batch % 10 == 0:
-                print(f"Training batch {batch}/{len(train_dataloader)} with average loss {loss/batch:,.2f}...", end="\r")
+                print(f"Batch {batch}/{len(train_dataloader)}: {loss/batch:,.2e}...", end="\r")
                 if queue:
                     info_gui["progress_batch"] = (batch, len(train_dataloader)+len(validate_dataloader))
                     info_gui["training_loss"] = [*training_loss, loss/batch]
                     queue.put(info_gui)
+            
+            # Requested to stop from GUI.
+            if queue_to_main and not queue_to_main.empty():
+                break
         print()
         loss /= batch
         training_loss.append(loss)
-        print(f"Average training loss: {loss:,.2f}")
+        print(f"Training loss: {loss:,.2e}")
 
         # Adjust the learning rate if a scheduler is used.
         if scheduler:
@@ -256,25 +275,24 @@ def train_regression(
                 labels.append(label_data)
 
                 if batch % 50 == 0:
-                    print(f"Validating batch {batch}/{len(validate_dataloader)}...", end="\r")
+                    print(f"Batch {batch}/{len(validate_dataloader)}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (len(train_dataloader)+batch, len(train_dataloader)+len(validate_dataloader))
                         queue.put(info_gui)
+                
+                # Requested to stop from GUI.
+                if queue_to_main and not queue_to_main.empty():
+                    break
         print()
         loss /= batch
         validation_loss.append(loss)
-        print(f"Average validation loss: {loss:,.2f}")
+        print(f"Validation loss: {loss:,.2e}")
 
         # Calculate evaluation metrics on validation results.
         outputs = np.concatenate(outputs, axis=0)
         labels = np.concatenate(labels, axis=0)
         mre = metrics.mean_relative_error(outputs, labels)
         print(f"MRE: {mre:.3f}")
-        # if queue:
-        #     info_gui["info_training"] = {
-        #         "MRE (Validation)": mre,
-        #     }
-        #     queue.put(info_gui)
 
         # Save the model parameters periodically and in the last iteration of the loop.
         if epoch % save_model_every == 0 or epoch == epochs[-1]:
@@ -304,11 +322,10 @@ def train_regression(
             info_gui["info_training"]["Epoch Runtime"] = duration_text
             queue.put(info_gui)
         
-        # Stop if the user stopped training from the GUI.
-        if queue_to_main:
-            if not queue_to_main.empty() and queue_to_main.get() == True:
-                queue_to_main.queue.clear()
-                break
+        # Requested to stop from GUI.
+        if queue_to_main and not queue_to_main.empty():
+            queue_to_main.queue.clear()
+            break
     
     # Plot the loss history.
     if not queue:
@@ -358,13 +375,13 @@ def test_regression(
             outputs.append(output_data)
             
             if batch % 1 == 0:
-                print(f"Testing batch {batch}/{len(test_dataloader)}...", end="\r")
+                print(f"Batch {batch}/{len(test_dataloader)}...", end="\r")
                 if queue:
                     info_gui["progress_batch"] = (batch, len(test_dataloader))
                     queue.put(info_gui)
         print()
     loss /= batch
-    print(f"Average testing loss: {loss:,.2f}")
+    print(f"Testing loss: {loss:,.2e}")
     
     # Concatenate testing results from all batches into a single array.
     inputs = np.concatenate(inputs, axis=0)
@@ -680,8 +697,14 @@ def main(
             )
 
             # Transform values back to original range.
-            outputs = dataset.transform(outputs, inverse=True)
-            labels = dataset.transform(labels, inverse=True)
+            outputs = dataset.transform(
+                dataset.scale(outputs, inverse=True),
+                inverse=True,
+            )
+            labels = dataset.transform(
+                dataset.scale(labels, inverse=True),
+                inverse=True,
+            )
 
             if evaluate:
                 results.append(
@@ -701,7 +724,7 @@ if __name__ == "__main__":
         "train_existing": not True,
         "save_model_every": 10,
 
-        "epoch_count": 20,
+        "epoch_count": 10,
         "learning_rate": 1e-7,
         "decay_learning_rate": not True,
         "batch_sizes": (32, 128, 128),
@@ -711,9 +734,9 @@ if __name__ == "__main__":
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
         
-        "dataset_id": 2,
-        "transformation_exponent": 1,  # None
-        "filename_subset": "subset_2d_1bin_100.txt",
+        "dataset_id": 3,
+        "transformation_exponent": 1,
+        "filename_subset": None,
         
         "train": True,
         "test": True,
