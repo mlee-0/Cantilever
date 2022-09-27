@@ -1,3 +1,4 @@
+import torch
 from torch.utils.data import Dataset
 
 from helpers import *
@@ -25,22 +26,27 @@ class CantileverDataset(Dataset):
         
         # Load previously generated labels.
         self.labels = read_pickle(os.path.join(folder_labels, filename_labels))
-        print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
+        self.labels = torch.tensor(self.labels)
+        print(f"Label images take up {self.labels.storage().nbytes()/1e6:,.2f} MB.")
 
         # The raw maximum value found in the entire dataset.
-        self.max_value = np.max(self.labels)
+        self.max_value = self.labels.max()
 
         # Apply the transformation to the label values.
-        self.labels = self.transform(self.labels, inverse=False)
+        self.transform(self.labels, inverse=False)
         
         # The raw maximum value found in the entire dataset, after scaling and transformation has been applied.
-        self.scaled_max_value = np.max(self.labels)
+        self.scaled_max_value = self.labels.max()
         # Scale the transformed labels so that the maximum value is 1.
-        self.labels = self.scale(self.labels)
+        self.scale(self.labels)
         
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
-        print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")
+        self.inputs = torch.tensor(self.inputs).float()
+        # Normalize to zero mean and unit standard deviation.
+        self.inputs -= self.inputs.mean()
+        self.inputs /= self.inputs.std()
+        print(f"Input images take up {self.inputs.storage().nbytes()/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
         self.loads = (samples[load.name] - load.low) / (load.high - load.low)
@@ -54,24 +60,20 @@ class CantileverDataset(Dataset):
     
     def __getitem__(self, index):
         """Return input data (tuple of image, list of numerical data) and label images."""
-        # Return copies of arrays so that arrays are not modified.
-        return (
-            (np.copy(self.inputs[index, ...]), self.loads[index]),
-            np.copy(self.labels[index, ...]),
-        )
+        return (self.inputs[index, ...], self.loads[index]), self.labels[index, ...]
     
-    def transform(self, y: np.ndarray, inverse=False) -> np.ndarray:
-        """Raise the given data to an exponent, or the inverse of the exponent."""
+    def transform(self, y: torch.tensor, inverse=False) -> None:
+        """Raise the given data to an exponent, or the inverse of the exponent. Performed in-place."""
         if not inverse:
-            return y ** self.transformation_exponent
+            y **= self.transformation_exponent
         else:
-            return y ** (1 / self.transformation_exponent)
+            y **= (1 / self.transformation_exponent)
     
-    def scale(self, y: np.ndarray, inverse=False) -> np.ndarray:
+    def scale(self, y: torch.tensor, inverse=False) -> None:
         if not inverse:
-            return y / self.scaled_max_value
+            y /= self.scaled_max_value
         else:
-            return y * self.scaled_max_value
+            y *= self.scaled_max_value
 
 class CantileverDataset3d(Dataset):
     """

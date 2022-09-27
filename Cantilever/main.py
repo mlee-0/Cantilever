@@ -20,7 +20,6 @@ from datasets import *
 from helpers import *
 import metrics
 from networks import *
-from preprocessing import *
 
 
 # Free memory between subsequent runs.
@@ -80,7 +79,7 @@ def train_regression(
 
     # Main training-validation loop.
     for epoch in epochs:
-        print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M:%S %p')})")
+        print(f"\nEpoch {epoch}/{epochs[-1]} ({time.strftime('%I:%M %p')})")
         time_start = time.time()
         
         # Train on the training dataset.
@@ -93,7 +92,7 @@ def train_regression(
             # Predict an output from the model with the given input.
             output_data = model(input_data)
             # Calculate the loss.
-            loss_current = loss_function(output_data, label_data.float())
+            loss_current = loss_function(output_data, label_data)
             # Update the cumulative loss.
             loss += loss_current.item()
 
@@ -145,8 +144,8 @@ def train_regression(
                 loss += loss_function(output_data, label_data.float()).item()
 
                 # Convert to NumPy arrays for evaluation metric calculations.
-                output_data = output_data.cpu().numpy()
-                label_data = label_data.cpu().numpy()
+                output_data = output_data.cpu()
+                label_data = label_data.cpu()
 
                 outputs.append(output_data)
                 labels.append(label_data)
@@ -219,7 +218,7 @@ def train_regression(
 def test_regression(
     device: str, model: nn.Module, loss_function: nn.Module, dataset: Dataset, test_dataloader: DataLoader,
     queue=None, queue_to_main=None, info_gui: dict=None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
     """Test the given regression model and return its outputs and corresponding labels and inputs."""
 
     # Initialize values to send to the GUI.
@@ -243,9 +242,9 @@ def test_regression(
             loss += loss_function(output_data, label_data.float()).item()
 
             # Convert to NumPy arrays for evaluation metric calculations.
-            input_data = input_data.cpu().detach().numpy()
-            output_data = output_data.cpu().detach().numpy()
-            label_data = label_data.cpu().numpy()
+            input_data = input_data.cpu().detach()
+            output_data = output_data.cpu().detach()
+            label_data = label_data.cpu()
 
             inputs.append(input_data)
             labels.append(label_data)
@@ -261,9 +260,9 @@ def test_regression(
     print(f"Testing loss: {loss:,.2e}")
     
     # Concatenate testing results from all batches into a single array.
-    inputs = np.concatenate(inputs, axis=0)
-    outputs = np.concatenate(outputs, axis=0)
-    labels = np.concatenate(labels, axis=0)
+    inputs = torch.cat(inputs, dim=0)
+    outputs = torch.cat(outputs, dim=0)
+    labels = torch.cat(labels, dim=0)
 
     if queue:
         info_gui["info_metrics"] = {f"Loss ({loss_function})": loss}
@@ -574,14 +573,14 @@ def main(
             )
 
             # Transform values back to original range.
-            outputs = dataset.transform(
-                dataset.scale(outputs, inverse=True),
-                inverse=True,
-            )
-            labels = dataset.transform(
-                dataset.scale(labels, inverse=True),
-                inverse=True,
-            )
+            dataset.scale(outputs, inverse=True)
+            dataset.transform(outputs, inverse=True)
+            dataset.scale(labels, inverse=True)
+            dataset.transform(labels, inverse=True)
+
+            outputs = outputs.numpy()
+            labels = labels.numpy()
+            inputs = inputs.numpy()
 
             if evaluate:
                 results.append(
@@ -602,7 +601,7 @@ if __name__ == "__main__":
         "save_model_every": 10,
 
         "epoch_count": 10,
-        "learning_rate": 1e-7,
+        "learning_rate": 1e-2,
         "decay_learning_rate": not True,
         "batch_sizes": (32, 128, 128),
         "training_split": (0.8, 0.1, 0.1),
