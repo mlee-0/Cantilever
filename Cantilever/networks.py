@@ -21,7 +21,7 @@ class Nie(nn.Module):
         MOMENTUM = 0.1
 
         # Number of features in the output of the first layer.
-        nf = 32
+        nf = 16
 
         self.convolution_1 = nn.Sequential(
             nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
@@ -44,7 +44,7 @@ class Nie(nn.Module):
         # Convenience functions for returning residual blocks and squeeze-and-excitation blocks.
         residual_block = lambda: nn.Sequential(
             nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
             nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
@@ -53,7 +53,7 @@ class Nie(nn.Module):
             nn.AvgPool2d(kernel_size=kernel_size),
             nn.Flatten(),
             nn.Linear(nf*4, nf*4//16),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Linear(nf*4//16, nf*4),
             nn.Sigmoid(),
         )
@@ -71,7 +71,7 @@ class Nie(nn.Module):
         self.se_5 = se_block(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(4,2), stride=(1,2), padding=(0,2), output_padding=(0,0), padding_mode="zeros"),
+            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(2,2), stride=2, padding=(1,2), output_padding=(0,0), padding_mode="zeros"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
@@ -89,7 +89,6 @@ class Nie(nn.Module):
     def forward(self, x, value_load: float = None):
         batch_size = x.size(0)
 
-        x = x.float()
         conv_1 = self.convolution_1(x)
         conv_2 = self.convolution_2(conv_1)
         x = self.convolution_3(conv_2)
@@ -199,7 +198,6 @@ class Nie3d(nn.Module):
     def forward(self, x, value_load: float = None):
         batch_size = x.size(0)
 
-        x = x.float()
         conv_1 = self.convolution_1(x)
         conv_2 = self.convolution_2(conv_1)
         conv_3 = self.convolution_3(conv_2)
@@ -251,8 +249,6 @@ class FullyCnn(nn.Module):
         self.linear = nn.Linear(in_features=32*5*10, out_features=np.prod(output_size))
 
     def forward(self, x):
-        x = x.float()
-
         x = self.convolution_1(x)
         x = self.convolution_2(x)
         x = self.linear(x.view(x.shape[0], -1))
@@ -293,8 +289,6 @@ class UNetCnn(nn.Module):
         )
 
     def forward(self, x):
-        x = x.float()
-
         encoding_1 = self.encoding_1(x)
         x = self.downsize_1(encoding_1)
         encoding_2 = self.encoding_2(x)
@@ -388,7 +382,6 @@ class AutoencoderCnn(nn.Module):
         # # self.unflatten = nn.Unflatten(1, (128, 1, 3))
 
     def forward(self, x):
-        x = x.float()
         # Convolution.
         x = self.convolution_1(x)
         # print(x.size())
