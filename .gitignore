@@ -4,10 +4,10 @@
 *.pth
 *.png
 subset*.txt
-Cantilever/ansys_script.lgw
-Cantilever/Labels 2D
-Cantilever/Labels 3D
-Cantilever/Results
+ansys_script.lgw
+Labels 2D
+Labels 3D
+Results
 DED/*
 
 aclImdb

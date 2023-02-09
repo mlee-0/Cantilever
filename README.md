@@ -1,6 +1,3 @@
-# Thesis
-
-
 # Cantilever
 This program trains a convolutional neural network that predicts the stress distribution in a rectangular cantilever beam subjected to a point load at the free end with the following variable parameters:
 * Load magnitude

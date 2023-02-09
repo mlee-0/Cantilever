@@ -442,7 +442,13 @@ def main(
     
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    # samples = samples.iloc[:50000, :]
+    # samples = samples.iloc[:10, :]
+    # samples['Load'] = 1000
+    # samples['Angle XY'] = 90
+    # samples['Angle XZ'] = 0
+    # samples['Length'] = 40
+    # samples['Height'] = 20
+    # samples['Width'] = 20
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
@@ -578,6 +584,12 @@ def main(
             dataset.scale(labels, inverse=True)
             dataset.transform(labels, inverse=True)
 
+            # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
+            outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
+            outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
+            outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
+            write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
+
             outputs = outputs.numpy()
             labels = labels.numpy()
             inputs = inputs.numpy()
@@ -611,7 +623,7 @@ if __name__ == "__main__":
         "Loss": nn.MSELoss,
         
         "dataset_id": 2,
-        "transformation_exponent": 1,
+        "transformation_exponent": 1,  # This is the denominator only
         "filename_subset": None,
         
         "train": True,
