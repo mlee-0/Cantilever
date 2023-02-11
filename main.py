@@ -473,9 +473,9 @@ def main(
             transformation_exponent = 0.5023404737562848
         dataset = CantileverDataset3d(samples, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
 
-    indices_train = range(0, train_size),
-    indices_validate = range(train_size, train_size+validate_size),
-    indices_test = range(train_size+validate_size, train_size+validate_size+test_size),
+    indices_train = range(0, train_size)
+    indices_validate = range(train_size, train_size+validate_size)
+    indices_test = range(train_size+validate_size, train_size+validate_size+test_size)
 
     results = []
 
