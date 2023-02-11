@@ -395,7 +395,7 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
     return results
 
 def main(
-    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], training_split: Tuple[float, float, float], k_fold: bool, Model: nn.Module,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], training_split: Tuple[float, float, float], Model: nn.Module,
     filename_model: str, train_existing: bool, save_model_every: int,
     dataset_id: int, filename_subset: str,
     train: bool, test: bool, evaluate: bool,
@@ -423,7 +423,6 @@ def main(
     `training_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
     `filename_model`: Name of the .pth file to load and save to during training.
     `filename_subset`: Name of the .txt file that contains a subset of the entire dataset to use.
-    `k_fold`: Use k-fold cross-validation, with k automatically calculated from the specified training/validation/testing split.
     
     `queue`: A Queue used to send information to the GUI.
     `queue_to_main`: A Queue used to receive information from the GUI.
@@ -485,131 +484,109 @@ def main(
             transformation_exponent = 0.5023404737562848
         dataset = CantileverDataset3d(samples, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
 
-    # Divide the dataset into k folds.
-    if k_fold:
-        indices_folds = np.arange(0, len(dataset)+1, validate_size+test_size)
+    indices_train = range(0, train_size),
+    indices_validate = range(train_size, train_size+validate_size),
+    indices_test = range(train_size+validate_size, train_size+validate_size+test_size),
 
-        # List of tuples: (training indices, validation indices, testing indices).
-        folds = []
-        for i, j in zip(indices_folds[:-1], indices_folds[1:]):
-            folds.append((
-                [*range(0, i), *range(j, len(dataset))],
-                range(i, i+int((j-i)/2)),
-                range(i+int((j-i)/2), j),
-            ))
-    else:
-        folds = [(
-            range(0, train_size),
-            range(train_size, train_size+validate_size),
-            range(train_size+validate_size, train_size+validate_size+test_size),
-        )]
-    
     results = []
-    for k, (indices_train, indices_validate, indices_test) in enumerate(folds, 1):
-        if k_fold:
-            print(f"\nPerforming {len(folds)}-fold cross-validation on fold {k}.")
 
-        # Split the dataset into training, validation, and testing.
-        batch_size_train, batch_size_validate, batch_size_test = batch_sizes
-        train_dataset = Subset(dataset, indices_train)
-        validate_dataset = Subset(dataset, indices_validate)
-        test_dataset = Subset(dataset, indices_test)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
-        validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
-        
-        # Initialize the model, optimizer, and loss function.
-        args = {
-            Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
-            Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
-            FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
-            UNetCnn: [dataset.input_channels, dataset.output_channels],
-            AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
-        }
-        model = Model(*args[Model])
-        model.to(device)
-        optimizer = Optimizer(model.parameters(), lr=learning_rate)
-        if decay_learning_rate:
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-        else:
-            scheduler = None
-        loss_function = Loss()
+    # Split the dataset into training, validation, and testing.
+    batch_size_train, batch_size_validate, batch_size_test = batch_sizes
+    train_dataset = Subset(dataset, indices_train)
+    validate_dataset = Subset(dataset, indices_validate)
+    test_dataset = Subset(dataset, indices_test)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
+    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
+    
+    # Initialize the model, optimizer, and loss function.
+    args = {
+        Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
+        Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
+        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
+        UNetCnn: [dataset.input_channels, dataset.output_channels],
+        AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
+    }
+    model = Model(*args[Model])
+    model.to(device)
+    optimizer = Optimizer(model.parameters(), lr=learning_rate)
+    if decay_learning_rate:
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    else:
+        scheduler = None
+    loss_function = Loss()
 
-        # Load previously saved model and optimizer parameters.
-        if checkpoint is not None:
-            model.load_state_dict(checkpoint["model_state_dict"])
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            if queue:
-                queue.put({
-                    "epochs": range(1, checkpoint["epoch"]+1),
-                    "training_loss": checkpoint["training_loss"],
-                    "validation_loss": checkpoint["validation_loss"],
-                })
-        
+    # Load previously saved model and optimizer parameters.
+    if checkpoint is not None:
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if queue:
-            info_gui["info_training"]["Training Size"] = train_size
-            info_gui["info_training"]["Validation Size"] = validate_size
-            info_gui["info_training"]["Testing Size"] = test_size
-            info_gui["info_training"]["Learning Rate"] = learning_rate
-            queue.put(info_gui)
+            queue.put({
+                "epochs": range(1, checkpoint["epoch"]+1),
+                "training_loss": checkpoint["training_loss"],
+                "validation_loss": checkpoint["validation_loss"],
+            })
+    
+    if queue:
+        info_gui["info_training"]["Training Size"] = train_size
+        info_gui["info_training"]["Validation Size"] = validate_size
+        info_gui["info_training"]["Testing Size"] = test_size
+        info_gui["info_training"]["Learning Rate"] = learning_rate
+        queue.put(info_gui)
 
-        if train:
-            model = train_regression(
-                device = device,
-                epoch_count = epoch_count,
-                checkpoint = checkpoint,
-                filepath_model = filepath_model,
-                save_model_every = save_model_every,
-                model = model,
-                optimizer = optimizer,
-                loss_function = loss_function,
-                train_dataloader = train_dataloader,
-                validate_dataloader = validate_dataloader,
-                scheduler = scheduler,
-                queue = queue,
-                queue_to_main = queue_to_main,
-                info_gui = info_gui,
-                )
-        
-        if test:
-            outputs, labels, inputs = test_regression(
-                device = device,
-                model = model,
-                loss_function = loss_function,
-                dataset = dataset,
-                test_dataloader = test_dataloader,
-                queue = queue,
-                queue_to_main = queue_to_main,
-                info_gui = info_gui,
+    if train:
+        model = train_regression(
+            device = device,
+            epoch_count = epoch_count,
+            checkpoint = checkpoint,
+            filepath_model = filepath_model,
+            save_model_every = save_model_every,
+            model = model,
+            optimizer = optimizer,
+            loss_function = loss_function,
+            train_dataloader = train_dataloader,
+            validate_dataloader = validate_dataloader,
+            scheduler = scheduler,
+            queue = queue,
+            queue_to_main = queue_to_main,
+            info_gui = info_gui,
+            )
+    
+    if test:
+        outputs, labels, inputs = test_regression(
+            device = device,
+            model = model,
+            loss_function = loss_function,
+            dataset = dataset,
+            test_dataloader = test_dataloader,
+            queue = queue,
+            queue_to_main = queue_to_main,
+            info_gui = info_gui,
+        )
+
+        # Transform values back to original range.
+        dataset.scale(outputs, inverse=True)
+        dataset.transform(outputs, inverse=True)
+        dataset.scale(labels, inverse=True)
+        dataset.transform(labels, inverse=True)
+
+        # # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
+        # outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
+        # outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
+        # outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
+        # write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
+
+        outputs = outputs.numpy()
+        labels = labels.numpy()
+        inputs = inputs.numpy()
+
+        if evaluate:
+            results.append(
+                evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
             )
 
-            # Transform values back to original range.
-            dataset.scale(outputs, inverse=True)
-            dataset.transform(outputs, inverse=True)
-            dataset.scale(labels, inverse=True)
-            dataset.transform(labels, inverse=True)
+    return results
 
-            # # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
-            # outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
-            # outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
-            # outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
-            # write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
-
-            outputs = outputs.numpy()
-            labels = labels.numpy()
-            inputs = inputs.numpy()
-
-            if evaluate:
-                results.append(
-                    evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
-                )
-    
-    # Average and display the results from k-fold cross-validation.
-    if k_fold:
-        print("\nAveraged evaluation metrics:")
-        averaged_results = {key: np.mean([result[key] for result in results]) for key in results[0].keys()}
-        for key, value in averaged_results.items():
-            print(f"{key}: {value:,.3f}")
 
 if __name__ == "__main__":
     kwargs = {
@@ -622,7 +599,6 @@ if __name__ == "__main__":
         "decay_learning_rate": not True,
         "batch_sizes": (16, 128, 128),
         "training_split": (0.8, 0.1, 0.1),
-        "k_fold": not True,
         "Model": Nie,
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
