@@ -9,35 +9,37 @@ import random
 import numpy as np
 import pandas as pd
 import scipy as sp
-from scipy import stats, optimize
 
 from helpers import *
 
 
-def generate_samples(number_samples: int, start: int = 1) -> pd.DataFrame:
+def generate_samples(start: int = 1) -> pd.DataFrame:
     """Generate sample values for each parameter and return them as a DataFrame. Specify the starting sample number if generating samples to add to an existing dataset."""
 
     assert start != 0, f"The starting sample number {start} should be a positive integer."
 
     # Generate sample values for each parameter.
     samples = {}
+    data = np.meshgrid(*[np.arange(p.low, p.high + (p.step/2), p.step).round(p.precision) for p in [load, angle_1, length, height, position]])
+    number_samples = data[0].size
     samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
-    samples[load.name] = generate_uniform_values(number_samples, (load.low, load.high), load.step, load.precision)  # generate_logspace_values(..., skew_amount=2.0, skew_high=True)
-    samples[angle_1.name] = generate_uniform_values(number_samples, (angle_1.low, angle_1.high), angle_1.step, angle_1.precision)  # generate_angles(..., std=45)
-    samples[angle_2.name] = generate_uniform_values(number_samples, (angle_2.low, angle_2.high), angle_2.step, angle_2.precision)  # generate_angles(..., std=45)
-    samples[length.name] = generate_uniform_values(number_samples, (length.low, length.high), length.step, length.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=True)
-    samples[height.name] = generate_uniform_values(number_samples, (height.low, height.high), height.step, height.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=False)
-    samples[width.name] = generate_uniform_values(number_samples, (width.low, width.high), width.step, width.precision)  # generate_logspace_values(..., skew_amount=1.0, skew_high=False)
-    samples[elastic_modulus.name] = generate_uniform_values(number_samples, (elastic_modulus.low, elastic_modulus.high), elastic_modulus.step, elastic_modulus.precision)
-    
-    # Calculate the number of nodes in each direction.
-    nodes_length = np.round(NODES_X * (samples[length.name] / length.high))
-    nodes_height = np.round(NODES_Y * (samples[height.name] / height.high))
-    nodes_width = np.round(NODES_Z * (samples[width.name] / width.high))
+    samples[load.name] = data[0].flatten()
+    samples[angle_1.name] = data[1].flatten()
+    samples[angle_2.name] = np.zeros(number_samples)
+    samples[length.name] = data[2].flatten()
+    samples[height.name] = data[3].flatten()
+    samples[width.name] = np.zeros(number_samples)
+    samples[position.name] = data[4].flatten()
 
-    samples[KEY_NODES_LENGTH] = nodes_length
-    samples[KEY_NODES_HEIGHT] = nodes_height
-    samples[KEY_NODES_WIDTH] = nodes_width
+    # Calculate the number of nodes in each direction.
+    samples[KEY_NODES_LENGTH] = np.round(NODES_X * (samples[length.name] / length.high))
+    samples[KEY_NODES_HEIGHT] = np.round(NODES_Y * (samples[height.name] / height.high))
+    samples[KEY_NODES_WIDTH] = np.round(NODES_Z * (samples[width.name] / width.high))
+
+    # Calculate the node number of the node the load acts on.
+    samples[KEY_LOAD_NODE_NUMBER] = np.round(samples[position.name] * samples[KEY_NODES_LENGTH]).astype(int)
+    samples[KEY_LOAD_NODE_NUMBER][samples[KEY_LOAD_NODE_NUMBER] >= 2] += 1
+    samples[KEY_LOAD_NODE_NUMBER][samples[position.name] == 1.0] = 2
     
     # Calculate the x-, y-, z-components of the loads.
     x_loads_2d = np.round(np.cos(samples[angle_1.name] * (np.pi/180)) * samples[load.name], load.precision)
@@ -119,6 +121,8 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
     `bounds`: A tuple of (low, high) values that define a range in which to search for exponent values.
     """
 
+    from scipy import optimize
+
     BINS = 100
 
     # Calculate the target distribution.
@@ -149,6 +153,9 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
 
 def polynomial_chaos_expansion(data: np.ndarray, target_data: np.ndarray) -> np.ndarray:
     """Transform the given array to match the target statistical moments using polynomial chaos expansion."""
+
+    from scipy import stats, optimize
+
     mz1 = 0
     mz2 = lambda b: b[0]**2 + 2*b[1]**2 + 6*b[2]**2
     mz3 = lambda b: 6*b[0]**2*b[1] + 8*b[1]**3 + 36*b[0]*b[1]*b[2] + 108*b[1]*b[2]**2
@@ -217,7 +224,7 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
         commands_define_samples = [f'*DIM,{samples_variable},ARRAY,{13},{number_samples}\n']
         for i in range(number_samples):
             commands_define_samples.append(
-                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD_2D][i]},{samples[KEY_Y_LOAD_2D][i]},{samples[KEY_X_LOAD_3D][i]},{samples[KEY_Y_LOAD_3D][i]},{samples[KEY_Z_LOAD_3D][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[elastic_modulus.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
+                f'{samples_variable}(1,{samples[KEY_SAMPLE_NUMBER][i]}) = {samples[load.name][i]},{samples[KEY_X_LOAD_2D][i]},{samples[KEY_Y_LOAD_2D][i]},{samples[KEY_X_LOAD_3D][i]},{samples[KEY_Y_LOAD_3D][i]},{samples[KEY_Z_LOAD_3D][i]},{samples[KEY_LOAD_NODE_NUMBER][i]},{samples[length.name][i]},{samples[height.name][i]},{samples[width.name][i]},{samples[KEY_NODES_LENGTH][i]},{samples[KEY_NODES_HEIGHT][i]},{samples[KEY_NODES_WIDTH][i]}\n'
                 )
         placeholder_substitutions['! placeholder_define_samples\n'] = commands_define_samples
         # Add loop commands.
@@ -245,7 +252,6 @@ def write_ansys_script(samples: pd.DataFrame, filename: str) -> None:
 
 
 if __name__ == "__main__":
-    NUMBER_SAMPLES = 10000
     # Must be 1 if creating a new dataset.
     START_SAMPLE_NUMBER = 1
     # Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
@@ -265,9 +271,11 @@ if __name__ == "__main__":
     else:
         overwrite_existing = False
     if samples is None or overwrite_existing:
-        samples_new = generate_samples(NUMBER_SAMPLES, start=START_SAMPLE_NUMBER)
+        samples_new = generate_samples(start=START_SAMPLE_NUMBER)
         if WRITE_MODE == "a" and samples is not None:
             samples = pd.concat((samples, samples_new), axis=0, ignore_index=True)
+        else:
+            samples = samples_new
 
     write_samples(samples, filename_sample, mode=WRITE_MODE)
     write_ansys_script(samples, filename_ansys)

@@ -19,7 +19,7 @@ KEYW,pr_sgui,1
 ! placeholder_loop_start
 
 ! Define either 2 (2D analysis) or 3 (3D analysis).
-dimensions = 3
+dimensions = 2
 
 ! placeholder_define_samples
 
@@ -28,10 +28,10 @@ load_y_2d = samples(3,i,1)
 load_x_3d = samples(4,i,1)
 load_y_3d = samples(5,i,1)
 load_z_3d = samples(6,i,1)
-length = samples(7,i,1)
-height = samples(8,i,1)
-width = samples(9,i,1)
-elastic_modulus = samples(10,i,1)
+node_load = samples(7,i,1)
+length = samples(8,i,1)
+height = samples(9,i,1)
+width = samples(10,i,1)
 nodes_x = samples(11,i,1)
 nodes_y = samples(12,i,1)
 nodes_z = samples(13,i,1)
@@ -88,7 +88,7 @@ KEYW,PR_MULTI,0
 ! Define material properties.
 MPTEMP,,,,,,,,  
 MPTEMP,1,0
-MPDATA,EX,1,,elastic_modulus*1e9
+MPDATA,EX,1,,1e9
 MPDATA,PRXY,1,,0.3  
 
 
@@ -132,20 +132,9 @@ MPDATA,PRXY,1,,0.3
 *IF,dimensions,EQ,2,THEN
     DL,4, ,ALL,0
 
-    nodal_load_x = load_x_2d/nodes_y
-    nodal_load_y = load_y_2d/nodes_y
-
-    ! Interior nodal loads.
-    LSEL,S,LINE,,2
-    NSLL,S,0
-    F,ALL,FX,nodal_load_x
-    F,ALL,FY,nodal_load_y
-    
-    ! Edge nodal loads.
-    KSEL,S,KP,,2,3
-    NSLK,S
-    F,ALL,FX,nodal_load_x/2
-    F,ALL,FY,nodal_load_y/2
+    NSEL,S,,,node_load
+    F,ALL,FX,load_x_2d
+    F,ALL,FY,load_y_2d
 *ELSE
     DA,5,ALL,0
 

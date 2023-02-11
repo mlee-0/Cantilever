@@ -46,13 +46,13 @@ class Parameter:
     precision: int = 0
 
 # Settings for each parameter.
-length = Parameter(low=2, high=4, step=0.1, precision=1, name="Length", units="m")
-height = Parameter(low=1, high=2, step=0.1, precision=1, name="Height", units="m")
-width = Parameter(low=1, high=2, step=0.1, precision=1, name="Width", units="m")
-elastic_modulus = Parameter(low=200, high=200, step=1, precision=0, name="Elastic Modulus", units="GPa")
-load = Parameter(low=500, high=1000, step=5, precision=0, name="Load", units="N")
-angle_1 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XY", units="Degrees")
-angle_2 = Parameter(low=0, high=360, step=1, precision=0, name="Angle XZ", units="Degrees")
+length = Parameter(low=0.8, high=3.2, step=0.2, precision=1, name="Length", units="m")
+height = Parameter(low=0.4, high=1.6, step=0.2, precision=1, name="Height", units="m")
+width = Parameter(low=0.4, high=1.6, step=0.2, precision=1, name="Width", units="m")
+load = Parameter(low=500, high=500, step=5, precision=0, name="Load", units="N")
+position = Parameter(low=0.2, high=1.0, step=0.2, precision=1, name="Load Position", units="fraction")
+angle_1 = Parameter(low=0, high=90, step=5, precision=0, name="Angle XY", units="Degrees")
+angle_2 = Parameter(low=0, high=90, step=5, precision=0, name="Angle XZ", units="Degrees")
 
 # Names of quantities that are derived from randomly generated values.
 KEY_SAMPLE_NUMBER = "Sample Number"
@@ -64,18 +64,15 @@ KEY_Z_LOAD_3D = "Load Z (3D)"
 KEY_NODES_LENGTH = "Nodes Length"
 KEY_NODES_HEIGHT = "Nodes Height"
 KEY_NODES_WIDTH = "Nodes Width"
+KEY_LOAD_NODE_NUMBER = "Load Node Number"
 
 # Size of input images (height, width). Must have the same aspect ratio as the largest possible cantilever geometry.
-INPUT_SIZE = (round(height.high / height.step), round(length.high / length.step))
-INPUT_SIZE_3D = (
-    round(height.high / height.step),
-    round(length.high / length.step),
-    round(width.high / width.step)
-)
+INPUT_SIZE = (16, 32)
+INPUT_SIZE_3D = (16, 32, 16)
 # Number of nodes to create in each direction in FEA.
-NODES_X = 30
-NODES_Y = 15
-NODES_Z = 15
+NODES_X = 32
+NODES_Y = 16
+NODES_Z = 16
 # Size of output images (height, width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
 OUTPUT_SIZE = (NODES_Y, NODES_X)
 OUTPUT_SIZE_3D = (NODES_Y, NODES_X, NODES_Z)
@@ -105,63 +102,49 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
     
     time_start = time.time()
 
-    DATA_TYPE = np.uint8
+    DATA_TYPE = int
 
     number_samples = len(samples)
-    images = [None] * number_samples
+    h, w = INPUT_SIZE
+    images = np.zeros((number_samples, 3 if not is_3d else 5, h, w), DATA_TYPE)
 
     for i in range(number_samples):
         pixel_length = int(samples[KEY_NODES_LENGTH][i])
         pixel_height = int(samples[KEY_NODES_HEIGHT][i])
         pixel_width = int(samples[KEY_NODES_WIDTH][i])
-        
-        channels = []
-        h, w = INPUT_SIZE
 
         # Create a channel with a white rectangle representing the length and height of the cantilever.
-        channel = np.zeros((h, w), dtype=DATA_TYPE)
-        channel[:pixel_height, :pixel_length] = 255
-        channels.append(channel)
+        images[i, 0, :pixel_height, :pixel_length] = 1
 
         # Create a channel with a white rectangle representing the height and width of the cantilever.
         if is_3d:
-            channel = np.zeros((h, w), dtype=DATA_TYPE)
-            channel[:pixel_height, :pixel_width] = 255
-            channels.append(channel)
+            images[i, 1, :pixel_height, :pixel_width] = 1
 
-        # Create a channel with a gray line of pixels representing the load magnitude and XY angle.
-        channel = np.zeros((h, w), dtype=DATA_TYPE)
-        r = np.arange(max(channel.shape))
+        # Create a channel with a white line representing the XY angle.
+        r = np.arange(max(h, w))
         x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + w/2
         y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + h/2
         x = x.astype(int)
         y = y.astype(int)
         inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
-        channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-        channel = np.flipud(channel)
-        channels.append(channel)
+        images[i, 1 if not is_3d else 2, y[inside_image], x[inside_image]] = 1
+        images[i, 1 if not is_3d else 2, ...] = np.flipud(images[i, 1 if not is_3d else 2, ...])
         
-        # Create a channel with a gray line of pixels representing the load magnitude and XZ angle.
+        # Create a channel with a white line representing the XZ angle.
         if is_3d:
-            channel = np.zeros((h, w), dtype=DATA_TYPE)
-            r = np.arange(max(channel.shape))
+            r = np.arange(max(h, w))
             x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + w/2
             y = r * np.sin(samples[angle_2.name][i] * np.pi/180) + h/2
             x = x.astype(int)
             y = y.astype(int)
             inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
-            channel[y[inside_image], x[inside_image]] = 255 * (samples[load.name][i] / load.high)
-            channel = np.flipud(channel)
-            channels.append(channel)
+            images[i, 3, y[inside_image], x[inside_image]] = 1
+            images[i, 3, ...] = np.flipud(images[i, 3, ...])
 
-        # # Add two channels with vertical and horizontal indices.
-        # indices = np.indices((h, w), dtype=DATA_TYPE)
-        # channels.append(indices[0, ...])
-        # channels.append(indices[1, ...])
-        
-        images[i] = channels
-    
-    images = np.array(images)
+        # Create a channel with a single pixel representing where the load is.
+        position_x = int(np.round(samples[position.name][i] * samples[KEY_NODES_LENGTH][i]) - 1)
+        position_y = int(samples[KEY_NODES_HEIGHT][i] - 1)
+        images[i, 2 if not is_3d else 4, position_y, position_x] = 1
 
     time_end = time.time()
     print(f"Generated {images.shape[0]:,} input images in {time_end - time_start:.2f} seconds.")
@@ -428,12 +411,11 @@ class Colors:
 if __name__ == "__main__":
     # Convert text files to an array and save them as .pickle files.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples[70000:80000]
+    # samples = samples[:4000]
 
     folder = os.path.join(FOLDER_ROOT, "Labels 2D")
     labels = generate_label_images(samples, folder, is_3d=not True)
-    print(labels.shape)
-    write_pickle(labels, os.path.join(folder, "labels_80k.pickle"))
+    write_pickle(labels, os.path.join(folder, "labels.pickle"))
 
     # p = read_pickle("Cantilever/Labels 3D/labels.pickle")[:1000, ...]
     # max_value = np.max(p)

@@ -30,13 +30,13 @@ class Nie(nn.Module):
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(nf*1, nf*2, kernel_size=4, stride=2, padding=1, padding_mode="zeros"),
+            nn.Conv2d(nf*1, nf*2, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
             nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(nf*2, nf*4, kernel_size=4, stride=2, padding=1, padding_mode="zeros"),
+            nn.Conv2d(nf*2, nf*4, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
             nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
@@ -71,12 +71,12 @@ class Nie(nn.Module):
         self.se_5 = se_block(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=(2,2), stride=2, padding=(1,2), output_padding=(0,0), padding_mode="zeros"),
+            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=(3,2), stride=2, padding=1, output_padding=(0,0), padding_mode="zeros"),
+            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
         )
@@ -86,7 +86,7 @@ class Nie(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-    def forward(self, x, value_load: float = None):
+    def forward(self, x):
         batch_size = x.size(0)
 
         conv_1 = self.convolution_1(x)
@@ -109,15 +109,7 @@ class Nie(nn.Module):
         se = self.se_5(residual)
         x = x + residual * se.reshape((batch_size, -1, 1, 1))
 
-        # Add load value.
-        if value_load is not None:
-            x = x + value_load
-
         x = self.deconvolution_1(x)
-        # x = self.deconvolution_2(conv_2[..., 1:-1, 2:-2] + x)
-        # x = self.deconvolution_3(conv_1[..., 2:-3, 5:-5] + x)
-        # x = self.deconvolution_2(torch.cat((conv_2[..., 1:-1, 2:-2], x), dim=1))
-        # x = self.deconvolution_3(torch.cat((conv_1[..., 2:-3, 5:-5], x), dim=1))
         x = self.deconvolution_2(x)
         x = self.deconvolution_3(x)
     

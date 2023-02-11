@@ -85,7 +85,7 @@ def train_regression(
         # Train on the training dataset.
         model.train(True)
         loss = 0
-        for batch, ((input_data, load), label_data) in enumerate(train_dataloader, 1):
+        for batch, (input_data, label_data) in enumerate(train_dataloader, 1):
             input_data = input_data.to(device)
             label_data = label_data.to(device)
             
@@ -137,7 +137,7 @@ def train_regression(
         outputs = []
         labels = []
         with torch.no_grad():
-            for batch, ((input_data, load), label_data) in enumerate(validate_dataloader, 1):
+            for batch, (input_data, label_data) in enumerate(validate_dataloader, 1):
                 input_data = input_data.to(device)
                 label_data = label_data.to(device)
                 output_data = model(input_data)
@@ -235,7 +235,7 @@ def test_regression(
     labels = []
 
     with torch.no_grad():
-        for batch, ((input_data, load), label_data) in enumerate(test_dataloader, 1):
+        for batch, (input_data, label_data) in enumerate(test_dataloader, 1):
             input_data = input_data.to(device)
             label_data = label_data.to(device)
             output_data = model(input_data)
@@ -258,6 +258,17 @@ def test_regression(
         print()
     loss /= batch
     print(f"Testing loss: {loss:,.2e}")
+
+    # Show an output and corresponding label.
+    i = 2
+    plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.imshow(label_data[i, 0, ...])
+    plt.title('True')
+    plt.subplot(1, 2, 2)
+    plt.imshow(output_data[i, 0, ...])
+    plt.title('Predicted')
+    plt.show()
     
     # Concatenate testing results from all batches into a single array.
     inputs = torch.cat(inputs, dim=0)
@@ -389,7 +400,7 @@ def main(
     dataset_id: int, filename_subset: str,
     train: bool, test: bool, evaluate: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
-    transformation_exponent: float = None,
+    normalize_inputs: bool = False, transformation_exponent: float = None,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
@@ -442,13 +453,7 @@ def main(
     
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    # samples = samples.iloc[:10, :]
-    # samples['Load'] = 1000
-    # samples['Angle XY'] = 90
-    # samples['Angle XZ'] = 0
-    # samples['Length'] = 40
-    # samples['Height'] = 20
-    # samples['Width'] = 20
+    samples = samples[:4000]
 
     # Get the specified subset of the dataset, if provided.
     if filename_subset is not None:
@@ -470,15 +475,15 @@ def main(
     if dataset_id == 2:
         if transformation_exponent is None:
             transformation_exponent = 0.4949464243559395
-        dataset = CantileverDataset(samples, is_3d=False, transformation_exponent=transformation_exponent)
+        dataset = CantileverDataset(samples, is_3d=False, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
     elif dataset_id == 3:
         if transformation_exponent is None:
             transformation_exponent = 0.5023404737562848
-        dataset = CantileverDataset(samples, is_3d=True, transformation_exponent=transformation_exponent)
+        dataset = CantileverDataset(samples, is_3d=True, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
     elif dataset_id == 4:
         if transformation_exponent is None:
             transformation_exponent = 0.5023404737562848
-        dataset = CantileverDataset3d(samples, transformation_exponent=transformation_exponent)
+        dataset = CantileverDataset3d(samples, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
 
     # Divide the dataset into k folds.
     if k_fold:
@@ -584,11 +589,11 @@ def main(
             dataset.scale(labels, inverse=True)
             dataset.transform(labels, inverse=True)
 
-            # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
-            outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
-            outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
-            outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
-            write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
+            # # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
+            # outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
+            # outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
+            # outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
+            # write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
 
             outputs = outputs.numpy()
             labels = labels.numpy()
@@ -610,12 +615,12 @@ if __name__ == "__main__":
     kwargs = {
         "filename_model": "model.pth",
         "train_existing": not True,
-        "save_model_every": 10,
+        "save_model_every": 1,
 
         "epoch_count": 10,
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-4,
         "decay_learning_rate": not True,
-        "batch_sizes": (32, 128, 128),
+        "batch_sizes": (16, 128, 128),
         "training_split": (0.8, 0.1, 0.1),
         "k_fold": not True,
         "Model": Nie,
@@ -623,7 +628,8 @@ if __name__ == "__main__":
         "Loss": nn.MSELoss,
         
         "dataset_id": 2,
-        "transformation_exponent": 1,  # This is the denominator only
+        "normalize_inputs": False,
+        "transformation_exponent": 1,
         "filename_subset": None,
         
         "train": True,

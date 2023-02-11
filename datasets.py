@@ -12,10 +12,9 @@ class CantileverDataset(Dataset):
     Label images have shape (batch, channel, height, length).
     """
 
-    def __init__(self, samples: pd.DataFrame, is_3d: bool, transformation_exponent: float = 1):
+    def __init__(self, samples: pd.DataFrame, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=1):
         self.number_samples = len(samples)
         self.transformation_exponent = transformation_exponent
-        print(f"Using transformation exponent: {self.transformation_exponent}.")
 
         if is_3d:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
@@ -27,40 +26,66 @@ class CantileverDataset(Dataset):
         # Load previously generated labels.
         self.labels = read_pickle(os.path.join(folder_labels, filename_labels))
         self.labels = torch.tensor(self.labels)
-        print(f"Label images take up {self.labels.storage().nbytes()/1e6:,.2f} MB.")
 
         # The raw maximum value found in the entire dataset.
         self.max_value = self.labels.max()
 
-        # Apply the transformation to the label values.
-        self.transform(self.labels, inverse=False)
+        # # Apply the transformation to the label values.
+        # self.transform(self.labels, inverse=False)
         
-        # The raw maximum value found in the entire dataset, after scaling and transformation has been applied.
-        self.scaled_max_value = self.labels.max()
-        # Scale the transformed labels so that the maximum value is 1.
-        self.scale(self.labels)
+        # # The raw maximum value found in the entire dataset, after scaling and transformation has been applied.
+        # self.scaled_max_value = self.labels.max()
+        # # Scale the transformed labels so that the maximum value is 1.
+        # self.scale(self.labels)
         
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
         self.inputs = torch.tensor(self.inputs).float()
-        # Normalize to zero mean and unit standard deviation.
-        self.inputs -= self.inputs.mean()
-        self.inputs /= self.inputs.std()
-        print(f"Input images take up {self.inputs.storage().nbytes()/1e6:,.2f} MB.")
+        if normalize_inputs:
+            # Normalize to zero mean and unit standard deviation.
+            self.inputs -= self.inputs.mean()
+            self.inputs /= self.inputs.std()
 
-        # Numerical inputs, scaled to [0, 1].
-        self.loads = (samples[load.name] - load.low) / (load.high - load.low)
+        # Visualize input and label data.
+        # import random
+        # plt.figure()
+        # for i in random.sample(range(1000), k=3):
+        #     for channel in range(self.inputs.size(1)):
+        #         plt.subplot(1, 3, channel+1)
+        #         plt.imshow(self.inputs[i, channel, ...])
+        #     plt.show()
+        # plt.figure()
+        # import random
+        # for i in range(3):
+        #     plt.subplot(1, 3, i+1)
+        #     plt.imshow(self.labels[random.randint(0, 999), 0, ...])
+        # plt.show()
 
         # Number of channels in input and label images.
         self.input_channels = self.inputs.shape[1]
         self.output_channels = self.labels.shape[1]
 
+        # Print information about the data.
+        print(f"\nDataset '{type(self)}':")
+        
+        print(f"Input data:")
+        print(f"\tShape: {self.inputs.size()}")
+        print(f"\tMemory: {self.inputs.storage().nbytes()/1e6:,.2f} MB")
+        print(f"\tMin, max: {self.inputs.min()}, {self.inputs.max()}")
+
+        print(f"Label data:")
+        print(f"\tShape: {self.labels.size()}")
+        print(f"\tMemory: {self.labels.storage().nbytes()/1e6:,.2f} MB")
+        print(f"\tTransformation exponent: {self.transformation_exponent}")
+        print(f"\tMin, max: {self.labels.min()}, {self.labels.max()}")
+        print(f"\tOriginal max: {self.max_value}")
+
     def __len__(self):
         return self.number_samples
     
     def __getitem__(self, index):
-        """Return input data (tuple of image, list of numerical data) and label images."""
-        return (self.inputs[index, ...], self.loads[index]), self.labels[index, ...]
+        """Return input and label images."""
+        return self.inputs[index, ...], self.labels[index, ...]
     
     def transform(self, y: torch.tensor, inverse=False) -> None:
         """Raise the given data to an exponent, or the inverse of the exponent. Performed in-place."""
@@ -82,7 +107,7 @@ class CantileverDataset3d(Dataset):
     Input images have shape (batch, channel, height, length, width).
     Label images have shape (batch, channel=1, height, length, width).
     """
-    def __init__(self, samples: pd.DataFrame, transformation_exponent: float = 1):
+    def __init__(self, samples: pd.DataFrame, normalize_inputs: bool=False, transformation_exponent: float=1):
         self.number_samples = len(samples)
         self.transformation_exponent = transformation_exponent
         print(f"Using transformation exponent: {self.transformation_exponent}.")
@@ -103,6 +128,8 @@ class CantileverDataset3d(Dataset):
         
         # Create input images.
         self.inputs = generate_input_images_3d(samples)
+        if normalize_inputs:
+            raise NotImplementedError()
         print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")
 
         # Numerical inputs, scaled to [0, 1].
@@ -116,12 +143,9 @@ class CantileverDataset3d(Dataset):
         return self.number_samples
     
     def __getitem__(self, index):
-        """Return input data (tuple of image, list of numerical data) and label images."""
+        """Return input and label images."""
         # Return copies of arrays so that arrays are not modified.
-        return (
-            (np.copy(self.inputs[index, ...]), self.loads[index]),
-            np.copy(self.labels[index, ...]),
-        )
+        return np.copy(self.inputs[index, ...]), np.copy(self.labels[index, ...])
     
     def transform(self, y: np.ndarray, inverse=False) -> np.ndarray:
         if not inverse:
