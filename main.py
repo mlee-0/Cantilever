@@ -397,7 +397,7 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
 def main(
     epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], training_split: Tuple[float, float, float], Model: nn.Module,
     filename_model: str, train_existing: bool, save_model_every: int,
-    dataset_id: int, filename_subset: str,
+    dataset_id: int,
     train: bool, test: bool, evaluate: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
     normalize_inputs: bool = False, transformation_exponent: float = None,
@@ -422,7 +422,6 @@ def main(
     `dataset_id`: An integer representing the dataset to use.
     `training_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
     `filename_model`: Name of the .pth file to load and save to during training.
-    `filename_subset`: Name of the .txt file that contains a subset of the entire dataset to use.
     
     `queue`: A Queue used to send information to the GUI.
     `queue_to_main`: A Queue used to receive information from the GUI.
@@ -453,16 +452,6 @@ def main(
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
     samples = samples[:4000]
-
-    # Get the specified subset of the dataset, if provided.
-    if filename_subset is not None:
-        filepath_subset = os.path.join(FOLDER_ROOT, filename_subset)
-        with open(filepath_subset, "r") as f:
-            sample_indices = [int(_) for _ in f.readlines()]
-        
-        samples = samples.iloc[sample_indices, :]
-        samples = samples.reset_index()
-        print(f"Using a subset with {len(samples)} samples loaded from {filepath_subset}.")
 
     # Calculate the dataset split sizes.
     sample_size = len(samples)
@@ -606,7 +595,6 @@ if __name__ == "__main__":
         "dataset_id": 2,
         "normalize_inputs": False,
         "transformation_exponent": 1,
-        "filename_subset": None,
         
         "train": True,
         "test": True,
