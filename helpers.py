@@ -78,6 +78,19 @@ OUTPUT_SIZE = (NODES_Y, NODES_X)
 OUTPUT_SIZE_3D = (NODES_Y, NODES_X, NODES_Z)
 
 
+def split_dataset(dataset_size: int, splits: List[float]) -> List[int]:
+    """Return the subset sizes according to the fractions defined in `splits`."""
+
+    assert sum(splits) == 1.0, f"The fractions {splits} must sum to 1."
+
+    # Define the last subset size as the remaining number of data to ensure that they all sum to dataset_size.
+    subset_sizes = []
+    for fraction in splits[:-1]:
+        subset_sizes.append(int(fraction * dataset_size))
+    subset_sizes.append(dataset_size - sum(subset_sizes))
+
+    return subset_sizes
+
 def plot_histogram(values: np.ndarray, title=None) -> None:
     plt.figure()
     plt.hist(values, bins=100, rwidth=0.75, color="#0095ff")
@@ -411,7 +424,6 @@ class Colors:
 if __name__ == "__main__":
     # Convert text files to an array and save them as .pickle files.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    # samples = samples[:4000]
 
     folder = os.path.join(FOLDER_ROOT, "Labels 2D")
     labels = generate_label_images(samples, folder, is_3d=not True)

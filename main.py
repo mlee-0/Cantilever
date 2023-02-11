@@ -395,7 +395,7 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
     return results
 
 def main(
-    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], training_split: Tuple[float, float, float], Model: nn.Module,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], Model: nn.Module,
     filename_model: str, train_existing: bool, save_model_every: int,
     dataset_id: int,
     train: bool, test: bool, evaluate: bool,
@@ -420,7 +420,7 @@ def main(
     `Loss`: A Module subclass to instantiate, not an instance of the class.
 
     `dataset_id`: An integer representing the dataset to use.
-    `training_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
+    `dataset_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
     `filename_model`: Name of the .pth file to load and save to during training.
     
     `queue`: A Queue used to send information to the GUI.
@@ -435,7 +435,7 @@ def main(
         "info_training": {},
         "info_metrics": {},
     } if queue else None
-    
+
     filepath_model = os.path.join(FOLDER_CHECKPOINTS, filename_model)
 
     if (test and not train) or (train and train_existing):
@@ -448,17 +448,14 @@ def main(
         checkpoint = None
 
     assert dataset_id in {2, 3, 4}, f"Invalid dataset ID: {dataset_id}."
-    
+
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-    samples = samples[:4000]
 
     # Calculate the dataset split sizes.
-    sample_size = len(samples)
-    train_size, validate_size, test_size = [int(split * sample_size) for split in training_split]
-    assert train_size + validate_size + test_size == sample_size
-    print(f"Split {sample_size:,} samples into {train_size:,} training / {validate_size:,} validation / {test_size:,} test.")
-    
+    train_size, validate_size, test_size = split_dataset(len(samples), dataset_split)
+    print(f"Split {len(samples):,} samples into {train_size:,} training / {validate_size:,} validation / {test_size:,} test.")
+
     # Create the Dataset containing all data.
     if dataset_id == 2:
         if transformation_exponent is None:
@@ -487,7 +484,7 @@ def main(
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
     validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
-    
+
     # Initialize the model, optimizer, and loss function.
     args = {
         Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
@@ -515,7 +512,7 @@ def main(
                 "training_loss": checkpoint["training_loss"],
                 "validation_loss": checkpoint["validation_loss"],
             })
-    
+
     if queue:
         info_gui["info_training"]["Training Size"] = train_size
         info_gui["info_training"]["Validation Size"] = validate_size
@@ -540,7 +537,7 @@ def main(
             queue_to_main = queue_to_main,
             info_gui = info_gui,
             )
-    
+
     if test:
         outputs, labels, inputs = test_regression(
             device = device,
@@ -584,10 +581,10 @@ if __name__ == "__main__":
         "save_model_every": 1,
 
         "epoch_count": 10,
-        "learning_rate": 1e-4,
+        "learning_rate": 1e-5,
         "decay_learning_rate": not True,
         "batch_sizes": (16, 128, 128),
-        "training_split": (0.8, 0.1, 0.1),
+        "dataset_split": (0.8, 0.1, 0.1),
         "Model": Nie,
         "Optimizer": torch.optim.SGD,
         "Loss": nn.MSELoss,
