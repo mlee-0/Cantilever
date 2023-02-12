@@ -17,27 +17,24 @@ class Nie(nn.Module):
     def __init__(self, input_channels: int, input_size: Tuple[int, int], output_channels: int):
         super().__init__()
 
-        TRACK_RUNNING_STATS = False
-        MOMENTUM = 0.1
-
         # Number of features in the output of the first layer.
         nf = 16
 
         self.convolution_1 = nn.Sequential(
             nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
-            nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*1),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
             nn.Conv2d(nf*1, nf*2, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
-            nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*2),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
             nn.Conv2d(nf*2, nf*4, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
-            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*4),
             nn.ReLU(inplace=True),
         )
 
@@ -45,9 +42,9 @@ class Nie(nn.Module):
         residual_block = lambda: nn.Sequential(
             nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
             nn.ReLU(inplace=False),
-            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*4),
             nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
-            nn.BatchNorm2d(nf*4, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*4),
         )
         se_block = lambda kernel_size: nn.Sequential(
             nn.AvgPool2d(kernel_size=kernel_size),
@@ -73,16 +70,15 @@ class Nie(nn.Module):
         self.deconvolution_1 = nn.Sequential(
             nn.ConvTranspose2d(nf*4, nf*2, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(nf*2, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*2),
         )
         self.deconvolution_2 = nn.Sequential(
             nn.ConvTranspose2d(nf*2, nf*1, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(nf*1, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
+            nn.BatchNorm2d(nf*1),
         )
         self.deconvolution_3 = nn.Sequential(
             nn.Conv2d(nf*1, output_channels, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
-            # nn.BatchNorm2d(OUTPUT_CHANNELS, momentum=MOMENTUM, track_running_stats=TRACK_RUNNING_STATS),
             nn.ReLU(inplace=True),
         )
 
