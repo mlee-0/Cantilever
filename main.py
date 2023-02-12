@@ -4,9 +4,9 @@ Run this script to train and test the model.
 
 
 import gc
-import glob
 import os
 from queue import Queue
+import random
 import time
 
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import Dataset, Subset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 from datasets import *
 from helpers import *
@@ -259,17 +259,6 @@ def test_regression(
     loss /= batch
     print(f"Testing loss: {loss:,.2e}")
 
-    # Show an output and corresponding label.
-    i = 2
-    plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.imshow(label_data[i, 0, ...])
-    plt.title('True')
-    plt.subplot(1, 2, 2)
-    plt.imshow(output_data[i, 0, ...])
-    plt.title('Predicted')
-    plt.show()
-    
     # Concatenate testing results from all batches into a single array.
     inputs = torch.cat(inputs, dim=0)
     outputs = torch.cat(outputs, dim=0)
@@ -452,10 +441,6 @@ def main(
     # Load the samples.
     samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
 
-    # Calculate the dataset split sizes.
-    train_size, validate_size, test_size = split_dataset(len(samples), dataset_split)
-    print(f"Split {len(samples):,} samples into {train_size:,} training / {validate_size:,} validation / {test_size:,} test.")
-
     # Create the Dataset containing all data.
     if dataset_id == 2:
         if transformation_exponent is None:
@@ -470,20 +455,18 @@ def main(
             transformation_exponent = 0.5023404737562848
         dataset = CantileverDataset3d(samples, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
 
-    indices_train = range(0, train_size)
-    indices_validate = range(train_size, train_size+validate_size)
-    indices_test = range(train_size+validate_size, train_size+validate_size+test_size)
+    # Split the dataset into training, validation, and testing.
+    train_dataset, validate_dataset, test_dataset = random_split(
+        dataset,
+        split_dataset(len(dataset), dataset_split),
+        generator=torch.Generator().manual_seed(43),
+    )
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_sizes[0], shuffle=True)
+    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_sizes[1], shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_sizes[2], shuffle=False)
+    print(f"Split {len(samples):,} samples into {len(train_dataset):,} training / {len(validate_dataset):,} validation / {len(test_dataset):,} test.")
 
     results = []
-
-    # Split the dataset into training, validation, and testing.
-    batch_size_train, batch_size_validate, batch_size_test = batch_sizes
-    train_dataset = Subset(dataset, indices_train)
-    validate_dataset = Subset(dataset, indices_validate)
-    test_dataset = Subset(dataset, indices_test)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True)
-    validate_dataloader = DataLoader(validate_dataset, batch_size=batch_size_validate, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size_test, shuffle=False)
 
     # Initialize the model, optimizer, and loss function.
     args = {
@@ -514,9 +497,9 @@ def main(
             })
 
     if queue:
-        info_gui["info_training"]["Training Size"] = train_size
-        info_gui["info_training"]["Validation Size"] = validate_size
-        info_gui["info_training"]["Testing Size"] = test_size
+        info_gui["info_training"]["Training Size"] = len(train_dataset)
+        info_gui["info_training"]["Validation Size"] = len(validate_dataset)
+        info_gui["info_training"]["Testing Size"] = len(test_dataset)
         info_gui["info_training"]["Learning Rate"] = learning_rate
         queue.put(info_gui)
 
