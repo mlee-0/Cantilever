@@ -30,14 +30,11 @@ class CantileverDataset(Dataset):
         # The raw maximum value found in the entire dataset.
         self.max_value = self.labels.max()
 
-        # # Apply the transformation to the label values.
-        # self.transform(self.labels, inverse=False)
-        
-        # # The raw maximum value found in the entire dataset, after scaling and transformation has been applied.
-        # self.scaled_max_value = self.labels.max()
-        # # Scale the transformed labels so that the maximum value is 1.
+        # Scale the label data so that the maximum value is 1.
         # self.scale(self.labels)
-        
+        # Apply the transformation to the label data.
+        self.transform(self.labels)
+
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
         self.inputs = torch.tensor(self.inputs).float()
@@ -87,18 +84,21 @@ class CantileverDataset(Dataset):
         """Return input and label images."""
         return self.inputs[index, ...], self.labels[index, ...]
     
-    def transform(self, y: torch.tensor, inverse=False) -> None:
-        """Raise the given data to an exponent, or the inverse of the exponent. Performed in-place."""
-        if not inverse:
-            y **= self.transformation_exponent
-        else:
-            y **= (1 / self.transformation_exponent)
+    def transform(self, y: torch.Tensor) -> None:
+        """Raise the given data to the transformation exponent. Performed in-place."""
+        y **= self.transformation_exponent
     
-    def scale(self, y: torch.tensor, inverse=False) -> None:
-        if not inverse:
-            y /= self.scaled_max_value
-        else:
-            y *= self.scaled_max_value
+    def untransform(self, y: torch.Tensor) -> None:
+        """Raise the given data to the inverse of the transformation exponent. Performed in-place."""
+        y **= 1 / self.transformation_exponent
+    
+    def scale(self, y: torch.Tensor) -> None:
+        """Divide the given data by the maximum value found in the label data. Performed in-place."""
+        y /= self.max_value
+    
+    def unscale(self, y: torch.Tensor) -> None:
+        """Multiply the given data by the maximum value found in the label data. Performed in-place."""
+        y *= self.max_value
 
 class CantileverDataset3d(Dataset):
     """

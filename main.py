@@ -534,10 +534,22 @@ def main(
         )
 
         # Transform values back to original range.
-        dataset.scale(outputs, inverse=True)
-        dataset.transform(outputs, inverse=True)
-        dataset.scale(labels, inverse=True)
-        dataset.transform(labels, inverse=True)
+        dataset.untransform(outputs)
+        # dataset.unscale(outputs)
+        dataset.untransform(labels)
+        # dataset.unscale(labels)
+
+        # Show an output and corresponding label.
+        for _ in range(3):
+            i = random.choice(range(len(test_dataset)))
+            plt.figure()
+            plt.subplot(1, 2, 1)
+            plt.imshow(labels[i, 0, ...])
+            plt.title(f'True (max {labels[i].max()})')
+            plt.subplot(1, 2, 2)
+            plt.imshow(outputs[i, 0, ...])
+            plt.title(f'Predicted (max {outputs[i].max()})')
+            plt.show()
 
         # # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
         # outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
