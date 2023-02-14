@@ -111,9 +111,51 @@ def generate_angles(number_samples: int, bounds: Tuple[float, float], step, prec
 
     return values
 
-def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bounds: Tuple[float, float] = None):
+def find_uniform_bins(data, bins=10):
+    """Return an array of bin edges for which each bin has the almost same number of data and an array of bin edges within the range [0, 1]."""
+
+    # Order each value in the data.
+    data_ = data[data > 0].flatten().numpy()
+    data_.sort()
+
+    # Find the bin edges for the data's range and the bin edges for the range [0, 1].
+    bin_indices = np.linspace(0, data_.size-1, bins+1).round().astype(int)
+    bin_edges = [0] + [data_[i] for i in bin_indices[1:]]
+    normalized_bin_edges = np.linspace(0, 1, bins+1)
+
+    return bin_edges, normalized_bin_edges
+
+def transform_uniform_bins(data, bin_edges, normalized_bin_edges) -> np.ndarray:
+    transformed = np.zeros(data.shape)
+    for low, high, normalized_low, normalized_high in zip(bin_edges[:-1], bin_edges[1:], normalized_bin_edges[:-1], normalized_bin_edges[1:]):
+        # For the last bin, include the upper bound.
+        if high != bin_edges[-1]:
+            mask = (data >= low) & (data < high)
+        else:
+            mask = (data >= low) & (data <= high)
+
+        transformed[mask] = (data[mask] - low) / (high - low)
+        transformed[mask] = transformed[mask] * (normalized_high - normalized_low) + normalized_low
+    
+    return transformed
+
+def untransform_uniform_bins(data, bin_edges, normalized_bin_edges) -> np.ndarray:
+    untransformed = np.zeros(data.shape)
+    for low, high, normalized_low, normalized_high in zip(bin_edges[:-1], bin_edges[1:], normalized_bin_edges[:-1], normalized_bin_edges[1:]):
+        # For the last bin, include the upper bound.
+        if normalized_high != normalized_bin_edges[-1]:
+            mask = (data >= normalized_low) & (data < normalized_high)
+        else:
+            mask = (data >= normalized_low) & (data <= normalized_high)
+
+        untransformed[mask] = (data[mask] - normalized_low) / (normalized_high - normalized_low)
+        untransformed[mask] = untransformed[mask] * (high - low) + low
+    
+    return untransformed
+
+def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bounds: Tuple[float, float] = None) -> float:
     """
-    Return the exponent that transforms the given data to a new distribution that most closely matches a target distribution. The target distribution is calculated as the CDF of the given data in which all samples are normalized to [0, 1].
+    Return the exponent that transforms the given data to a new distribution that most closely matches a target distribution. The target distribution is calculated as the histogram of the given data in which each individual sample is normalized to [0, 1].
 
     Parameters:
     `data`: Multidimensional array of values to be transformed according to: data ^ exponent. The first dimension must be the sample dimension, along which all samples in the dataset are located.
@@ -126,10 +168,9 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
     BINS = 100
 
     # Calculate the target distribution.
-    non_sample_dimensions = tuple(range(1, data.ndim))
-    data_normalized = data / np.expand_dims(data.max(axis=non_sample_dimensions), axis=non_sample_dimensions)
+    data_normalized = data / data.max(axis=tuple(range(1, data.ndim)), keepdims=True)
     pdf_target, _ = np.histogram(data_normalized, bins=BINS)
-    pdf_target = pdf_target / data_normalized.size
+    # pdf_target = pdf_target / data_normalized.size
 
     # Objective function to minimize. Returns the difference between two PDFs.
     def f(exponent):
@@ -138,7 +179,7 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
 
         # Calculate the PDF of the transformed values.
         pdf, _ = np.histogram(transformed, bins=BINS)
-        pdf = pdf / transformed.size
+        # pdf = pdf / transformed.size
 
         # Calculate the sum of the differences between frequencies in the two PDFs.
         difference = np.sum(np.abs(pdf - pdf_target))
@@ -149,45 +190,14 @@ def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bou
     exponent = result.x
     print(f"Found optimum exponent {exponent}.")
 
-    return exponent
-
-def polynomial_chaos_expansion(data: np.ndarray, target_data: np.ndarray) -> np.ndarray:
-    """Transform the given array to match the target statistical moments using polynomial chaos expansion."""
-
-    from scipy import stats, optimize
-
-    mz1 = 0
-    mz2 = lambda b: b[0]**2 + 2*b[1]**2 + 6*b[2]**2
-    mz3 = lambda b: 6*b[0]**2*b[1] + 8*b[1]**3 + 36*b[0]*b[1]*b[2] + 108*b[1]*b[2]**2
-    mz4 = lambda b: 3*b[0]**4 + 60*b[1]**4 + 3348*b[2]**4 + 24*b[0]**3*b[2] + 60*b[0]**2*b[1]**2 + 252*b[0]**2*b[2]**2 + 576*b[0]*b[1]**2*b[2] + 1296*b[0]*b[2]**3 + 2232*b[1]**2*b[2]**2
-
-    # Target moments.
-    mx1, mx2, mx3, mx4 = [stats.moment(target_data, i) for i in (1, 2, 3, 4)]
-
-    f = lambda b: np.sum((
-        (mz1 - mx1) ** 2,
-        (mz2(b) - mx2) ** 2,
-        (mz3(b) - mx3) ** 2,
-        (mz4(b) - mx4) ** 2,
-    ))
-    initial_guess = [0, 1, 1, 1]
-    results = sp.optimize.minimize(f, initial_guess)
-
-    xi = np.random.randn(10000)
-    b0, b1, b2, b3 = results.x
-    z = b0 + b1*xi + b2*(xi**2 - 1) + b3*(xi**3 - 3*xi)
-    print(*[stats.moment(z, i) for i in (1, 2, 3, 4)])
-    print(mx1, mx2, mx3, mx4)
-
     plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.hist(z, bins=100)
-    plt.title("Transformed")
-    plt.subplot(1, 2, 2)
-    plt.hist(target_data, bins=100)
-    plt.title("Target")
+    plt.hist(data_normalized[data_normalized > 0].flatten(), bins=BINS, alpha=0.5, label='Target')
+    transformed = (data/data.max()) ** exponent
+    plt.hist(transformed[transformed > 0].flatten() / transformed.max(), bins=BINS, alpha=0.5, label=f'{exponent}')
+    plt.legend()
     plt.show()
-    return z
+
+    return exponent
 
 def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None:
     """

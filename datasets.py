@@ -13,7 +13,6 @@ class CantileverDataset(Dataset):
     """
 
     def __init__(self, samples: pd.DataFrame, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=1):
-        self.number_samples = len(samples)
         self.transformation_exponent = transformation_exponent
 
         if is_3d:
@@ -29,11 +28,17 @@ class CantileverDataset(Dataset):
 
         # The raw maximum value found in the entire dataset.
         self.max_value = self.labels.max()
+        # The maximum value to scale the label data to after applying the transformation.
+        self.scaled = 100
 
-        # Scale the label data so that the maximum value is 1.
-        # self.scale(self.labels)
         # Apply the transformation to the label data.
-        self.transform(self.labels)
+        self.labels_transformed = self.transform(self.labels)
+
+        # # Show the histogram of the original data and transformed data, both of which have the same range of values.
+        # plt.figure()
+        # plt.hist(self.labels.numpy().flatten(), bins=100, alpha=0.5)
+        # plt.hist(self.labels_transformed.numpy().flatten(), bins=100, alpha=0.5)
+        # plt.show()
 
         # Create input images.
         self.inputs = generate_input_images(samples, is_3d=is_3d)
@@ -74,31 +79,23 @@ class CantileverDataset(Dataset):
         print(f"\tShape: {self.labels.size()}")
         print(f"\tMemory: {self.labels.storage().nbytes()/1e6:,.2f} MB")
         print(f"\tTransformation exponent: {self.transformation_exponent}")
-        print(f"\tMin, max: {self.labels.min()}, {self.labels.max()}")
+        print(f"\tMin, max: {self.labels_transformed.min()}, {self.labels_transformed.max()}")
         print(f"\tOriginal max: {self.max_value}")
 
     def __len__(self):
-        return self.number_samples
-    
+        return self.inputs.size(0)
+
     def __getitem__(self, index):
         """Return input and label images."""
-        return self.inputs[index, ...], self.labels[index, ...]
-    
-    def transform(self, y: torch.Tensor) -> None:
-        """Raise the given data to the transformation exponent. Performed in-place."""
-        y **= self.transformation_exponent
-    
-    def untransform(self, y: torch.Tensor) -> None:
-        """Raise the given data to the inverse of the transformation exponent. Performed in-place."""
-        y **= 1 / self.transformation_exponent
-    
-    def scale(self, y: torch.Tensor) -> None:
-        """Divide the given data by the maximum value found in the label data. Performed in-place."""
-        y /= self.max_value
-    
-    def unscale(self, y: torch.Tensor) -> None:
-        """Multiply the given data by the maximum value found in the label data. Performed in-place."""
-        y *= self.max_value
+        return self.inputs[index, ...], self.labels_transformed[index, ...]
+
+    def transform(self, y: torch.Tensor) -> torch.Tensor:
+        """Raise the given data to the transformation exponent."""
+        return (y / self.max_value) ** self.transformation_exponent * self.scaled
+
+    def untransform(self, y: torch.Tensor) -> torch.Tensor:
+        """Raise the given data to the inverse of the transformation exponent."""
+        return ((y / self.scaled) ** (1 / self.transformation_exponent)) * self.max_value
 
 class CantileverDataset3d(Dataset):
     """

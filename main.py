@@ -45,7 +45,7 @@ def load_model(filepath: str, device: str) -> dict:
 def train_regression(
     device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
-    train_dataloader: DataLoader, validate_dataloader: DataLoader,
+    train_dataloader: DataLoader, validate_dataloader: DataLoader, dataset: Dataset,
     scheduler = None,
     queue=None, queue_to_main=None, info_gui: dict=None,
 ) -> nn.Module:
@@ -102,7 +102,7 @@ def train_regression(
             
             # Reset gradients of model parameters.
             optimizer.zero_grad()
-            # Backpropagate the prediction loss.
+            # Calculate gradients.
             loss_current.backward()
             # Adjust model parameters.
             optimizer.step()
@@ -143,14 +143,13 @@ def train_regression(
                 output_data = model(input_data)
                 loss += loss_function(output_data, label_data.float()).item()
 
-                # Convert to NumPy arrays for evaluation metric calculations.
                 output_data = output_data.cpu()
                 label_data = label_data.cpu()
 
                 outputs.append(output_data)
                 labels.append(label_data)
 
-                if batch % 50 == 0:
+                if batch % 10 == 0:
                     print(f"Batch {batch}/{len(validate_dataloader)}...", end="\r")
                     if queue:
                         info_gui["progress_batch"] = (len(train_dataloader)+batch, len(train_dataloader)+len(validate_dataloader))
@@ -165,10 +164,11 @@ def train_regression(
         print(f"Validation loss: {loss:,.2e}")
 
         # Calculate evaluation metrics on validation results.
-        outputs = np.concatenate(outputs, axis=0)
-        labels = np.concatenate(labels, axis=0)
-        mre = metrics.mean_relative_error(outputs, labels)
-        print(f"MRE: {mre:.3f}")
+        outputs = torch.cat(outputs, dim=0)
+        labels = torch.cat(labels, dim=0)
+        outputs = dataset.untransform(outputs)
+        labels = dataset.untransform(labels)
+        evaluate_results(outputs.numpy(), labels.numpy())
 
         # Save the model parameters periodically and in the last iteration of the loop.
         if epoch % save_model_every == 0 or epoch == epochs[-1]:
@@ -241,7 +241,6 @@ def test_regression(
             output_data = model(input_data)
             loss += loss_function(output_data, label_data.float()).item()
 
-            # Convert to NumPy arrays for evaluation metric calculations.
             input_data = input_data.cpu().detach()
             output_data = output_data.cpu().detach()
             label_data = label_data.cpu()
@@ -274,9 +273,8 @@ def test_regression(
 
     return outputs, labels, inputs
 
-def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue=None, info_gui: dict=None):
+def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_gui: dict=None):
     """Calculate and return evaluation metrics."""
-    folder_results = os.path.join(FOLDER_ROOT, "Results")
 
     results = {
         "ME": metrics.mean_error(outputs, labels),
@@ -291,28 +289,36 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
     for metric, value in results.items():
         print(f"{metric}: {value:,.3f}")
 
-    # # Write output images and corresponding label images to files. Concatenate them vertically, and concatenate channels (if multiple channels) horizontally.
-    # indices = range(0, labels.shape[0], 100)
-    # for i in indices:
-    #     image = np.vstack((
-    #         np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
-    #         np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
-    #     ))
-    #     write_image(
-    #         array_to_colormap(image, dataset.max_value),
-    #         os.path.join(folder_results, f"{i+1}_fea_model.png"),
-    #         )
-    # print(f"Wrote {len(indices)} test images in {folder_results}.")
+    # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
-    # # Write images for each channel in the specified input images.
-    # for i in (720, 1060, 2960):
-    #     for channel in range(inputs.shape[1]):
-    #         write_image(
-    #             inputs[i, channel, ...],
-    #             os.path.join(folder_results, f"input_{i+1}_channel_{channel+1}.png"),
-    #         )
+    # Initialize values to send to the GUI.
+    if queue:
+        info_gui["info_metrics"] = results
+        queue.put(info_gui)
 
-    # Plot 3D voxel models for corresponding model outputs and labels for the specified samples.
+    return results
+
+def save_predictions(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, save_every: int=1) -> None:
+    """Save output data and corresponding label data as image files. They are concatenated vertically, and their channels (if multiple channels) are concatenated horizontally."""
+
+    folder_results = os.path.join(FOLDER_ROOT, "Results")
+
+    indices = range(0, labels.shape[0], save_every)
+    for i in indices:
+        image = np.vstack((
+            np.hstack([labels[i, channel, ...] for channel in range(labels.shape[1])]),
+            np.hstack([outputs[i, channel, ...] for channel in range(outputs.shape[1])]),
+        ))
+        write_image(
+            array_to_colormap(image, dataset.max_value),
+            os.path.join(folder_results, f"{i+1}_fea_model.png"),
+            )
+
+    print(f"Saved {len(indices)} test images in {folder_results}.")
+
+def show_predictions_3d(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndarray, dataset: Dataset, queue: Queue) -> None:
+    """Plot 3D voxel models for output data and cooresponding label data."""
+
     if not queue and 1 not in labels.shape[-3:]:
         for i in (0,):
             TRANSPARENCY = 1.0
@@ -366,22 +372,6 @@ def evaluate_regression(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
             ax.set_title("True")
             
             plt.show()
-
-    # cdf_network, cdf_label, bin_edges, area_difference = metrics.area_metric(
-    #     outputs.flatten(),
-    #     labels.flatten(),
-    #     dataset.max_value,
-    #     plot=not queue,
-    # )
-
-    # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
-
-    # Initialize values to send to the GUI.
-    if queue:
-        info_gui["info_metrics"] = results
-        queue.put(info_gui)
-    
-    return results
 
 def main(
     epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], Model: nn.Module,
@@ -459,7 +449,7 @@ def main(
     train_dataset, validate_dataset, test_dataset = random_split(
         dataset,
         split_dataset(len(dataset), dataset_split),
-        generator=torch.Generator().manual_seed(43),
+        generator=torch.Generator().manual_seed(42),
     )
     train_dataloader = DataLoader(train_dataset, batch_size=batch_sizes[0], shuffle=True)
     validate_dataloader = DataLoader(validate_dataset, batch_size=batch_sizes[1], shuffle=True)
@@ -515,6 +505,7 @@ def main(
             loss_function = loss_function,
             train_dataloader = train_dataloader,
             validate_dataloader = validate_dataloader,
+            dataset = dataset,
             scheduler = scheduler,
             queue = queue,
             queue_to_main = queue_to_main,
@@ -533,14 +524,12 @@ def main(
             info_gui = info_gui,
         )
 
-        # Transform values back to original range.
-        dataset.untransform(outputs)
-        # dataset.unscale(outputs)
-        dataset.untransform(labels)
-        # dataset.unscale(labels)
+        # Transform values back to the original range.
+        outputs = dataset.untransform(outputs)
+        labels = dataset.untransform(labels)
 
         # Show an output and corresponding label.
-        for _ in range(3):
+        for _ in range(5):
             i = random.choice(range(len(test_dataset)))
             plt.figure()
             plt.subplot(1, 2, 1)
@@ -551,19 +540,9 @@ def main(
             plt.title(f'Predicted (max {outputs[i].max()})')
             plt.show()
 
-        # # Save a 3x6x3 stress prediction. Index bounds below are hardcoded from one specific output.
-        # outputs = outputs[:, np.linspace(0, 9, 3).round(), ...]
-        # outputs = outputs[:, :, np.linspace(0, 9, 3).round(), ...]  # 9 not 12; don't include the random small values
-        # outputs = outputs[:, :, :, np.linspace(0, 20, 6).round()]
-        # write_pickle(outputs[0, ...].numpy().transpose((1, 2, 0)), 'stress.pickle')
-
-        outputs = outputs.numpy()
-        labels = labels.numpy()
-        inputs = inputs.numpy()
-
         if evaluate:
             results.append(
-                evaluate_regression(outputs, labels, inputs, dataset, queue=queue, info_gui=info_gui)
+                evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
             )
 
     return results
@@ -576,17 +555,17 @@ if __name__ == "__main__":
         "save_model_every": 1,
 
         "epoch_count": 10,
-        "learning_rate": 1e-5,
+        "learning_rate": 1e-3,
         "decay_learning_rate": not True,
         "batch_sizes": (16, 128, 128),
         "dataset_split": (0.8, 0.1, 0.1),
         "Model": Nie,
-        "Optimizer": torch.optim.SGD,
+        "Optimizer": torch.optim.Adam,
         "Loss": nn.MSELoss,
         
         "dataset_id": 2,
         "normalize_inputs": False,
-        "transformation_exponent": 1,
+        "transformation_exponent": 1/3,
         
         "train": True,
         "test": True,
