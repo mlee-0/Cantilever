@@ -573,3 +573,22 @@ if __name__ == "__main__":
     }
 
     results = main(**kwargs)
+
+"""
+Test Results
+Keep transformation exponent fixed at 1/4; try scaling labels to different ranges to see if performance affected
+Hypothesis: scaling to [0, 1] is worse because much of values are small, and rounding errors (using float32 not float64)
+
+1/4 scaled to [0, 1]:  14.0% (10 epochs, 1e-1), 13.106% (11 epochs, 1e-1), 12.8% (10 epochs, 2e-2 (largest lr that doesn't have nan))
+
+1/4 scaled to [0, 10]: 10.451% and 8.261% (10 epochs, 1e-2), 8.662 (11 epochs, 2e-2)
+1/4 scaled to [0, 50]: 6.6% (10 epochs), 5.985 (10 epochs, 1e-2)
+1/4 scaled to [0, 100]: 6.105% (10 epochs, 1e-3)
+1/4 scaled to [0, 1000]: 6.759% (10 epochs, 1e-4)
+1/4 scaled to [0, 10,000]: 6.918% (10 epochs, 1e-5), 11.675% (10 eopchs, 1e-6) - likely a fluctuation
+1/4 scaled to original range: 9.836% (10 epochs, 1e-5), 14.658% (10 epochs, 1e-5), 8.901% (10 epochs, 1e-6)
+
+Testing format of input images; tested with Adam instead of SGD:
+- Use 3 channels, 3rd channel contains single pixel with value of 1 indicating location of load: 4.868
+- Use 2 channels, 1st channel contains shape of beam (all 1s) but with a single pixel with value of 2 indicating location of load: 4.567% MRE
+"""

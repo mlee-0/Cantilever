@@ -126,14 +126,18 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         pixel_height = int(samples[KEY_NODES_HEIGHT][i])
         pixel_width = int(samples[KEY_NODES_WIDTH][i])
 
-        # Create a channel with a white rectangle representing the length and height of the cantilever.
+        # Create a channel with a rectangle representing the length and height of the cantilever.
         images[i, 0, :pixel_height, :pixel_length] = 1
+        # Add a single pixel representing where the load is.
+        position_x = int(np.round(samples[position.name][i] * samples[KEY_NODES_LENGTH][i]) - 1)
+        position_y = int(samples[KEY_NODES_HEIGHT][i] - 1)
+        images[i, 0, position_y, position_x] = 2
 
-        # Create a channel with a white rectangle representing the height and width of the cantilever.
+        # Create a channel with a rectangle representing the height and width of the cantilever.
         if is_3d:
             images[i, 1, :pixel_height, :pixel_width] = 1
 
-        # Create a channel with a white line representing the XY angle.
+        # Create a channel with a line representing the XY angle.
         r = np.arange(max(h, w))
         x = r * np.cos(samples[angle_1.name][i] * np.pi/180) + w/2
         y = r * np.sin(samples[angle_1.name][i] * np.pi/180) + h/2
@@ -143,7 +147,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
         images[i, 1 if not is_3d else 2, y[inside_image], x[inside_image]] = 1
         images[i, 1 if not is_3d else 2, ...] = np.flipud(images[i, 1 if not is_3d else 2, ...])
         
-        # Create a channel with a white line representing the XZ angle.
+        # Create a channel with a line representing the XZ angle.
         if is_3d:
             r = np.arange(max(h, w))
             x = r * np.cos(samples[angle_2.name][i] * np.pi/180) + w/2
@@ -153,11 +157,6 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
             inside_image = (x >= 0) * (x < w) * (y >= 0) * (y < h)
             images[i, 3, y[inside_image], x[inside_image]] = 1
             images[i, 3, ...] = np.flipud(images[i, 3, ...])
-
-        # Create a channel with a single pixel representing where the load is.
-        position_x = int(np.round(samples[position.name][i] * samples[KEY_NODES_LENGTH][i]) - 1)
-        position_y = int(samples[KEY_NODES_HEIGHT][i] - 1)
-        images[i, 2 if not is_3d else 4, position_y, position_x] = 1
 
     time_end = time.time()
     print(f"Generated {images.shape[0]:,} input images in {time_end - time_start:.2f} seconds.")
