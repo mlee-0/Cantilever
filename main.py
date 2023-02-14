@@ -549,6 +549,15 @@ def main(
 
 
 if __name__ == "__main__":
+    # Define a weighted loss function, where the highest label value has a weight of 2 and the lowest label value (0) has a weight of 1 (unchanged).
+    class WeightedMSE(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+
+        def forward(self, inputs, labels):
+            weights = (labels / 57950.0) * 3 + 1  # Denominator is hard-coded based on the dataset
+            return torch.mean(((labels - inputs)**2) ** weights)
+
     kwargs = {
         "filename_model": "model.pth",
         "train_existing": not True,
@@ -561,7 +570,7 @@ if __name__ == "__main__":
         "dataset_split": (0.8, 0.1, 0.1),
         "Model": Nie,
         "Optimizer": torch.optim.Adam,
-        "Loss": nn.MSELoss,
+        "Loss": WeightedMSE,# nn.MSELoss,
         
         "dataset_id": 2,
         "normalize_inputs": False,
@@ -591,4 +600,10 @@ Hypothesis: scaling to [0, 1] is worse because much of values are small, and rou
 Testing format of input images; tested with Adam instead of SGD:
 - Use 3 channels, 3rd channel contains single pixel with value of 1 indicating location of load: 4.868
 - Use 2 channels, 1st channel contains shape of beam (all 1s) but with a single pixel with value of 2 indicating location of load: 4.567% MRE
+
+Testing weighted loss, with Adam and 2 channels in input:
+- Weighted MSE (weights in [1, 2], multiplied to loss): 4.631% MRE (10 epochs, 1e-3)
+- Weighted MSE (weights in [1, 2], loss exponentiated with these): 4.920% MRE (10 epochs, 1e-3)
+- Weighted MSE (weights in [1, 3], loss exponentiated with these): 4.757% MRE (10 epochs, 1e-3)
+- Weighted MSE (weights in [1, 4], loss exponentiated with these): 5.807% MRE (10 epochs, 1e-3)
 """
