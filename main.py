@@ -528,16 +528,22 @@ def main(
         outputs = dataset.untransform(outputs)
         labels = dataset.untransform(labels)
 
-        # Show an output and corresponding label.
+        # Show corresponding inputs, outputs, labels.
         for _ in range(5):
             i = random.choice(range(len(test_dataset)))
+            label, output = labels[i, 0, ...], outputs[i, 0, ...]
+            maximum = torch.max(label.max(), output.max())
             plt.figure()
-            plt.subplot(1, 2, 1)
-            plt.imshow(labels[i, 0, ...])
-            plt.title(f'True (max {labels[i].max()})')
-            plt.subplot(1, 2, 2)
-            plt.imshow(outputs[i, 0, ...])
-            plt.title(f'Predicted (max {outputs[i].max()})')
+            plt.subplot(1, 4, 1)
+            plt.imshow(inputs[i, 0, ...], cmap='gray')
+            plt.subplot(1, 4, 2)
+            plt.imshow(inputs[i, 1, ...], cmap='gray')
+            plt.subplot(1, 4, 3)
+            plt.imshow(maximum - label, cmap='Spectral', vmin=0, vmax=maximum)
+            plt.title(f'True (max {labels[i].max():.1f})')
+            plt.subplot(1, 4, 4)
+            plt.imshow(maximum - output, cmap='Spectral', vmin=0, vmax=maximum)
+            plt.title(f'Predicted (max {outputs[i].max():.1f})')
             plt.show()
 
         if evaluate:
@@ -549,32 +555,23 @@ def main(
 
 
 if __name__ == "__main__":
-    # Define a weighted loss function, where the highest label value has a weight of 2 and the lowest label value (0) has a weight of 1 (unchanged).
-    class WeightedMSE(torch.nn.Module):
-        def __init__(self) -> None:
-            super().__init__()
-
-        def forward(self, inputs, labels):
-            weights = (labels / 57950.0) * 3 + 1  # Denominator is hard-coded based on the dataset
-            return torch.mean(((labels - inputs)**2) ** weights)
-
     kwargs = {
         "filename_model": "model.pth",
-        "train_existing": not True,
+        "train_existing": True,
         "save_model_every": 1,
 
         "epoch_count": 10,
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-5,  # Nominal tested to be 1e-3 for labels in [0, 100]
         "decay_learning_rate": not True,
         "batch_sizes": (16, 128, 128),
         "dataset_split": (0.8, 0.1, 0.1),
         "Model": Nie,
         "Optimizer": torch.optim.Adam,
-        "Loss": WeightedMSE,# nn.MSELoss,
+        "Loss": nn.MSELoss,
         
         "dataset_id": 2,
         "normalize_inputs": False,
-        "transformation_exponent": 1/3,
+        "transformation_exponent": 1/5,
         
         "train": True,
         "test": True,
@@ -606,4 +603,27 @@ Testing weighted loss, with Adam and 2 channels in input:
 - Weighted MSE (weights in [1, 2], loss exponentiated with these): 4.920% MRE (10 epochs, 1e-3)
 - Weighted MSE (weights in [1, 3], loss exponentiated with these): 4.757% MRE (10 epochs, 1e-3)
 - Weighted MSE (weights in [1, 4], loss exponentiated with these): 5.807% MRE (10 epochs, 1e-3)
+
+Testing normalizing inputs (zero mean, unit variance), with Adam and 2 channels in input: 5.306% MRE
+Testing scaling inputs to [0, 1], with Adam and 2 channels in input: 4.886% MRE (10 epochs)
+Testing scaling inputs to [0, 100], with Adam and 2 channels in input: 5.560% MRE (11 epochs)
+Testing scaling inputs to [0, 255], with Adam and 2 channels in input: 5.745% MRE (10 epochs; validation reached 4.9%)
+
+Testing network architectures without SE blocks, transformation exponent 1/3, with Adam, 2-channel input (not normalized or scaled), MSE loss, 10 epochs:
+- Original Nie (res + SE): 5.997% MRE
+- Residual only (no SE): 4.615% MRE
+- Residual only (no SE), conv_1 and deconv_3 kernel size 3 instead of 9: 7.404% MRE (reached 4.7% validation)
+    - change 1st BN in residual block to come before 1st relu: 4.415% MRE (reached 3.9% validation)
+- Residual only (no SE), change 1st BN in residual block to come before 1st relu (1st conv kernel size 9): 4.466%
+- Residual only (no SE), bottleneck residual block, nf = 16 (same as all of above): 7.849% (likely too few channels)
+- Residual only (no SE), bottleneck residual block, nf = 32: 5.219%
+- 7 residual blocks (no SE), regular residual block, nf = 16: 6.264%
+
+Testing transformation exponent, with residual only (no SE), nf=16, Adam, 2-channel input (not normalized or scaled), MSE loss, 10 epochs:
+- 1/2: 6.609%, 9.039% (reached 6.0%)
+- 1/3: 6.087%, 6.089% (11 epochs)
+- 1/4: 4.927%, 5.426% (reached 4.7%), 5.556% = 5.303% mean
+- 1/5: 4.455%, 5.988%, 5.450% = 5.298% mean
+    - 1/5, initial/final kernel size 3 instead of 9: 4.369%
+- 1/6: 5.600%, 5.988% (reached 4.910%), 6.336% (reached 5.6%) = 5.975% mean
 """

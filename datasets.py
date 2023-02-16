@@ -48,13 +48,13 @@ class CantileverDataset(Dataset):
             self.inputs -= self.inputs.mean()
             self.inputs /= self.inputs.std()
 
-        # Visualize input and label data.
+        # # Visualize input and label data.
         # import random
         # plt.figure()
-        # for i in random.sample(range(1000), k=3):
+        # for i in random.sample(range(self.inputs.size(0)), k=3):
         #     for channel in range(self.inputs.size(1)):
-        #         plt.subplot(1, 3, channel+1)
-        #         plt.imshow(self.inputs[i, channel, ...])
+        #         plt.subplot(1, self.inputs.size(1), channel+1)
+        #         plt.imshow(self.inputs[i, channel, ...], cmap='gray', vmin=0, vmax=self.inputs.max())
         #     plt.show()
         # plt.figure()
         # import random
