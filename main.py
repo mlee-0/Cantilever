@@ -557,11 +557,11 @@ def main(
 if __name__ == "__main__":
     kwargs = {
         "filename_model": "model.pth",
-        "train_existing": True,
+        "train_existing": not True,
         "save_model_every": 1,
 
-        "epoch_count": 10,
-        "learning_rate": 1e-5,  # Nominal tested to be 1e-3 for labels in [0, 100]
+        "epoch_count": 5,
+        "learning_rate": 1e-3,  # Nominal tested to be 1e-3 for labels in [0, 100]
         "decay_learning_rate": not True,
         "batch_sizes": (16, 128, 128),
         "dataset_split": (0.8, 0.1, 0.1),
@@ -626,4 +626,9 @@ Testing transformation exponent, with residual only (no SE), nf=16, Adam, 2-chan
 - 1/5: 4.455%, 5.988%, 5.450% = 5.298% mean
     - 1/5, initial/final kernel size 3 instead of 9: 4.369%
 - 1/6: 5.600%, 5.988% (reached 4.910%), 6.336% (reached 5.6%) = 5.975% mean
+
+Testing missing ReLU after Res-SE blocks:
+- Fixed (x = torch.relu(x + residual * se.reshape((batch_size, -1, 1, 1)))): 5.844% MRE
+- Originally coded (no relu): 5.667% MRE
+- No SE blocks at all: 5.235% MRE
 """
