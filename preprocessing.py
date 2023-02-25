@@ -153,52 +153,6 @@ def untransform_uniform_bins(data, bin_edges, normalized_bin_edges) -> np.ndarra
     
     return untransformed
 
-def optimize_transformation_exponent(data: np.ndarray, initial_guess: float, bounds: Tuple[float, float] = None) -> float:
-    """
-    Return the exponent that transforms the given data to a new distribution that most closely matches a target distribution. The target distribution is calculated as the histogram of the given data in which each individual sample is normalized to [0, 1].
-
-    Parameters:
-    `data`: Multidimensional array of values to be transformed according to: data ^ exponent. The first dimension must be the sample dimension, along which all samples in the dataset are located.
-    `initial_guess`: Initial value for the exponent that optimization starts from.
-    `bounds`: A tuple of (low, high) values that define a range in which to search for exponent values.
-    """
-
-    from scipy import optimize
-
-    BINS = 100
-
-    # Calculate the target distribution.
-    data_normalized = data / data.max(axis=tuple(range(1, data.ndim)), keepdims=True)
-    pdf_target, _ = np.histogram(data_normalized, bins=BINS)
-    # pdf_target = pdf_target / data_normalized.size
-
-    # Objective function to minimize. Returns the difference between two PDFs.
-    def f(exponent):
-        # Transform the data.
-        transformed = data ** exponent
-
-        # Calculate the PDF of the transformed values.
-        pdf, _ = np.histogram(transformed, bins=BINS)
-        # pdf = pdf / transformed.size
-
-        # Calculate the sum of the differences between frequencies in the two PDFs.
-        difference = np.sum(np.abs(pdf - pdf_target))
-
-        return difference
-
-    result = optimize.minimize_scalar(f, bounds=bounds, method="bounded")
-    exponent = result.x
-    print(f"Found optimum exponent {exponent}.")
-
-    plt.figure()
-    plt.hist(data_normalized[data_normalized > 0].flatten(), bins=BINS, alpha=0.5, label='Target')
-    transformed = (data/data.max()) ** exponent
-    plt.hist(transformed[transformed > 0].flatten() / transformed.max(), bins=BINS, alpha=0.5, label=f'{exponent}')
-    plt.legend()
-    plt.show()
-
-    return exponent
-
 def write_samples(samples: pd.DataFrame, filename: str, mode: str = 'w') -> None:
     """
     Write the specified sample values to a file.
