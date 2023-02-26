@@ -44,10 +44,12 @@ def maximum_value(predicted: np.ndarray, true: np.ndarray, plot=False) -> Tuple[
 
     if plot:
         plt.figure()
-        plt.bar(range(len(max_true)), max_true, width=1.0, color=Colors.RED, label="True")
-        plt.bar(range(len(max_predicted)), max_predicted, width=0.5, color=Colors.BLUE_DARK, label="Predicted")
+        plt.bar(range(len(max_true)), max_true, color=[0.75]*3, alpha=1.0, width=1.0, label="True")
+        plt.bar(range(len(max_predicted)), max_predicted, alpha=0.5, width=1.0, label="Predicted")
+        plt.xticks([])
+        plt.ylabel('Stress [Pa]')
         plt.legend()
-        plt.title("Maximum Value")
+        plt.title("Maxima")
         plt.show()
     
     return max_predicted, max_true
@@ -78,3 +80,8 @@ def mean_relative_error(predicted: np.ndarray, true: np.ndarray) -> float:
     # Smoothing term to avoid division by zero.
     EPSILON = 0.01
     return np.mean(np.abs(predicted - true) / (EPSILON + np.maximum(predicted, true))) * 100
+
+def get_maxima_indices(data: np.ndarray) -> np.ndarray:
+    """Return a Boolean array containing the locations of the maxima for each data, assuming the data dimension is the first dimension."""
+    maxima = data.max(axis=tuple(range(1, data.ndim)), keepdims=True)
+    return data == maxima

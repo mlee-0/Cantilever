@@ -276,6 +276,8 @@ def test_regression(
 def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_gui: dict=None):
     """Calculate and return evaluation metrics."""
 
+    maxima = metrics.get_maxima_indices(labels)
+
     results = {
         "ME": metrics.mean_error(outputs, labels),
         "MAE": metrics.mean_absolute_error(outputs, labels),
@@ -285,11 +287,20 @@ def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_g
         "NMSE": metrics.normalized_mean_squared_error(outputs, labels),
         "NRMSE": metrics.normalized_root_mean_squared_error(outputs, labels),
         "MRE": metrics.mean_relative_error(outputs, labels),
+
+        "Maxima ME": metrics.mean_error(outputs[maxima], labels[maxima]),
+        "Maxima MAE": metrics.mean_absolute_error(outputs[maxima], labels[maxima]),
+        "Maxima MSE": metrics.mean_squared_error(outputs[maxima], labels[maxima]),
+        "Maxima RMSE": metrics.root_mean_squared_error(outputs[maxima], labels[maxima]),
+        "Maxima NMAE": metrics.normalized_mean_absolute_error(outputs[maxima], labels[maxima]),
+        "Maxima NMSE": metrics.normalized_mean_squared_error(outputs[maxima], labels[maxima]),
+        "Maxima NRMSE": metrics.normalized_root_mean_squared_error(outputs[maxima], labels[maxima]),
+        "Maxima MRE": metrics.mean_relative_error(outputs[maxima], labels[maxima]),
     }
     for metric, value in results.items():
         print(f"{metric}: {value:,.3f}")
 
-    # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
+    max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
     # Initialize values to send to the GUI.
     if queue:
