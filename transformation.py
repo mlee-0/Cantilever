@@ -23,22 +23,29 @@ def cost_statistical_moments(exponent: float, data: np.ndarray, target_moments: 
 def cost_histogram_mae(exponent: float, data: np.ndarray, target_histogram: np.ndarray):
     """MAE of the corresponding bins."""
     transformed = data ** exponent
-    histogram, _ = np.histogram(transformed, bins=bins)
+    histogram, _ = np.histogram(transformed, bins=target_histogram.size)
     mae = np.mean(np.abs(histogram - target_histogram))
     return mae
 
 def cost_histogram_mse(exponent: float, data: np.ndarray, target_histogram: np.ndarray):
     """MAE of the corresponding bins."""
     transformed = data ** exponent
-    histogram, _ = np.histogram(transformed, bins=bins)
+    histogram, _ = np.histogram(transformed, bins=target_histogram.size)
     mae = np.mean((histogram - target_histogram) ** 2)
     return mae
+
+def cost_kl_divergence(exponent: float, data: np.ndarray, target_histogram: np.ndarray):
+    """KL-diverence of PDFs."""
+    transformed = data ** exponent
+    histogram, _ = np.histogram(transformed, bins=target_histogram.size)
+    divergence = stats.entropy(histogram, target_histogram)
+    return divergence
 
 
 if __name__ == '__main__':
     bins = 100
     initial_guess = 1/2
-    objective = cost_histogram_mse
+    objective = cost_statistical_moments
 
     data = read_pickle('Labels 2D/labels.pickle')
     # Calculate the target distribution as the histogram of the given data in which each individual sample is normalized to [0, 1].
@@ -48,16 +55,17 @@ if __name__ == '__main__':
 
     if objective is cost_statistical_moments:
         args = (data, target_moments)
-    elif objective in [cost_histogram_mae, cost_histogram_mse]:
+    elif objective in [cost_histogram_mae, cost_histogram_mse, cost_kl_divergence]:
         args = (data, target_histogram)
 
     result = optimize.minimize_scalar(objective, bounds=(0, 1), method="bounded", args=args)
     exponent = result.x
     print(f"Optimum exponent: {exponent:.2f} = 1/{1/exponent:.2f}")
 
-    plt.figure()
+    plt.figure(figsize=(4, 3))
     plt.hist(data_normalized[data_normalized > 0].flatten(), bins=bins, alpha=0.5, label='Target')
     transformed = (data/data.max()) ** exponent
-    plt.hist(transformed[transformed > 0].flatten() / transformed.max(), bins=bins, alpha=0.5, label=f'{exponent}')
+    plt.hist(transformed[transformed > 0].flatten() / transformed.max(), bins=bins, alpha=0.5, label=f'1/{1/exponent:.2f}')
+    plt.yticks([])
     plt.legend()
     plt.show()
