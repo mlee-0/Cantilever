@@ -13,23 +13,35 @@ import scipy as sp
 from helpers import *
 
 
-def generate_samples(start: int = 1) -> pd.DataFrame:
+def generate_samples(start: int = 1, is_3d: bool=False) -> pd.DataFrame:
     """Generate sample values for each parameter and return them as a DataFrame. Specify the starting sample number if generating samples to add to an existing dataset."""
 
     assert start != 0, f"The starting sample number {start} should be a positive integer."
 
     # Generate sample values for each parameter.
     samples = {}
-    data = np.meshgrid(*[np.arange(p.low, p.high + (p.step/2), p.step).round(p.precision) for p in [load, angle_1, length, height, position]])
-    number_samples = data[0].size
-    samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
-    samples[load.name] = data[0].flatten()
-    samples[angle_1.name] = data[1].flatten()
-    samples[angle_2.name] = np.zeros(number_samples)
-    samples[length.name] = data[2].flatten()
-    samples[height.name] = data[3].flatten()
-    samples[width.name] = np.zeros(number_samples)
-    samples[position.name] = data[4].flatten()
+    if not is_3d:
+        data = np.meshgrid(*[np.arange(p.low, p.high + (p.step/2), p.step).round(p.precision) for p in [load, angle_1, length, height, position]])
+        number_samples = data[0].size
+        samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
+        samples[load.name] = data[0].flatten()
+        samples[angle_1.name] = data[1].flatten()
+        samples[angle_2.name] = np.zeros(number_samples)
+        samples[length.name] = data[2].flatten()
+        samples[height.name] = data[3].flatten()
+        samples[width.name] = np.zeros(number_samples)
+        samples[position.name] = data[4].flatten()
+    else:
+        data = np.meshgrid(*[np.arange(p.low, p.high + (p.step/2), p.step).round(p.precision) for p in [load, angle_1, angle_2, length, height, width, position]])
+        number_samples = data[0].size
+        samples[KEY_SAMPLE_NUMBER] = range(start, start+number_samples)
+        samples[load.name] = data[0].flatten()
+        samples[angle_1.name] = data[1].flatten()
+        samples[angle_2.name] = data[2].flatten()
+        samples[length.name] = data[3].flatten()
+        samples[height.name] = data[4].flatten()
+        samples[width.name] = data[5].flatten()
+        samples[position.name] = data[6].flatten()
 
     # Calculate the number of nodes in each direction.
     samples[KEY_NODES_LENGTH] = np.round(NODES_X * (samples[length.name] / length.high))
@@ -220,6 +232,8 @@ if __name__ == "__main__":
     START_SAMPLE_NUMBER = 1
     # Specify "w" (write) to create a new dataset, or specify "a" (append) to add new data to the existing dataset.
     WRITE_MODE = "w"
+    # 2D (False) or 3D (True) dataset.
+    is_3d = False
 
     filename_sample = "samples.csv"
     filename_ansys = "ansys_script.lgw"

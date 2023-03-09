@@ -41,7 +41,6 @@ def cost_kl_divergence(exponent: float, data: np.ndarray, target_histogram: np.n
     divergence = stats.entropy(histogram, target_histogram)
     return divergence
 
-
 if __name__ == '__main__':
     bins = 100
     initial_guess = 1/2
