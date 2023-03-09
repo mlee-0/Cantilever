@@ -295,7 +295,7 @@ def plot_loss(figure: matplotlib.figure.Figure, epochs: list, loss: List[list], 
         if not len(loss_i):
             continue
         color = colors[i % len(colors)]
-        axis.plot(epochs[:len(loss_i)], loss_i, ".-", color=color, label=labels[i])
+        axis.semilogy(epochs[:len(loss_i)], loss_i, ".-", color=color, label=labels[i])
         axis.annotate(f"{loss_i[-1]:,.2f}", (epochs[-1 - (len(epochs)-len(loss_i))], loss_i[-1]), color=color, fontsize=10)
     
     # Plot a vertical line indicating when the current training session began.
@@ -303,7 +303,6 @@ def plot_loss(figure: matplotlib.figure.Figure, epochs: list, loss: List[list], 
         axis.vlines(start_epoch - 0.5, 0, max([max(_) for _ in loss]), colors=(Colors.GRAY,), label="Current session starts")
     
     axis.legend()
-    axis.set_ylim(bottom=0)
     axis.set_xlabel("Epochs")
     axis.set_ylabel("Loss")
     axis.grid(axis="y")
