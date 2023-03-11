@@ -299,11 +299,10 @@ def plot_lt_logarithms_functions():
 
 def plot_lt_metrics_exponentiation():
     """Evaluation metrics for models trained with different transformation exponents."""
-    denominators = np.arange(1.00, 4.01, 0.25)
+    denominators = np.arange(1.25, 4.01, 0.25)
 
     def _results():
         return np.array([
-            [-14.172823, 26.664255, 6433.2803, 80.20773, 0.05851412, 0.030980959739528607, 0.1760141, 1427.5680541992188, -210.35655, 326.40854, 208159.39, 456.24487, 0.040336978, 0.003178920740372834, 0.05638192, 4.810509085655212],
             [4.60984, 20.740469, 5251.4233, 72.466705, 0.0455145, 0.02528945575867015, 0.1590266, 397.6400136947632, 7.3831654, 272.31485, 138784.64, 372.53812, 0.03365218, 0.0021194593777553853, 0.04603759, 3.94560769200325],
             [0.032291014, 18.51287, 5554.6357, 74.52943, 0.04062609, 0.026749649491570528, 0.1635532, 98.50154519081116, -95.56946, 367.6348, 281610.88, 530.6702, 0.045431644, 0.004300640238060562, 0.065579265, 5.399021133780479],
             [-1.7691576, 20.721878, 5505.4775, 74.198906, 0.045473717, 0.026512927303431896, 0.16282791, 61.136698722839355, -56.847607, 331.50977, 205032.03, 452.80463, 0.04096738, 0.003131161052232236, 0.055956777, 4.9522023648023605],
@@ -319,6 +318,7 @@ def plot_lt_metrics_exponentiation():
         ])
 
     results = _results()
+    result_baseline = [-14.172823, 26.664255, 6433.2803, 80.20773, 0.05851412, 0.030980959739528607, 0.1760141, 1427.5680541992188, -210.35655, 326.40854, 208159.39, 456.24487, 0.040336978, 0.003178920740372834, 0.05638192, 4.810509085655212]
 
     me = results[:, 0]
     mae = results[:, 1]
@@ -337,44 +337,59 @@ def plot_lt_metrics_exponentiation():
     maxima_nrmse = results[:, 6+8]
     maxima_mre = results[:, 7+8]
 
-    labels = [f"1/{denominator}" for denominator in denominators]
     plt.figure()
+    labels = [f"1/{denominator}" for denominator in denominators]
+
     plt.subplot(2, 2, 1)
     plt.plot(denominators, mae, '.-')
+    plt.axhline(result_baseline[1], linestyle='--', color=[0.5]*3, label='No transformation')
     plt.xticks(ticks=denominators, labels=labels, rotation=90)
+    plt.legend()
     plt.title('MAE')
+
     plt.subplot(2, 2, 2)
-    plt.plot(denominators, mse, '.-')
-    plt.xticks(ticks=denominators, labels=labels, rotation=90)
-    plt.title('MSE')
-    plt.subplot(2, 2, 3)
-    plt.plot(denominators, rmse, '.-')
-    plt.xticks(ticks=denominators, labels=labels, rotation=90)
-    plt.title('RMSE')
-    plt.subplot(2, 2, 4)
     plt.semilogy(denominators, mre, '.-')
+    plt.axhline(result_baseline[7], linestyle='--', color=[0.5]*3, label='No transformation')
     plt.xticks(ticks=denominators, labels=labels, rotation=90)
+    plt.legend()
     plt.title('MRE')
+
+    plt.subplot(2, 2, 3)
+    plt.plot(denominators, mse, '.-')
+    plt.axhline(result_baseline[2], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=denominators, labels=labels, rotation=90)
+    plt.legend()
+    plt.title('MSE')
+
+    plt.subplot(2, 2, 4)
+    plt.plot(denominators, rmse, '.-')
+    plt.axhline(result_baseline[3], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=denominators, labels=labels, rotation=90)
+    plt.legend()
+    plt.title('RMSE')
+
+    plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.4)
     plt.show()
 
 def plot_lt_metrics_logarithm():
     """Evaluation metrics for models trained with different transformation logarithms."""
-    size = [0.5, 1]
-    x_1 = [1e-2, 0.1, 0.5, 1.0]
+    size = 1
+    x1 = [1e-10, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1.0]
 
     def _results():
         return np.array([
-            [-25.909452, 31.70677, 24274.783, 155.80367, 0.06957981, 0.11690090445277997, 0.34190774, 286.30990982055664, -446.5486, 611.2797, 895812.4, 946.47363, 0.076921865, 0.01418523959327339, 0.1191018, 7.417932152748108],
-            [-9.971659, 25.07012, 9697.933, 98.47808, 0.055015903, 0.046702791194708215, 0.21610828, 962.7808570861816, -264.52115, 388.84775, 376059.62, 613.237, 0.0489316, 0.005954925418374069, 0.07716816, 5.185775458812714],
-            [6.571792, 30.303213, 9377.879, 96.83945, 0.06649973, 0.04516136037727199, 0.21251202, 1835.4372024536133, -169.67236, 360.88824, 277625.34, 526.9017, 0.045413245, 0.0043962130108535676, 0.066303946, 5.172388255596161],
-            [-10.520536, 28.46741, 6201.72, 78.751, 0.062471077, 0.029865808336069468, 0.17281726, 2976.873016357422, -124.54792, 288.80194, 166407.17, 407.93036, 0.03634209, 0.0026350669726859935, 0.051332906, 4.436640068888664],
-            [-2.1913984, 31.808561, 27684.307, 166.38602, 0.06980319, 0.133320263186554, 0.36513048, 301.25558376312256, -441.36874, 750.15967, 1359901.5, 1166.1482, 0.094398156, 0.021534117119951453, 0.14674509, 9.652598202228546],
-            [1.0918914, 27.39456, 8335.709, 91.3001, 0.060116805, 0.04014261825032946, 0.20035623, 1426.124095916748, -460.6867, 516.3282, 540647.75, 735.28754, 0.06497341, 0.008561187680974124, 0.09252669, 6.971164047718048],
-            [-16.57666, 30.9987, 18189.473, 134.86835, 0.06802596, 0.0875956426728829, 0.2959656, 1016.8990135192871, -230.46414, 403.5637, 514281.72, 717.1344, 0.050783414, 0.008143680085809474, 0.09024234, 4.912705719470978],
-            [-16.004984, 30.58923, 7240.871, 85.09331, 0.067127384, 0.034870096786256, 0.18673536, 1608.900260925293, -228.02551, 329.22263, 193880.89, 440.3191, 0.041428525, 0.0030701148620243804, 0.05540862, 5.054793134331703],
+            [-46.61707, 81.62808, 104194.875, 322.7923, 0.17913103, 0.5017747591591175, 0.7083606, 8.379248529672623, -1134.9989, 1603.0781, 4845543.0, 2201.2595, 0.20172721, 0.0767294472958232, 0.2770008, 21.441812813282013],
+            [-30.642654, 43.472458, 48549.98, 220.3406, 0.09539936, 0.2338038029205155, 0.48353264, 4.73240464925766, -1127.0745, 1166.425, 2524188.0, 1588.7693, 0.14677992, 0.03997065965790612, 0.19992663, 15.237011015415192],
+            [-2.4943182, 27.800255, 17629.07, 132.7745, 0.06100704, 0.08489689464517118, 0.29137072, 8.853719383478165, -49.512188, 684.5157, 1080435.1, 1039.4398, 0.08613769, 0.017108751275191174, 0.13080043, 9.44911539554596],
+            [-22.574715, 31.452307, 25291.91, 159.0343, 0.06902139, 0.12179908491191409, 0.34899724, 23.956964910030365, -459.74298, 749.3136, 1341869.0, 1158.3907, 0.094291694, 0.021248571463177397, 0.14576891, 9.128406643867493],
+            [11.316159, 22.93864, 17228.13, 131.25598, 0.050338347, 0.08296609953791545, 0.28803837, 222.18806743621826, 13.44763, 405.512, 490360.97, 700.2578, 0.051028583, 0.007764893657456334, 0.088118635, 5.601198971271515],
+            [-2.624227, 17.21473, 3585.543, 59.879402, 0.037777375, 0.017267047456248998, 0.13140413, 331.00085258483887, -26.609068, 222.3025, 120319.54, 346.87106, 0.027973974, 0.001905266702029852, 0.04364936, 3.09450663626194],
+            [-7.626922, 25.303167, 6272.219, 79.19734, 0.05552724, 0.030205332806813555, 0.17379682, 3048.2200622558594, -147.8363, 318.08496, 327443.6, 572.22687, 0.040026993, 0.005185087815544217, 0.07200755, 4.281115159392357],
+            [3.5159266, 23.52587, 5087.252, 71.324974, 0.051626995, 0.024498843534813984, 0.15652107, 829.193115234375, 11.684146, 253.77457, 128860.09, 358.9709, 0.031934336, 0.0020405068682551085, 0.045171972, 3.6780644208192825],
         ])
 
     results = _results()
+    result_baseline = [-14.172823, 26.664255, 6433.2803, 80.20773, 0.05851412, 0.030980959739528607, 0.1760141, 1427.5680541992188, -210.35655, 326.40854, 208159.39, 456.24487, 0.040336978, 0.003178920740372834, 0.05638192, 4.810509085655212]
 
     me = results[:, 0]
     mae = results[:, 1]
@@ -392,50 +407,44 @@ def plot_lt_metrics_logarithm():
     maxima_nmse = results[:, 5+8]
     maxima_nrmse = results[:, 6+8]
     maxima_mre = results[:, 7+8]
-    print(mse)
 
     plt.figure()
+    labels = [str(_) for _ in x1]
 
     plt.subplot(2, 2, 1)
-    plt.imshow(mae.reshape((len(size), len(x_1))), cmap='Reds')
-    plt.colorbar()
-    plt.xticks(ticks=range(len(x_1)), labels=x_1)
-    plt.yticks(ticks=range(len(size)), labels=size)
-    plt.xlabel('Size')
-    plt.ylabel('x_1')
+    plt.plot(mae, '.-')
+    plt.axhline(result_baseline[1], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=range(len(x1)), labels=labels, rotation=90)
+    plt.legend()
     plt.title('MAE')
 
     plt.subplot(2, 2, 2)
-    plt.imshow(mse.reshape((len(size), len(x_1))), cmap='Reds')
-    plt.colorbar()
-    plt.xticks(ticks=range(len(x_1)), labels=x_1)
-    plt.yticks(ticks=range(len(size)), labels=size)
-    plt.xlabel('Size')
-    plt.ylabel('x_1')
-    plt.title('MSE')
-
-    plt.subplot(2, 2, 3)
-    plt.imshow(rmse.reshape((len(size), len(x_1))), cmap='Reds')
-    plt.colorbar()
-    plt.xticks(ticks=range(len(x_1)), labels=x_1)
-    plt.yticks(ticks=range(len(size)), labels=size)
-    plt.xlabel('Size')
-    plt.ylabel('x_1')
-    plt.title('RMSE')
-
-    plt.subplot(2, 2, 4)
-    plt.imshow(mre.reshape((len(size), len(x_1))), cmap='Reds')
-    plt.colorbar()
-    plt.xticks(ticks=range(len(x_1)), labels=x_1)
-    plt.yticks(ticks=range(len(size)), labels=size)
-    plt.xlabel('Size')
-    plt.ylabel('x_1')
+    plt.semilogy(mre, '.-')
+    plt.axhline(result_baseline[7], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=range(len(x1)), labels=labels, rotation=90)
+    plt.legend()
     plt.title('MRE')
 
+    plt.subplot(2, 2, 3)
+    plt.semilogy(mse, '.-')
+    plt.axhline(result_baseline[2], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=range(len(x1)), labels=labels, rotation=90)
+    plt.legend()
+    plt.title('MSE')
+
+    plt.subplot(2, 2, 4)
+    plt.semilogy(rmse, '.-')
+    plt.axhline(result_baseline[3], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.xticks(ticks=range(len(x1)), labels=labels, rotation=90)
+    plt.legend()
+    plt.title('RMSE')
+
+    plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.4)
     plt.show()
 
 
 if __name__ == '__main__':
-    # plot_page_progress(current=39, previous=33, goal_1=120, goal_2=150)
+    # plot_page_progress(current=38, previous=33, goal_1=120, goal_2=150)
 
-    plot_lt_logarithms_histogram()
+    plot_lt_metrics_exponentiation()
+    plot_lt_metrics_logarithm()
