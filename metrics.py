@@ -79,7 +79,7 @@ def mean_relative_error(predicted: np.ndarray, true: np.ndarray) -> float:
     """Return the mean relative error as a percentage."""
     # Smoothing term to avoid division by zero.
     EPSILON = 0.01
-    return np.mean(np.abs(predicted - true) / (EPSILON + np.maximum(predicted, true))) * 100
+    return np.mean(np.abs(predicted - true) / (EPSILON + true)) * 100
 
 def get_maxima_indices(data: np.ndarray) -> np.ndarray:
     """Return a Boolean array containing the locations of the maxima for each data, assuming the data dimension is the first dimension."""

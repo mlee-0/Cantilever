@@ -276,7 +276,8 @@ def test_regression(
 def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_gui: dict=None):
     """Calculate and return evaluation metrics."""
 
-    maxima = metrics.get_maxima_indices(labels)
+    outputs_maxima = np.max(outputs, axis=tuple(range(1, outputs.ndim)))
+    labels_maxima = np.max(labels, axis=tuple(range(1, labels.ndim)))
 
     results = {
         "ME": metrics.mean_error(outputs, labels),
@@ -288,19 +289,26 @@ def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_g
         "NRMSE": metrics.normalized_root_mean_squared_error(outputs, labels),
         "MRE": metrics.mean_relative_error(outputs, labels),
 
-        "Maxima ME": metrics.mean_error(outputs[maxima], labels[maxima]),
-        "Maxima MAE": metrics.mean_absolute_error(outputs[maxima], labels[maxima]),
-        "Maxima MSE": metrics.mean_squared_error(outputs[maxima], labels[maxima]),
-        "Maxima RMSE": metrics.root_mean_squared_error(outputs[maxima], labels[maxima]),
-        "Maxima NMAE": metrics.normalized_mean_absolute_error(outputs[maxima], labels[maxima]),
-        "Maxima NMSE": metrics.normalized_mean_squared_error(outputs[maxima], labels[maxima]),
-        "Maxima NRMSE": metrics.normalized_root_mean_squared_error(outputs[maxima], labels[maxima]),
-        "Maxima MRE": metrics.mean_relative_error(outputs[maxima], labels[maxima]),
+        "Maxima ME": metrics.mean_error(outputs_maxima, labels_maxima),
+        "Maxima MAE": metrics.mean_absolute_error(outputs_maxima, labels_maxima),
+        "Maxima MSE": metrics.mean_squared_error(outputs_maxima, labels_maxima),
+        "Maxima RMSE": metrics.root_mean_squared_error(outputs_maxima, labels_maxima),
+        "Maxima NMAE": metrics.normalized_mean_absolute_error(outputs_maxima, labels_maxima),
+        "Maxima NMSE": metrics.normalized_mean_squared_error(outputs_maxima, labels_maxima),
+        "Maxima NRMSE": metrics.normalized_root_mean_squared_error(outputs_maxima, labels_maxima),
+        "Maxima MRE": metrics.mean_relative_error(outputs_maxima, labels_maxima),
     }
     for metric, value in results.items():
         print(f"{metric}: {value:,.3f}")
 
-    max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
+    # Show a parity plot.
+    plt.plot(labels.flatten(), outputs.flatten(), '.')
+    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'k--')
+    plt.xlabel('True')
+    plt.ylabel('Predicted')
+    plt.show()
+
+    # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
     # Initialize values to send to the GUI.
     if queue:
@@ -418,7 +426,7 @@ def main(
     """
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using {device} device.")
+    print(f"\nUsing {device} device.")
 
     # Initialize values to send to the GUI.
     info_gui = {
@@ -467,7 +475,7 @@ def main(
     test_dataloader = DataLoader(test_dataset, batch_size=batch_sizes[2], shuffle=False)
     print(f"Split {len(samples):,} samples into {len(train_dataset):,} training / {len(validate_dataset):,} validation / {len(test_dataset):,} test.")
 
-    results = []
+    results = None
 
     # Initialize the model, optimizer, and loss function.
     args = {
@@ -558,9 +566,7 @@ def main(
             plt.show()
 
         if evaluate:
-            results.append(
-                evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
-            )
+            results = evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
 
     return results
 

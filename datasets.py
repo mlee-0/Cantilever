@@ -36,8 +36,8 @@ class CantileverDataset(Dataset):
 
         # # Show the histogram of the original data and transformed data, both of which have the same range of values.
         # plt.figure()
-        # plt.hist(self.labels.numpy().flatten(), bins=100, alpha=0.5)
-        # plt.hist(self.labels_transformed.numpy().flatten(), bins=100, alpha=0.5)
+        # plt.hist((self.labels / self.labels.max()).numpy().flatten(), bins=100, alpha=0.5)
+        # plt.hist((self.labels_transformed / self.labels_transformed.max()).numpy().flatten(), bins=100, alpha=0.5)
         # plt.show()
 
         # Create input images.
@@ -80,6 +80,7 @@ class CantileverDataset(Dataset):
         print(f"\tMemory: {self.labels.storage().nbytes()/1e6:,.2f} MB")
         print(f"\tTransformation exponent: {self.transformation_exponent}")
         print(f"\tMin, max: {self.labels_transformed.min()}, {self.labels_transformed.max()}")
+        print(f"\tMean: {self.labels_transformed.mean()}")
         print(f"\tOriginal max: {self.max_value}")
 
     def __len__(self):
