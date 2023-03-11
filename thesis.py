@@ -243,7 +243,7 @@ def plot_lt_powers_functions():
     """Graphs of different exponentiation transformations."""
 
     x = np.linspace(0, 1, 100)
-    plt.plot(x, x, '--', color=[0.5]*3, label='Original')
+    plt.plot(x, x, '--', color=[0.5]*3, label='No transformation')
 
     for power in np.arange(1.25, 4.01, 0.25):
         plt.plot(x, x ** power, label=f'1/{power}')
@@ -258,13 +258,21 @@ def plot_lt_logarithms_histogram():
     data = data[data > 0].flatten()
     data /= data.max()
 
-    for i, base in enumerate([2, np.e, 3, 4, 5, 10]):
-        transformed = np.log(data * 2 + 0.01) / np.log(base)
-        transformed = transformed - transformed.min()
-        transformed = transformed / transformed.max()
-        plt.subplot(3, 4, i+1)
-        plt.hist(data, bins=100, alpha=0.5, label=f'Original')
-        plt.hist(transformed, bins=100, alpha=0.5, label=f'{base}')
+    size = 1
+    x1s = [1.0, 0.5, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-10]
+
+    for i, x1 in enumerate(x1s):
+        transformed = data.copy()
+        transformed -= transformed.min()
+        transformed /= transformed.max()
+        transformed *= size
+        transformed += x1
+        transformed = np.log(transformed)
+        transformed -= transformed.min()
+        transformed /= transformed.max()
+        plt.subplot(2, 4, i+1)
+        plt.hist(data, bins=100, color=[0.5]*3, alpha=0.5, label=f'Original')
+        plt.hist(transformed, bins=100, alpha=0.5, label=f'({x1}, 1+{x1})')
         plt.xticks([])
         plt.yticks([])
         plt.legend()
@@ -274,16 +282,22 @@ def plot_lt_logarithms_histogram():
 def plot_lt_logarithms_functions():
     """Graphs of different logarithm transformations."""
 
-    for i, (x_1, x_2) in enumerate([[0.01, 3], [0.01, 2], [1, 2], [2, 3]]):
-        x = np.linspace(x_1, x_2, 100)
-        plt.subplot(1, 4, i+1)
-        plt.plot(x, x, '--', color=[0.5]*3, label='Original')
-        plt.plot(x, np.log(x), label=f'[{x_1}, {x_2}]')
-    
+    size = 1
+    x1s = [1.0, 0.5, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-10]
+    plt.plot(np.linspace(0, 1, 1000), '--', color=[0.5]*3, label='No transformation')
+    for i, x1 in enumerate(x1s):
+        x = np.linspace(x1, x1+size, 1000)
+        y = np.log(x)
+        y -= y.min()
+        y /= y.max()
+        plt.plot(y, '-', label=f'[{x1}, 1+{x1}]')
+        plt.legend()
+
+    plt.xticks([])
     plt.legend()
     plt.show()
 
-def plot_lt_metrics():
+def plot_lt_metrics_exponentiation():
     """Evaluation metrics for models trained with different transformation exponents."""
     denominators = np.arange(1.00, 4.01, 0.25)
 
@@ -343,8 +357,85 @@ def plot_lt_metrics():
     plt.title('MRE')
     plt.show()
 
+def plot_lt_metrics_logarithm():
+    """Evaluation metrics for models trained with different transformation logarithms."""
+    size = [0.5, 1]
+    x_1 = [1e-2, 0.1, 0.5, 1.0]
+
+    def _results():
+        return np.array([
+            [-25.909452, 31.70677, 24274.783, 155.80367, 0.06957981, 0.11690090445277997, 0.34190774, 286.30990982055664, -446.5486, 611.2797, 895812.4, 946.47363, 0.076921865, 0.01418523959327339, 0.1191018, 7.417932152748108],
+            [-9.971659, 25.07012, 9697.933, 98.47808, 0.055015903, 0.046702791194708215, 0.21610828, 962.7808570861816, -264.52115, 388.84775, 376059.62, 613.237, 0.0489316, 0.005954925418374069, 0.07716816, 5.185775458812714],
+            [6.571792, 30.303213, 9377.879, 96.83945, 0.06649973, 0.04516136037727199, 0.21251202, 1835.4372024536133, -169.67236, 360.88824, 277625.34, 526.9017, 0.045413245, 0.0043962130108535676, 0.066303946, 5.172388255596161],
+            [-10.520536, 28.46741, 6201.72, 78.751, 0.062471077, 0.029865808336069468, 0.17281726, 2976.873016357422, -124.54792, 288.80194, 166407.17, 407.93036, 0.03634209, 0.0026350669726859935, 0.051332906, 4.436640068888664],
+            [-2.1913984, 31.808561, 27684.307, 166.38602, 0.06980319, 0.133320263186554, 0.36513048, 301.25558376312256, -441.36874, 750.15967, 1359901.5, 1166.1482, 0.094398156, 0.021534117119951453, 0.14674509, 9.652598202228546],
+            [1.0918914, 27.39456, 8335.709, 91.3001, 0.060116805, 0.04014261825032946, 0.20035623, 1426.124095916748, -460.6867, 516.3282, 540647.75, 735.28754, 0.06497341, 0.008561187680974124, 0.09252669, 6.971164047718048],
+            [-16.57666, 30.9987, 18189.473, 134.86835, 0.06802596, 0.0875956426728829, 0.2959656, 1016.8990135192871, -230.46414, 403.5637, 514281.72, 717.1344, 0.050783414, 0.008143680085809474, 0.09024234, 4.912705719470978],
+            [-16.004984, 30.58923, 7240.871, 85.09331, 0.067127384, 0.034870096786256, 0.18673536, 1608.900260925293, -228.02551, 329.22263, 193880.89, 440.3191, 0.041428525, 0.0030701148620243804, 0.05540862, 5.054793134331703],
+        ])
+
+    results = _results()
+
+    me = results[:, 0]
+    mae = results[:, 1]
+    mse = results[:, 2]
+    rmse = results[:, 3]
+    nmae = results[:, 4]
+    nmse = results[:, 5]
+    nrmse = results[:, 6]
+    mre = results[:, 7]
+    maxima_me = results[:, 0+8]
+    maxima_mae = results[:, 1+8]
+    maxima_mse = results[:, 2+8]
+    maxima_rmse = results[:, 3+8]
+    maxima_nmae = results[:, 4+8]
+    maxima_nmse = results[:, 5+8]
+    maxima_nrmse = results[:, 6+8]
+    maxima_mre = results[:, 7+8]
+    print(mse)
+
+    plt.figure()
+
+    plt.subplot(2, 2, 1)
+    plt.imshow(mae.reshape((len(size), len(x_1))), cmap='Reds')
+    plt.colorbar()
+    plt.xticks(ticks=range(len(x_1)), labels=x_1)
+    plt.yticks(ticks=range(len(size)), labels=size)
+    plt.xlabel('Size')
+    plt.ylabel('x_1')
+    plt.title('MAE')
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(mse.reshape((len(size), len(x_1))), cmap='Reds')
+    plt.colorbar()
+    plt.xticks(ticks=range(len(x_1)), labels=x_1)
+    plt.yticks(ticks=range(len(size)), labels=size)
+    plt.xlabel('Size')
+    plt.ylabel('x_1')
+    plt.title('MSE')
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(rmse.reshape((len(size), len(x_1))), cmap='Reds')
+    plt.colorbar()
+    plt.xticks(ticks=range(len(x_1)), labels=x_1)
+    plt.yticks(ticks=range(len(size)), labels=size)
+    plt.xlabel('Size')
+    plt.ylabel('x_1')
+    plt.title('RMSE')
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(mre.reshape((len(size), len(x_1))), cmap='Reds')
+    plt.colorbar()
+    plt.xticks(ticks=range(len(x_1)), labels=x_1)
+    plt.yticks(ticks=range(len(size)), labels=size)
+    plt.xlabel('Size')
+    plt.ylabel('x_1')
+    plt.title('MRE')
+
+    plt.show()
+
 
 if __name__ == '__main__':
-    # plot_page_progress(current=34, previous=33, goal_1=120, goal_2=150)
+    # plot_page_progress(current=39, previous=33, goal_1=120, goal_2=150)
 
-    plot_input()
+    plot_lt_logarithms_histogram()

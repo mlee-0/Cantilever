@@ -10,7 +10,7 @@ import os
 import pickle
 import re
 import time
-from typing import Any, List, Tuple
+from typing import *
 
 import matplotlib
 import matplotlib.pyplot as plt

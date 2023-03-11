@@ -398,7 +398,7 @@ def main(
     dataset_id: int,
     train: bool, test: bool, evaluate: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
-    normalize_inputs: bool = False, transformation_exponent: float = None,
+    normalize_inputs: bool = False, transformation_exponent: float = None, transformation_logarithm: Tuple[float, float]=None,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
@@ -452,9 +452,7 @@ def main(
 
     # Create the Dataset containing all data.
     if dataset_id == 2:
-        if transformation_exponent is None:
-            transformation_exponent = 0.4949464243559395
-        dataset = CantileverDataset(samples, is_3d=False, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
+        dataset = CantileverDataset(samples, is_3d=False, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent, transformation_logarithm=transformation_logarithm)
     elif dataset_id == 3:
         if transformation_exponent is None:
             transformation_exponent = 0.5023404737562848
@@ -479,11 +477,11 @@ def main(
 
     # Initialize the model, optimizer, and loss function.
     args = {
-        Nie: [dataset.input_channels, INPUT_SIZE, dataset.output_channels],
-        Nie3d: [dataset.input_channels, INPUT_SIZE_3D, dataset.output_channels],
-        FullyCnn: [dataset.input_channels, OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.output_channels],
-        UNetCnn: [dataset.input_channels, dataset.output_channels],
-        AutoencoderCnn: [dataset.input_channels, dataset.output_channels],
+        Nie: [dataset.inputs.size(1), INPUT_SIZE, dataset.labels.size(1)],
+        Nie3d: [dataset.inputs.size(1), INPUT_SIZE_3D, dataset.labels.size(1)],
+        FullyCnn: [dataset.inputs.size(1), OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.labels.size(1)],
+        UNetCnn: [dataset.inputs.size(1), dataset.labels.size(1)],
+        AutoencoderCnn: [dataset.inputs.size(1), dataset.labels.size(1)],
     }
     model = Model(*args[Model])
     model.to(device)
@@ -544,8 +542,8 @@ def main(
         )
 
         # Transform values back to the original range.
-        outputs = dataset.untransform(outputs)
-        labels = dataset.untransform(labels)
+        outputs = dataset.untransform_logarithm(outputs)
+        labels = dataset.untransform_logarithm(labels)
 
         # Show corresponding inputs, outputs, labels.
         for _ in range(5):

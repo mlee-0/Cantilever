@@ -12,8 +12,9 @@ class CantileverDataset(Dataset):
     Label images have shape (batch, channel, height, length).
     """
 
-    def __init__(self, samples: pd.DataFrame, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=1):
+    def __init__(self, samples: pd.DataFrame, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=None, transformation_logarithm: Tuple[float, float]=None):
         self.transformation_exponent = transformation_exponent
+        self.transformation_logarithm = transformation_logarithm
 
         if is_3d:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
@@ -32,7 +33,10 @@ class CantileverDataset(Dataset):
         self.scaled = 100
 
         # Apply the transformation to the label data.
-        self.labels_transformed = self.transform(self.labels)
+        if self.transformation_exponent is not None:
+            self.labels_transformed = self.transform_exponentiation(self.labels)
+        elif self.transformation_logarithm is not None:
+            self.labels_transformed = self.transform_logarithm(self.labels)
 
         # # Show the histogram of the original data and transformed data, both of which have the same range of values.
         # plt.figure()
@@ -63,10 +67,6 @@ class CantileverDataset(Dataset):
         #     plt.imshow(self.labels[random.randint(0, 999), 0, ...])
         # plt.show()
 
-        # Number of channels in input and label images.
-        self.input_channels = self.inputs.shape[1]
-        self.output_channels = self.labels.shape[1]
-
         # Print information about the data.
         print(f"\nDataset '{type(self)}':")
         
@@ -78,7 +78,8 @@ class CantileverDataset(Dataset):
         print(f"Label data:")
         print(f"\tShape: {self.labels.size()}")
         print(f"\tMemory: {self.labels.storage().nbytes()/1e6:,.2f} MB")
-        print(f"\tTransformation exponent: {self.transformation_exponent}")
+        print(f"\tExponentiation transformation: {self.transformation_exponent}")
+        print(f"\tLogarithm transformation: {self.transformation_logarithm}")
         print(f"\tMin, max: {self.labels_transformed.min()}, {self.labels_transformed.max()}")
         print(f"\tMean: {self.labels_transformed.mean()}")
         print(f"\tOriginal max: {self.max_value}")
@@ -90,13 +91,35 @@ class CantileverDataset(Dataset):
         """Return input and label images."""
         return self.inputs[index, ...], self.labels_transformed[index, ...]
 
-    def transform(self, y: torch.Tensor) -> torch.Tensor:
-        """Raise the given data to the transformation exponent."""
+    def transform_exponentiation(self, y: torch.Tensor):
+        """Scale data to [0, 1], exponentiate, and scale to the specified range."""
         return (y / self.max_value) ** self.transformation_exponent * self.scaled
 
-    def untransform(self, y: torch.Tensor) -> torch.Tensor:
-        """Raise the given data to the inverse of the transformation exponent."""
+    def untransform_exponentiation(self, y: torch.Tensor):
         return ((y / self.scaled) ** (1 / self.transformation_exponent)) * self.max_value
+
+    def transform_logarithm(self, y: torch.Tensor):
+        """Scale data to [x[0], x[1]], take the natural logarithm, and scale to the specified range."""
+        x_1, x_2 = self.transformation_logarithm
+        y = y / self.max_value
+        y = y * (x_2 - x_1) + x_1
+        y = np.log(y)
+        self._min = y.min()
+        y -= self._min
+        self._max = y.max()
+        y /= self._max
+        y *= self.scaled
+        return y
+
+    def untransform_logarithm(self, y: torch.Tensor):
+        x_1, x_2 = self.transformation_logarithm
+        y = y / self.scaled
+        y = y * self._max
+        y = y + self._min
+        y = np.exp(y)
+        y = (y - x_1) / (x_2 - x_1)
+        y = y * self.max_value
+        return y
 
 class CantileverDataset3d(Dataset):
     """
