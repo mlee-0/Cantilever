@@ -30,6 +30,55 @@ def plot_page_progress(current: int, previous: int, goal_1: int=120, goal_2: int
     plt.yticks([])
     plt.show()
 
+def plot_page_history(cumulative: bool=True):
+    """Figure of cumulative pages by day, or pages added by day."""
+
+    from datetime import datetime
+    pages = {
+        '2023-01-26': 0,
+        '2023-02-20': 2,
+        '2023-02-21': 3,
+        '2023-02-22': 3,
+        '2023-02-23': 8,
+        '2023-02-24': 9,
+        '2023-02-25': 13,
+        '2023-02-26': 18,
+        '2023-02-28': 20,
+        '2023-03-02': 24,
+        '2023-03-04': 27,
+        '2023-03-05': 31,
+        '2023-03-06': 31,
+        '2023-03-07': 32,
+        '2023-03-08': 34,
+        '2023-03-09': 38,
+        '2023-03-11': 42,
+        '2023-03-12': 46,
+        '2023-03-13': 51,
+        '2023-03-15': 56,
+        '2023-03-16': 60,
+        '2023-03-19': 65,
+        '2023-03-20': 66,
+        '2023-03-21': 75,
+        '2023-03-22': 79,
+        '2023-03-23': 85,
+        '2023-03-24': 85,
+    }
+    dates = [datetime.strptime(_, '%Y-%m-%d') for _ in pages.keys()]
+
+    plt.figure()
+    plt.grid(axis='y')
+    if cumulative:
+        plt.step(dates, pages.values(), color=[0/255, 191/255, 96/255])
+        plt.axhline(y=120, color=[0.25]*3)
+        plt.ylim([0, 130])
+        plt.yticks(range(0, 120+1, 10))
+    else:
+        plt.bar(dates, np.diff([0, *pages.values()]), color=[0/255, 191/255, 96/255])
+    plt.xlabel('Date')
+    plt.ylabel('Pages')
+    plt.xticks(rotation=90)
+    plt.show()
+
 def plot_label_histogram():
     """Figure of histogram of all labels in dataset."""
 
@@ -456,7 +505,8 @@ def plot_lt_metrics(transform: str):
 
 
 if __name__ == '__main__':
-    plot_page_progress(current=51, previous=33, goal_1=120, goal_2=150)
+    # plot_page_progress(current=85, previous=56, goal_1=120, goal_2=150)
+    plot_page_history(cumulative=True)
 
     # plot_lt_metrics('log')
     # plot_lt_logarithms_domain()
