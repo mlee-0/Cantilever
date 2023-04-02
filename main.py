@@ -11,7 +11,6 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -43,7 +42,7 @@ def load_model(filepath: str, device: str) -> dict:
         return checkpoint
 
 def train_regression(
-    device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int,
+    device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_only: bool,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
     train_dataloader: DataLoader, validate_dataloader: DataLoader, dataset: Dataset,
     scheduler = None,
@@ -163,15 +162,18 @@ def train_regression(
         validation_loss.append(loss)
         print(f"Validation loss: {loss:,.2e}")
 
-        # Calculate evaluation metrics on validation results.
-        outputs = torch.cat(outputs, dim=0)
-        labels = torch.cat(labels, dim=0)
-        outputs = dataset.untransform(outputs)
-        labels = dataset.untransform(labels)
-        evaluate_results(outputs.numpy(), labels.numpy())
+        # # Calculate evaluation metrics on validation results.
+        # outputs = torch.cat(outputs, dim=0)
+        # labels = torch.cat(labels, dim=0)
+        # outputs = dataset.untransform(outputs)
+        # labels = dataset.untransform(labels)
+        # evaluate_results(outputs.numpy(), labels.numpy())
 
         # Save the model parameters periodically and in the last iteration of the loop.
-        if epoch % save_model_every == 0 or epoch == epochs[-1]:
+        if (
+            (save_best_only and (validation_loss[-1] <= min(validation_loss))) or
+            (not save_best_only and epoch % save_model_every == 0 or epoch == epochs[-1])
+        ):
             save_model(
                 filepath_model,
                 epoch = epoch,
@@ -301,13 +303,6 @@ def evaluate_results(outputs: np.ndarray, labels: np.ndarray, queue=None, info_g
     for metric, value in results.items():
         print(f"{metric}: {value:,.3f}")
 
-    # Show a parity plot.
-    plt.plot(labels.flatten(), outputs.flatten(), '.')
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'k--')
-    plt.xlabel('True')
-    plt.ylabel('Predicted')
-    plt.show()
-
     # max_network, max_label = metrics.maximum_value(outputs, labels, plot=not queue)
 
     # Initialize values to send to the GUI.
@@ -393,12 +388,12 @@ def show_predictions_3d(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
             plt.show()
 
 def main(
-    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], Model: nn.Module,
-    filename_model: str, train_existing: bool, save_model_every: int,
-    dataset_id: int,
-    train: bool, test: bool, evaluate: bool,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], model: nn.Module,
+    filename_model: str, train_existing: bool, save_model_every: int, save_best_only: bool,
+    dataset: Dataset,
+    train: bool, test: bool,
+    show_parity: bool, show_predictions: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
-    normalize_inputs: bool = False, transformation_exponent: float = None, transformation_logarithm: Tuple[float, float]=None,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
@@ -407,17 +402,16 @@ def main(
     Parameters:
     `train`: Train the model.
     `test`: Test the model.
-    `evaluate`: Evaluate the test results, if testing.
     `train_existing`: Load a previously saved model and continue training it.
 
     `epoch_count`: Number of epochs to train.
     `learning_rate`: Learning rate for the optimizer.
     `batch_sizes`: Tuple of batch sizes for the training, validation, and testing datasets.
-    `Model`: A Module subclass to instantiate, not an instance of the class.
+    `model`: The network to train.
     `Optimizer`: An Optimizer subclass to instantiate, not an instance of the class.
     `Loss`: A Module subclass to instantiate, not an instance of the class.
 
-    `dataset_id`: An integer representing the dataset to use.
+    `dataset`: The dataset to train on.
     `dataset_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
     `filename_model`: Name of the .pth file to load and save to during training.
     
@@ -445,23 +439,6 @@ def main(
     else:
         checkpoint = None
 
-    assert dataset_id in {2, 3, 4}, f"Invalid dataset ID: {dataset_id}."
-
-    # Load the samples.
-    samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
-
-    # Create the Dataset containing all data.
-    if dataset_id == 2:
-        dataset = CantileverDataset(samples, is_3d=False, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent, transformation_logarithm=transformation_logarithm)
-    elif dataset_id == 3:
-        if transformation_exponent is None:
-            transformation_exponent = 0.5023404737562848
-        dataset = CantileverDataset(samples, is_3d=True, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
-    elif dataset_id == 4:
-        if transformation_exponent is None:
-            transformation_exponent = 0.5023404737562848
-        dataset = CantileverDataset3d(samples, normalize_inputs=normalize_inputs, transformation_exponent=transformation_exponent)
-
     # Split the dataset into training, validation, and testing.
     train_dataset, validate_dataset, test_dataset = random_split(
         dataset,
@@ -471,19 +448,11 @@ def main(
     train_dataloader = DataLoader(train_dataset, batch_size=batch_sizes[0], shuffle=True)
     validate_dataloader = DataLoader(validate_dataset, batch_size=batch_sizes[1], shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_sizes[2], shuffle=False)
-    print(f"Split {len(samples):,} samples into {len(train_dataset):,} training / {len(validate_dataset):,} validation / {len(test_dataset):,} test.")
+    print(f"Split {len(dataset):,} data into {len(train_dataset):,} training / {len(validate_dataset):,} validation / {len(test_dataset):,} test.")
 
     results = None
 
     # Initialize the model, optimizer, and loss function.
-    args = {
-        Nie: [dataset.inputs.size(1), INPUT_SIZE, dataset.labels.size(1)],
-        Nie3d: [dataset.inputs.size(1), INPUT_SIZE_3D, dataset.labels.size(1)],
-        FullyCnn: [dataset.inputs.size(1), OUTPUT_SIZE_3D if dataset_id == 3 else OUTPUT_SIZE, dataset.labels.size(1)],
-        UNetCnn: [dataset.inputs.size(1), dataset.labels.size(1)],
-        AutoencoderCnn: [dataset.inputs.size(1), dataset.labels.size(1)],
-    }
-    model = Model(*args[Model])
     model.to(device)
     optimizer = Optimizer(model.parameters(), lr=learning_rate)
     if decay_learning_rate:
@@ -517,6 +486,7 @@ def main(
             checkpoint = checkpoint,
             filepath_model = filepath_model,
             save_model_every = save_model_every,
+            save_best_only = save_best_only,
             model = model,
             optimizer = optimizer,
             loss_function = loss_function,
@@ -541,109 +511,176 @@ def main(
             info_gui = info_gui,
         )
 
-        # Transform values back to the original range.
-        outputs = dataset.untransform_logarithm(outputs)
-        labels = dataset.untransform_logarithm(labels)
+        # # Transform values back to the original range.
+        # outputs = dataset.untransform_logarithm(outputs)
+        # labels = dataset.untransform_logarithm(labels)
 
-        # Show corresponding inputs, outputs, labels.
-        for _ in range(5):
-            i = random.choice(range(len(test_dataset)))
-            label, output = labels[i, 0, ...], outputs[i, 0, ...]
-            maximum = torch.max(label.max(), output.max())
-            plt.figure()
-            plt.subplot(1, 4, 1)
-            plt.imshow(inputs[i, 0, ...], cmap='gray')
-            plt.subplot(1, 4, 2)
-            plt.imshow(inputs[i, 1, ...], cmap='gray')
-            plt.subplot(1, 4, 3)
-            plt.imshow(maximum - label, cmap='Spectral', vmin=0, vmax=maximum)
-            plt.title(f'True (max {labels[i].max():.1f})')
-            plt.subplot(1, 4, 4)
-            plt.imshow(maximum - output, cmap='Spectral', vmin=0, vmax=maximum)
-            plt.title(f'Predicted (max {outputs[i].max():.1f})')
+        # Calculate evaluation metrics.
+        results = evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
+
+        # Show a parity plot.
+        if show_parity:
+            plt.plot(labels.flatten(), outputs.flatten(), '.')
+            plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'k--')
+            plt.xlabel('True')
+            plt.ylabel('Predicted')
             plt.show()
 
-        if evaluate:
-            results = evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
+        # Show corresponding inputs, outputs, labels.
+        if show_predictions:
+            for i in random.sample(range(len(test_dataset)), k=3):
+                label, output = labels[i, 0, ...], outputs[i, 0, ...]
+                maximum = torch.max(label.max(), output.max())
+                plt.figure()
+                plt.subplot(1, 4, 1)
+                plt.imshow(inputs[i, 0, ...], cmap='gray')
+                plt.subplot(1, 4, 2)
+                plt.imshow(inputs[i, 1, ...], cmap='gray')
+                plt.subplot(1, 4, 3)
+                plt.imshow(maximum - label, cmap='Spectral', vmin=0, vmax=maximum)
+                plt.title(f'True (max {labels[i].max():.1f})')
+                plt.subplot(1, 4, 4)
+                plt.imshow(maximum - output, cmap='Spectral', vmin=0, vmax=maximum)
+                plt.title(f'Predicted (max {outputs[i].max():.1f})')
+                plt.show()
 
     return results
 
 
 if __name__ == "__main__":
-    kwargs = {
-        "filename_model": "model.pth",
-        "train_existing": not True,
-        "save_model_every": 1,
+    count = 20
+    np.random.seed(42)
+    learning_rate_exponents = np.random.rand(count) * 5 - 5
+    batch_sizes = np.random.randint(1, 128+1, count)
+    model_sizes = np.random.randint(1, 64+1, count)
+    # plt.subplot(1, 3, 1)
+    # plt.hist(learning_rate_exponents, bins=10)
+    # plt.subplot(1, 3, 2)
+    # plt.hist(batch_sizes, bins=10)
+    # plt.subplot(1, 3, 3)
+    # plt.hist(model_sizes, bins=10)
+    # plt.show()
 
-        "epoch_count": 5,
-        "learning_rate": 1e-3,  # Nominal tested to be 1e-3 for labels in [0, 100]
-        "decay_learning_rate": not True,
-        "batch_sizes": (16, 128, 128),
-        "dataset_split": (0.8, 0.1, 0.1),
-        "Model": Nie,
-        "Optimizer": torch.optim.Adam,
-        "Loss": nn.MSELoss,
-        
-        "dataset_id": 2,
-        "normalize_inputs": False,
-        "transformation_exponent": 1/5,
-        
-        "train": True,
-        "test": True,
-        "evaluate": True,
-    }
+    dataset = CantileverDataset(
+        is_3d=False,
+        normalize_inputs=False,
+        transformation_exponent=1,
+        transformation_logarithm=None,
+    )
 
-    results = main(**kwargs)
+    for exponent, batch_size, model_size in zip(learning_rate_exponents, batch_sizes, model_sizes):
+        exponent = round(exponent, 4)
+        batch_size = int(batch_size)
+        model_size = int(model_size)
+        filename = f"rsht_{exponent}_{batch_size}_{model_size}.pth"
+
+        main(
+            filename_model = filename,
+            train_existing = True,
+            save_model_every = 10,
+            save_best_only = True,
+
+            epoch_count = 10,
+            learning_rate = 10**exponent,  # Nominal tested to be 1e-3 for labels in [0, 100]
+            decay_learning_rate = not True,
+            batch_sizes = (batch_size, 128, 128),
+            dataset_split = (0.8, 0.1, 0.1),
+            model = StressNet(2, 1, model_size),
+            Optimizer = torch.optim.Adam,
+            Loss = nn.MSELoss,
+            
+            dataset = dataset,
+            
+            train = not True,
+            test = True,
+            show_parity = not True,
+            show_predictions = not True,
+        )
+        print((exponent, batch_size, model_size))
+
+    # # Exponentiation transformation testing.
+    # all_results = {}
+    # for denominator in np.arange(1.0, 4.01, 0.25):
+    #     denominator = round(denominator, 2)
+    #     exponent = 1 / denominator
+    #     kwargs['transformation_exponent'] = exponent
+    #     kwargs['filename_model'] = 'te_log.pth' #f"te_1_{denominator}.pth"
+
+    #     print(f"\nExponent: 1/{1/exponent:.3f}")
+    #     results = main(**kwargs)
+    #     all_results[denominator] = results
+
+    # # Logarithm transformation testing.
+    # all_results = {}
+    # size = 1
+    # for x_1 in [5e-5, 5e-4, 5e-3, 5e-2]:
+    #     x_2 = x_1 + size
+    #     kwargs['transformation_logarithm'] = (x_1, x_2)
+    #     kwargs['filename_model'] = f'tl_{x_1:.0e}.pth'
+
+    #     print(f"\nLogarithm: (x1, x2) = ({x_1}, {x_2})")
+    #     results = main(**kwargs)
+    #     all_results[(x_1, x_2)] = results
+
+    # for results in all_results.values():
+    #     print(list(results.values()))
+
 
 """
-Test Results
-Keep transformation exponent fixed at 1/4; try scaling labels to different ranges to see if performance affected
-Hypothesis: scaling to [0, 1] is worse because much of values are small, and rounding errors (using float32 not float64)
+4x8 bottleneck:
+Testing loss: 3.56e-02
+ME: -0.015
+MAE: 0.056
+MSE: 0.035
+RMSE: 0.188
+NMAE: 0.072
+NMSE: 0.057
+NRMSE: 0.239
+MRE: 13.038
+Maxima ME: -0.308
+Maxima MAE: 0.517
+Maxima MSE: 0.620
+Maxima RMSE: 0.787
+Maxima NMAE: 0.038
+Maxima NMSE: 0.003
+Maxima NRMSE: 0.057
+Maxima MRE: 3.759
 
-1/4 scaled to [0, 1]:  14.0% (10 epochs, 1e-1), 13.106% (11 epochs, 1e-1), 12.8% (10 epochs, 2e-2 (largest lr that doesn't have nan))
+2x4 bottleneck:
+Testing loss: 5.86e-02
+ME: -0.031
+MAE: 0.082
+MSE: 0.058
+RMSE: 0.242
+NMAE: 0.104
+NMSE: 0.094
+NRMSE: 0.307
+MRE: 21.363
+Maxima ME: -0.383
+Maxima MAE: 0.879
+Maxima MSE: 1.610
+Maxima RMSE: 1.269
+Maxima NMAE: 0.064
+Maxima NMSE: 0.009
+Maxima NRMSE: 0.093
+Maxima MRE: 7.537
 
-1/4 scaled to [0, 10]: 10.451% and 8.261% (10 epochs, 1e-2), 8.662 (11 epochs, 2e-2)
-1/4 scaled to [0, 50]: 6.6% (10 epochs), 5.985 (10 epochs, 1e-2)
-1/4 scaled to [0, 100]: 6.105% (10 epochs, 1e-3)
-1/4 scaled to [0, 1000]: 6.759% (10 epochs, 1e-4)
-1/4 scaled to [0, 10,000]: 6.918% (10 epochs, 1e-5), 11.675% (10 eopchs, 1e-6) - likely a fluctuation
-1/4 scaled to original range: 9.836% (10 epochs, 1e-5), 14.658% (10 epochs, 1e-5), 8.901% (10 epochs, 1e-6)
-
-Testing format of input images; tested with Adam instead of SGD:
-- Use 3 channels, 3rd channel contains single pixel with value of 1 indicating location of load: 4.868
-- Use 2 channels, 1st channel contains shape of beam (all 1s) but with a single pixel with value of 2 indicating location of load: 4.567% MRE
-
-Testing weighted loss, with Adam and 2 channels in input:
-- Weighted MSE (weights in [1, 2], multiplied to loss): 4.631% MRE (10 epochs, 1e-3)
-- Weighted MSE (weights in [1, 2], loss exponentiated with these): 4.920% MRE (10 epochs, 1e-3)
-- Weighted MSE (weights in [1, 3], loss exponentiated with these): 4.757% MRE (10 epochs, 1e-3)
-- Weighted MSE (weights in [1, 4], loss exponentiated with these): 5.807% MRE (10 epochs, 1e-3)
-
-Testing normalizing inputs (zero mean, unit variance), with Adam and 2 channels in input: 5.306% MRE
-Testing scaling inputs to [0, 1], with Adam and 2 channels in input: 4.886% MRE (10 epochs)
-Testing scaling inputs to [0, 100], with Adam and 2 channels in input: 5.560% MRE (11 epochs)
-Testing scaling inputs to [0, 255], with Adam and 2 channels in input: 5.745% MRE (10 epochs; validation reached 4.9%)
-
-Testing network architectures without SE blocks, transformation exponent 1/3, with Adam, 2-channel input (not normalized or scaled), MSE loss, 10 epochs:
-- Original Nie (res + SE): 5.997% MRE
-- Residual only (no SE): 4.615% MRE
-- Residual only (no SE), conv_1 and deconv_3 kernel size 3 instead of 9: 7.404% MRE (reached 4.7% validation)
-    - change 1st BN in residual block to come before 1st relu: 4.415% MRE (reached 3.9% validation)
-- Residual only (no SE), change 1st BN in residual block to come before 1st relu (1st conv kernel size 9): 4.466%
-- Residual only (no SE), bottleneck residual block, nf = 16 (same as all of above): 7.849% (likely too few channels)
-- Residual only (no SE), bottleneck residual block, nf = 32: 5.219%
-- 7 residual blocks (no SE), regular residual block, nf = 16: 6.264%
-
-Testing transformation exponent, with residual only (no SE), nf=16, Adam, 2-channel input (not normalized or scaled), MSE loss, 10 epochs:
-- 1/2: 6.609%, 9.039% (reached 6.0%)
-- 1/3: 6.087%, 6.089% (11 epochs)
-- 1/4: 4.927%, 5.426% (reached 4.7%), 5.556% = 5.303% mean
-- 1/5: 4.455%, 5.988%, 5.450% = 5.298% mean
-    - 1/5, initial/final kernel size 3 instead of 9: 4.369%
-- 1/6: 5.600%, 5.988% (reached 4.910%), 6.336% (reached 5.6%) = 5.975% mean
-
-Testing missing ReLU after Res-SE blocks:
-- Fixed (x = torch.relu(x + residual * se.reshape((batch_size, -1, 1, 1)))): 5.844% MRE
-- Originally coded (no relu): 5.667% MRE
-- No SE blocks at all: 5.235% MRE
+2x2 deconv, 4x8 bottleneck
+Testing loss: 2.63e-02
+ME: 0.008
+MAE: 0.054
+MSE: 0.026
+RMSE: 0.161
+NMAE: 0.069
+NMSE: 0.042
+NRMSE: 0.205
+MRE: 11.086
+Maxima ME: 0.008
+Maxima MAE: 0.525
+Maxima MSE: 0.638
+Maxima RMSE: 0.799
+Maxima NMAE: 0.038
+Maxima NMSE: 0.003
+Maxima NRMSE: 0.058
+Maxima MRE: 4.155
 """

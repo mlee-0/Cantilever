@@ -3,6 +3,7 @@ Functions for generating figures.
 """
 
 
+from matplotlib import cm
 import matplotlib.pyplot as plt
 from PIL import Image
 
@@ -11,7 +12,7 @@ from datasets import CantileverDataset
 
 
 def plot_page_progress(current: int, previous: int, goal_1: int=120, goal_2: int=150):
-    """Figure showing a bar graph of the current number of pages compared to the desired number of pages."""
+    """Bar graph of the current number of pages compared to the desired number of pages."""
 
     y = 1
     plt.figure(figsize=(6, 2))
@@ -30,12 +31,14 @@ def plot_page_progress(current: int, previous: int, goal_1: int=120, goal_2: int
     plt.yticks([])
     plt.show()
 
-def plot_page_history(cumulative: bool=True):
-    """Figure of cumulative pages by day, or pages added by day."""
+def plot_page_history():
+    """Cumulative pages by day and pages added by day."""
 
     from datetime import datetime
+    from matplotlib.dates import DateFormatter
     pages = {
         '2023-01-26': 0,
+        '2023-02-19': 0,
         '2023-02-20': 2,
         '2023-02-21': 3,
         '2023-02-22': 3,
@@ -62,21 +65,44 @@ def plot_page_history(cumulative: bool=True):
         '2023-03-22': 79,
         '2023-03-23': 85,
         '2023-03-24': 85,
+        '2023-03-25': 87,
+        '2023-03-26': 90,
+        '2023-03-27': 91,
+        '2023-03-28': 93,
+        '2023-03-29': 94,
+        '2023-03-30': 98,
+        '2023-03-31': 100,
+        '2023-04-01': 105,
     }
     dates = [datetime.strptime(_, '%Y-%m-%d') for _ in pages.keys()]
 
     plt.figure()
     plt.grid(axis='y')
-    if cumulative:
-        plt.step(dates, pages.values(), color=[0/255, 191/255, 96/255])
-        plt.axhline(y=120, color=[0.25]*3)
-        plt.ylim([0, 130])
-        plt.yticks(range(0, 120+1, 10))
-    else:
-        plt.bar(dates, np.diff([0, *pages.values()]), color=[0/255, 191/255, 96/255])
-    plt.xlabel('Date')
-    plt.ylabel('Pages')
+    plt.step(dates, pages.values(), where='mid', color=[0/255, 191/255, 96/255], label='Cumulative')
+    plt.bar(dates, np.diff([0, *pages.values()]), width=1.0, color=[0/255, 191/255, 96/255], alpha=1/3, label='Daily')
+    plt.axhline(y=120, color=[0.25]*3, linewidth=2)
+    plt.gca().xaxis.set_major_formatter(DateFormatter('%m-%d'))
+    plt.ylim([0, 130])
     plt.xticks(rotation=90)
+    plt.legend()
+    plt.show()
+
+def plot_page_distribution():
+    """Pie chart of pages by chapter."""
+
+    page_counts = np.diff([1, 12, 35, 78, 99])
+    goal = 120
+
+    plt.figure(figsize=(4, 4))
+    plt.pie(
+        [_/goal for _ in page_counts],
+        normalize=False,
+        labels=[f'Chapter {i+1}\n{count}' for i, count in enumerate(page_counts)],
+        pctdistance=0.8,
+        startangle=90,
+        counterclock=False,
+        wedgeprops={'width': 0.25, 'edgecolor': [1.0]*3},
+    )
     plt.show()
 
 def plot_label_histogram():
@@ -153,6 +179,65 @@ def plot_evaluation_metrics():
     plt.plot(error, np.sqrt(error ** 2), '--', label='RMSE')
     plt.xlabel('Error')
     plt.legend()
+    plt.show()
+
+def plot_hyperparameter_tuning_random_search(metric_name: Literal['mae', 'mse', 'rmse', 'mre']):
+    results = {
+        (-3.1273, 59, 51): (0.061, 0.022, 0.150, 15.010),
+        (-0.2464, 127, 7): (0.786, 7.430, 2.726, 34.358),
+        (-1.34, 42, 21): (0.109, 0.071, 0.267, 22.648),
+        (-2.0067, 128, 9): (0.105, 0.082, 0.287, 58.697),
+        (-4.2199, 92, 39): (0.127, 0.100, 0.317, 51.032),
+        (-4.22, 60, 18): (0.167, 0.200, 0.447, 115.045),
+        (-4.7096, 80, 4): (0.793, 6.153, 2.481, 1139.511),
+        (-0.6691, 15, 25): (0.786, 7.430, 2.726, 34.358),
+        (-1.9944, 62, 60): (0.098, 0.122, 0.350, 30.846),
+        (-1.4596, 62, 14): (0.111, 0.105, 0.324, 38.328),
+        (-4.8971, 47, 50): (0.191, 0.270, 0.520, 139.989),
+        (-0.1505, 62, 58): (0.786, 7.430, 2.726, 34.358),
+        (-0.8378, 51, 9): (0.147, 0.128, 0.357, 35.688),
+        (-3.9383, 108, 26): (0.123, 0.118, 0.343, 40.332),
+        (-4.0909, 55, 53): (0.081, 0.085, 0.291, 19.147),
+        (-4.083, 116, 2): (0.598, 4.747, 2.179, 742.315),
+        (-3.4788, 64, 20): (0.084, 0.056, 0.237, 25.062),
+        (-2.3762, 121, 28): (0.080, 0.054, 0.233, 19.360),
+        (-2.8403, 3, 47): (0.049, 0.026, 0.160, 10.869),
+        (-3.5439, 101, 60): (0.096, 0.120, 0.346, 32.817),
+    }
+
+    hyperparameter_names = ['Learning Rate Exponent', 'Batch Size', 'Model Size']
+
+    hyperparameters = list(zip(*results.keys()))
+    metrics = list(zip(*results.values()))
+    if metric_name == 'mae':
+        metrics = metrics[0]
+    elif metric_name == 'mse':
+        metrics = metrics[1]
+    elif metric_name == 'rmse':
+        metrics = metrics[2]
+    elif metric_name == 'mre':
+        metrics = metrics[3]
+    metrics = np.array(metrics)
+
+    plt.figure()
+    for j, hyperparameter in enumerate(hyperparameters):
+        plt.subplot(1, len(hyperparameter_names), j+1)
+        plt.scatter(hyperparameter, metrics)
+        plt.xlabel(hyperparameter_names[j])
+    plt.tight_layout()
+
+    colormap = cm.get_cmap('Greens_r')
+    plt.figure()
+    for row, hyperparameter_1 in enumerate(hyperparameters):
+        for column, hyperparameter_2 in enumerate(hyperparameters):
+            if hyperparameter_1 is not hyperparameter_2 and column >= row:
+                plt.subplot(len(hyperparameters), len(hyperparameters), row*len(hyperparameters)+(column+1))
+                plt.grid()
+                plt.scatter(hyperparameter_1, hyperparameter_2, color=colormap(metrics / metrics.max()))
+                plt.xlabel(hyperparameter_names[row])
+                plt.ylabel(hyperparameter_names[column])
+    plt.tight_layout()
+
     plt.show()
 
 def plot_stratified_sampling_histogram():
@@ -505,8 +590,8 @@ def plot_lt_metrics(transform: str):
 
 
 if __name__ == '__main__':
-    # plot_page_progress(current=85, previous=56, goal_1=120, goal_2=150)
-    plot_page_history(cumulative=True)
+    # plot_page_progress(current=104, previous=94, goal_1=120, goal_2=150)
+    # plot_page_history()
+    # plot_page_distribution()
 
-    # plot_lt_metrics('log')
-    # plot_lt_logarithms_domain()
+    plot_hyperparameter_tuning_random_search('mae')

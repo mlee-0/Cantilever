@@ -12,9 +12,11 @@ class CantileverDataset(Dataset):
     Label images have shape (batch, channel, height, length).
     """
 
-    def __init__(self, samples: pd.DataFrame, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=None, transformation_logarithm: Tuple[float, float]=None):
+    def __init__(self, is_3d: bool, normalize_inputs: bool=False, transformation_exponent: float=None, transformation_logarithm: Tuple[float, float]=None):
         self.transformation_exponent = transformation_exponent
         self.transformation_logarithm = transformation_logarithm
+
+        samples = read_samples(os.path.join(FOLDER_ROOT, "samples.csv"))
 
         if is_3d:
             folder_labels = os.path.join(FOLDER_ROOT, "Labels 3D")
@@ -37,6 +39,8 @@ class CantileverDataset(Dataset):
             self.labels_transformed = self.transform_exponentiation(self.labels)
         elif self.transformation_logarithm is not None:
             self.labels_transformed = self.transform_logarithm(self.labels)
+        else:
+            self.labels_transformed = self.labels
 
         # # Show the histogram of the original data and transformed data, both of which have the same range of values.
         # plt.figure()

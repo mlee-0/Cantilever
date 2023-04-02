@@ -119,7 +119,7 @@ def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
 
     number_samples = len(samples)
     h, w = INPUT_SIZE
-    images = np.zeros((number_samples, 3 if not is_3d else 5, h, w), DATA_TYPE)
+    images = np.zeros((number_samples, 2 if not is_3d else 4, h, w), DATA_TYPE)
 
     for i in range(number_samples):
         pixel_length = int(samples[KEY_NODES_LENGTH][i])

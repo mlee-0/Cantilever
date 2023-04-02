@@ -11,84 +11,82 @@ import torch
 from torch import nn
 
 
-class Nie(nn.Module):
-    """Based on: https://arxiv.org/pdf/1808.08914.pdf"""
-
-    def __init__(self, input_channels: int, input_size: Tuple[int, int], output_channels: int):
+class StressNet(nn.Module):
+    def __init__(self, input_channels: int, output_channels: int, model_size: int):
         super().__init__()
 
         # Number of features in the output of the first layer.
-        nf = 16
+        c = model_size
 
         self.convolution_1 = nn.Sequential(
-            nn.Conv2d(input_channels, nf*1, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
-            nn.BatchNorm2d(nf*1),
+            nn.Conv2d(input_channels, c*1, kernel_size=3, stride=1, padding=1, padding_mode="zeros"),
+            nn.BatchNorm2d(c*1),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_2 = nn.Sequential(
-            nn.Conv2d(nf*1, nf*2, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
-            nn.BatchNorm2d(nf*2),
+            nn.Conv2d(c*1, c*2, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
+            nn.BatchNorm2d(c*2),
             nn.ReLU(inplace=True),
         )
         # Reduces both the height and width by half.
         self.convolution_3 = nn.Sequential(
-            nn.Conv2d(nf*2, nf*4, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
-            nn.BatchNorm2d(nf*4),
+            nn.Conv2d(c*2, c*4, kernel_size=3, stride=2, padding=1, padding_mode="zeros"),
+            nn.BatchNorm2d(c*4),
             nn.ReLU(inplace=True),
         )
 
         # Convenience functions for returning residual blocks and squeeze-and-excitation blocks.
-        residual_block = lambda: nn.Sequential(
-            nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
-            nn.BatchNorm2d(nf*4),
+        residual = lambda: nn.Sequential(
+            nn.Conv2d(c*4, c*4, kernel_size=3, padding="same"),
+            nn.BatchNorm2d(c*4),
             nn.ReLU(inplace=False),
-            nn.Conv2d(nf*4, nf*4, kernel_size=3, padding="same"),
-            nn.BatchNorm2d(nf*4),
+            nn.Conv2d(c*4, c*4, kernel_size=3, padding="same"),
+            nn.BatchNorm2d(c*4),
         )
         # bottleneck_residual_block = lambda: nn.Sequential(
-        #     nn.Conv2d(nf*4, nf*1, kernel_size=1, stride=1, padding="same"),
-        #     nn.BatchNorm2d(nf*1),
+        #     nn.Conv2d(c*4, c*1, kernel_size=1, stride=1, padding="same"),
+        #     nn.BatchNorm2d(c*1),
         #     nn.ReLU(inplace=False),
-        #     nn.Conv2d(nf*1, nf*1, kernel_size=3, stride=1, padding="same"),
-        #     nn.BatchNorm2d(nf*1),
+        #     nn.Conv2d(c*1, c*1, kernel_size=3, stride=1, padding="same"),
+        #     nn.BatchNorm2d(c*1),
         #     nn.ReLU(inplace=False),
-        #     nn.Conv2d(nf*1, nf*4, kernel_size=1, stride=1, padding="same"),
-        #     nn.BatchNorm2d(nf*4),
+        #     nn.Conv2d(c*1, c*4, kernel_size=1, stride=1, padding="same"),
+        #     nn.BatchNorm2d(c*4),
         # )
-        se_block = lambda kernel_size: nn.Sequential(
-            nn.AvgPool2d(kernel_size=kernel_size),
+        se = lambda: nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(nf*4, nf*4//16),
+            nn.Linear(c*4, c*4//16),
             nn.ReLU(inplace=False),
-            nn.Linear(nf*4//16, nf*4),
+            nn.Linear(c*4//16, c*4),
             nn.Sigmoid(),
         )
         
-        output_size_residual = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
-        self.residual_1 = residual_block()
-        # self.se_1 = se_block(output_size_residual)
-        self.residual_2 = residual_block()
-        # self.se_2 = se_block(output_size_residual)
-        self.residual_3 = residual_block()
-        # self.se_3 = se_block(output_size_residual)
-        self.residual_4 = residual_block()
-        # self.se_4 = se_block(output_size_residual)
-        self.residual_5 = residual_block()
-        # self.se_5 = se_block(output_size_residual)
+        # output_size_residual = (round(input_size[0] / 2 / 2), round(input_size[1] / 2 / 2))
+        self.residual_1 = residual()
+        # self.se_1 = se(output_size_residual)
+        self.residual_2 = residual()
+        # self.se_2 = se(output_size_residual)
+        self.residual_3 = residual()
+        # self.se_3 = se(output_size_residual)
+        self.residual_4 = residual()
+        # self.se_4 = se(output_size_residual)
+        self.residual_5 = residual()
+        # self.se_5 = se(output_size_residual)
 
         self.deconvolution_1 = nn.Sequential(
-            nn.ConvTranspose2d(nf*4, nf*2, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
+            nn.ConvTranspose2d(c*4, c*2, kernel_size=2, stride=2, padding=0, padding_mode="zeros"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(nf*2),
+            nn.BatchNorm2d(c*2),
         )
         self.deconvolution_2 = nn.Sequential(
-            nn.ConvTranspose2d(nf*2, nf*1, kernel_size=3, stride=2, padding=1, output_padding=(1,1), padding_mode="zeros"),
+            nn.ConvTranspose2d(c*2, c*1, kernel_size=2, stride=2, padding=0, padding_mode="zeros"),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(nf*1),
+            nn.BatchNorm2d(c*1),
         )
         self.deconvolution_3 = nn.Sequential(
-            nn.Conv2d(nf*1, output_channels, kernel_size=9, stride=1, padding="same", padding_mode="zeros"),
+            nn.ConvTranspose2d(c*1, output_channels, kernel_size=3, stride=1, padding=1, padding_mode="zeros"),
             nn.ReLU(inplace=True),
         )
 
@@ -104,22 +102,6 @@ class Nie(nn.Module):
         x = torch.relu(x + self.residual_3(x))
         x = torch.relu(x + self.residual_4(x))
         x = torch.relu(x + self.residual_5(x))
-
-        # residual = self.residual_1(x)
-        # se = self.se_1(residual)
-        # x = x + residual * se.reshape((batch_size, -1, 1, 1))
-        # residual = self.residual_2(x)
-        # se = self.se_2(residual)
-        # x = x + residual * se.reshape((batch_size, -1, 1, 1))
-        # residual = self.residual_3(x)
-        # se = self.se_3(residual)
-        # x = x + residual * se.reshape((batch_size, -1, 1, 1))
-        # residual = self.residual_4(x)
-        # se = self.se_4(residual)
-        # x = x + residual * se.reshape((batch_size, -1, 1, 1))
-        # residual = self.residual_5(x)
-        # se = self.se_5(residual)
-        # x = x + residual * se.reshape((batch_size, -1, 1, 1))
 
         x = self.deconvolution_1(x)
         x = self.deconvolution_2(x)
