@@ -73,6 +73,11 @@ def plot_page_history():
         '2023-03-30': 98,
         '2023-03-31': 100,
         '2023-04-01': 105,
+        '2023-04-02': 109,
+        '2023-04-03': 111,
+        '2023-04-05': 113,
+        '2023-04-06': 114,
+        '2023-04-07': 116,
     }
     dates = [datetime.strptime(_, '%Y-%m-%d') for _ in pages.keys()]
 
@@ -90,7 +95,7 @@ def plot_page_history():
 def plot_page_distribution():
     """Pie chart of pages by chapter."""
 
-    page_counts = np.diff([1, 12, 35, 78, 99])
+    page_counts = np.diff([1, 12, 40, 92, 113, 117])
     goal = 120
 
     plt.figure(figsize=(4, 4))
@@ -182,6 +187,8 @@ def plot_evaluation_metrics():
     plt.show()
 
 def plot_hyperparameter_tuning_random_search(metric_name: Literal['mae', 'mse', 'rmse', 'mre']):
+    """Random search results"""
+
     results = {
         (-3.1273, 59, 51): (0.061, 0.022, 0.150, 15.010),
         (-0.2464, 127, 7): (0.786, 7.430, 2.726, 34.358),
@@ -237,6 +244,63 @@ def plot_hyperparameter_tuning_random_search(metric_name: Literal['mae', 'mse', 
                 plt.xlabel(hyperparameter_names[row])
                 plt.ylabel(hyperparameter_names[column])
     plt.tight_layout()
+
+    plt.show()
+
+def plot_hyperparameter_tuning_grid_search(metric_name: Literal['mae', 'mse', 'rmse', 'mre']):
+    """Grid search results."""
+
+    # Best results, not necessarily at end of 10 epochs.
+    results = {
+        (4, 16): (0.06913479, 0.05132358, 0.22654708, 15.065224468708038),
+        (4, 32): (0.05792376, 0.029064063, 0.17048186, 14.003099501132965),
+        (4, 64): (0.050798096, 0.021032125, 0.14502457, 12.044135481119156),
+        (8, 16): (0.06938156, 0.032970194, 0.18157697, 15.338702499866486),
+        (8, 32): (0.06445467, 0.033481278, 0.1829789, 17.66492873430252),
+        (8, 64): (0.07737578, 0.040889885, 0.20221248, 19.335877895355225),
+        (16, 16): (0.06512222, 0.033447757, 0.18288729, 15.748365223407745),
+        (16, 32): (0.049868856, 0.01937678, 0.13920051, 11.327722668647766),
+        (16, 64): (0.06872461, 0.037771214, 0.19434817, 15.472258627414703),
+        (32, 16): (0.06278347, 0.03689035, 0.1920686, 17.731794714927673),
+        (32, 32): (0.07862071, 0.051436126, 0.22679535, 16.146492958068848),
+        (32, 64): (0.05569741, 0.024537234, 0.15664366, 13.449710607528687),
+    }
+
+    hyperparameter_names = ['Batch Size', 'Model Size']
+
+    hyperparameters = [np.array(_) for _ in zip(*results.keys())]
+    metrics = list(zip(*results.values()))
+    if metric_name == 'mae':
+        metrics = metrics[0]
+    elif metric_name == 'mse':
+        metrics = metrics[1]
+    elif metric_name == 'rmse':
+        metrics = metrics[2]
+    elif metric_name == 'mre':
+        metrics = metrics[3]
+    metrics = np.reshape(metrics, (4, 3))
+
+    plt.imshow(metrics, cmap='Greens_r', vmin=metrics.min(), vmax=metrics.max())
+    plt.xticks(ticks=range(metrics.shape[1]), labels=np.unique(hyperparameters[1]))
+    plt.yticks(ticks=range(metrics.shape[0]), labels=np.unique(hyperparameters[0]))
+    plt.xlabel(hyperparameter_names[1])
+    plt.ylabel(hyperparameter_names[0])
+    # for axis_i in range(metrics.ndim):
+    #     axis_j, axis_k = [_ for _ in range(metrics.ndim) if _ != axis_i]
+
+    #     plt.figure()
+    #     for subplot in range(metrics.shape[axis_i]):
+    #         plt.subplot(1, metrics.shape[axis_i], subplot+1)
+    #         plt.imshow(metrics.take(subplot, axis=axis_i), cmap='Greens_r', vmin=metrics.min(), vmax=metrics.max())
+    #         plt.xticks(ticks=range(metrics.shape[axis_k]), labels=np.unique(hyperparameters[axis_k]))
+    #         plt.yticks(ticks=range(metrics.shape[axis_j]), labels=np.unique(hyperparameters[axis_j]))
+    #         plt.xlabel(hyperparameter_names[axis_k])
+    #         plt.ylabel(hyperparameter_names[axis_j])
+    #         plt.title(f"{hyperparameter_names[axis_i]} = {np.unique(hyperparameters[axis_i])[subplot]}")
+    #         # colorbar = plt.colorbar(ticks=[metrics.min(), metrics.max()], fraction=0.01)
+    #         # colorbar.set_ticklabels(['Best', 'Worst'])
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=0.3)
 
     plt.show()
 
@@ -590,8 +654,6 @@ def plot_lt_metrics(transform: str):
 
 
 if __name__ == '__main__':
-    # plot_page_progress(current=104, previous=94, goal_1=120, goal_2=150)
-    # plot_page_history()
-    # plot_page_distribution()
-
-    plot_hyperparameter_tuning_random_search('mae')
+    plot_page_progress(current=116, previous=113, goal_1=120, goal_2=150)
+    plot_page_history()
+    plot_page_distribution()

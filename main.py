@@ -41,6 +41,15 @@ def load_model(filepath: str, device: str) -> dict:
         print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
         return checkpoint
 
+def plot_loss(losses_training: List[float], losses_validation: List[float]) -> None:
+    plt.figure()
+    plt.semilogy(range(1, len(losses_training)+1), losses_training, '-', label='Training')
+    plt.semilogy(range(1, len(losses_validation)+1), losses_validation, '-', label='Validation')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
+
 def train_regression(
     device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_only: bool,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
@@ -172,7 +181,7 @@ def train_regression(
         # Save the model parameters periodically and in the last iteration of the loop.
         if (
             (save_best_only and (validation_loss[-1] <= min(validation_loss))) or
-            (not save_best_only and epoch % save_model_every == 0 or epoch == epochs[-1])
+            (not save_best_only and (epoch % save_model_every == 0 or epoch == epochs[-1]))
         ):
             save_model(
                 filepath_model,
@@ -204,17 +213,7 @@ def train_regression(
         if queue_to_main and not queue_to_main.empty():
             queue_to_main.queue.clear()
             break
-    
-    # Plot the loss history.
-    if not queue:
-        figure = plt.figure()
-        
-        all_training_loss = [*previous_training_loss, *training_loss]
-        all_validation_loss = [*previous_validation_loss, *validation_loss]
-        plot_loss(figure, range(1, epochs[-1]+1), [all_training_loss, all_validation_loss], ["Training", "Validation"], start_epoch=epochs[0])
 
-        plt.show()
-    
     return model
 
 def test_regression(
@@ -392,7 +391,7 @@ def main(
     filename_model: str, train_existing: bool, save_model_every: int, save_best_only: bool,
     dataset: Dataset,
     train: bool, test: bool,
-    show_parity: bool, show_predictions: bool,
+    show_loss: bool, show_parity: bool, show_predictions: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
@@ -499,6 +498,13 @@ def main(
             info_gui = info_gui,
             )
 
+    # Show the loss history.
+    if show_loss:
+        checkpoint = load_model(filepath=filepath_model, device=device)
+        losses_training = checkpoint.get("training_loss", [])
+        losses_validation = checkpoint.get("validation_loss", [])
+        plot_loss(losses_training, losses_validation)
+
     if test:
         outputs, labels, inputs = test_regression(
             device = device,
@@ -528,39 +534,36 @@ def main(
 
         # Show corresponding inputs, outputs, labels.
         if show_predictions:
-            for i in random.sample(range(len(test_dataset)), k=3):
+            for i in random.sample(range(len(test_dataset)), k=10):
                 label, output = labels[i, 0, ...], outputs[i, 0, ...]
                 maximum = torch.max(label.max(), output.max())
+
                 plt.figure()
-                plt.subplot(1, 4, 1)
-                plt.imshow(inputs[i, 0, ...], cmap='gray')
-                plt.subplot(1, 4, 2)
-                plt.imshow(inputs[i, 1, ...], cmap='gray')
-                plt.subplot(1, 4, 3)
-                plt.imshow(maximum - label, cmap='Spectral', vmin=0, vmax=maximum)
-                plt.title(f'True (max {labels[i].max():.1f})')
-                plt.subplot(1, 4, 4)
-                plt.imshow(maximum - output, cmap='Spectral', vmin=0, vmax=maximum)
-                plt.title(f'Predicted (max {outputs[i].max():.1f})')
+
+                # plt.subplot(1, 4, 1)
+                # plt.imshow(inputs[i, 0, ...], cmap='gray')
+                # plt.subplot(1, 4, 2)
+                # plt.imshow(inputs[i, 1, ...], cmap='gray')
+
+                plt.subplot(1, 2, 1)
+                plt.imshow(output, cmap='Spectral_r', vmin=0, vmax=maximum)
+                plt.title('Predicted')
+                colorbar = plt.colorbar(ticks=[0, maximum], fraction=0.05, aspect=10)
+                colorbar.ax.tick_params(labelsize=6)
+
+                plt.subplot(1, 2, 2)
+                plt.imshow(label, cmap='Spectral_r', vmin=0, vmax=maximum)
+                plt.title('True')
+                colorbar = plt.colorbar(ticks=[0, maximum], fraction=0.05, aspect=10)
+                colorbar.ax.tick_params(labelsize=6)
+
+                plt.tight_layout()
                 plt.show()
 
     return results
 
 
 if __name__ == "__main__":
-    count = 20
-    np.random.seed(42)
-    learning_rate_exponents = np.random.rand(count) * 5 - 5
-    batch_sizes = np.random.randint(1, 128+1, count)
-    model_sizes = np.random.randint(1, 64+1, count)
-    # plt.subplot(1, 3, 1)
-    # plt.hist(learning_rate_exponents, bins=10)
-    # plt.subplot(1, 3, 2)
-    # plt.hist(batch_sizes, bins=10)
-    # plt.subplot(1, 3, 3)
-    # plt.hist(model_sizes, bins=10)
-    # plt.show()
-
     dataset = CantileverDataset(
         is_3d=False,
         normalize_inputs=False,
@@ -568,119 +571,27 @@ if __name__ == "__main__":
         transformation_logarithm=None,
     )
 
-    for exponent, batch_size, model_size in zip(learning_rate_exponents, batch_sizes, model_sizes):
-        exponent = round(exponent, 4)
-        batch_size = int(batch_size)
-        model_size = int(model_size)
-        filename = f"rsht_{exponent}_{batch_size}_{model_size}.pth"
+    # 1e-3 (1-50), 1e-4 (51-100), 1e-5 (101-150), 1e-6 (151-350)
+    main(
+        filename_model = 'StressNet.pth',
+        train_existing = True,
+        save_model_every = 5,
+        save_best_only = not True,
 
-        main(
-            filename_model = filename,
-            train_existing = True,
-            save_model_every = 10,
-            save_best_only = True,
-
-            epoch_count = 10,
-            learning_rate = 10**exponent,  # Nominal tested to be 1e-3 for labels in [0, 100]
-            decay_learning_rate = not True,
-            batch_sizes = (batch_size, 128, 128),
-            dataset_split = (0.8, 0.1, 0.1),
-            model = StressNet(2, 1, model_size),
-            Optimizer = torch.optim.Adam,
-            Loss = nn.MSELoss,
-            
-            dataset = dataset,
-            
-            train = not True,
-            test = True,
-            show_parity = not True,
-            show_predictions = not True,
-        )
-        print((exponent, batch_size, model_size))
-
-    # # Exponentiation transformation testing.
-    # all_results = {}
-    # for denominator in np.arange(1.0, 4.01, 0.25):
-    #     denominator = round(denominator, 2)
-    #     exponent = 1 / denominator
-    #     kwargs['transformation_exponent'] = exponent
-    #     kwargs['filename_model'] = 'te_log.pth' #f"te_1_{denominator}.pth"
-
-    #     print(f"\nExponent: 1/{1/exponent:.3f}")
-    #     results = main(**kwargs)
-    #     all_results[denominator] = results
-
-    # # Logarithm transformation testing.
-    # all_results = {}
-    # size = 1
-    # for x_1 in [5e-5, 5e-4, 5e-3, 5e-2]:
-    #     x_2 = x_1 + size
-    #     kwargs['transformation_logarithm'] = (x_1, x_2)
-    #     kwargs['filename_model'] = f'tl_{x_1:.0e}.pth'
-
-    #     print(f"\nLogarithm: (x1, x2) = ({x_1}, {x_2})")
-    #     results = main(**kwargs)
-    #     all_results[(x_1, x_2)] = results
-
-    # for results in all_results.values():
-    #     print(list(results.values()))
-
-
-"""
-4x8 bottleneck:
-Testing loss: 3.56e-02
-ME: -0.015
-MAE: 0.056
-MSE: 0.035
-RMSE: 0.188
-NMAE: 0.072
-NMSE: 0.057
-NRMSE: 0.239
-MRE: 13.038
-Maxima ME: -0.308
-Maxima MAE: 0.517
-Maxima MSE: 0.620
-Maxima RMSE: 0.787
-Maxima NMAE: 0.038
-Maxima NMSE: 0.003
-Maxima NRMSE: 0.057
-Maxima MRE: 3.759
-
-2x4 bottleneck:
-Testing loss: 5.86e-02
-ME: -0.031
-MAE: 0.082
-MSE: 0.058
-RMSE: 0.242
-NMAE: 0.104
-NMSE: 0.094
-NRMSE: 0.307
-MRE: 21.363
-Maxima ME: -0.383
-Maxima MAE: 0.879
-Maxima MSE: 1.610
-Maxima RMSE: 1.269
-Maxima NMAE: 0.064
-Maxima NMSE: 0.009
-Maxima NRMSE: 0.093
-Maxima MRE: 7.537
-
-2x2 deconv, 4x8 bottleneck
-Testing loss: 2.63e-02
-ME: 0.008
-MAE: 0.054
-MSE: 0.026
-RMSE: 0.161
-NMAE: 0.069
-NMSE: 0.042
-NRMSE: 0.205
-MRE: 11.086
-Maxima ME: 0.008
-Maxima MAE: 0.525
-Maxima MSE: 0.638
-Maxima RMSE: 0.799
-Maxima NMAE: 0.038
-Maxima NMSE: 0.003
-Maxima NRMSE: 0.058
-Maxima MRE: 4.155
-"""
+        epoch_count = 50,
+        learning_rate = 1e-6,
+        decay_learning_rate = not True,
+        batch_sizes = (16, 128, 128),
+        dataset_split = (0.8, 0.1, 0.1),
+        model = StressNet(2, 1, 32),
+        Optimizer = torch.optim.Adam,
+        Loss = nn.MSELoss,
+        
+        dataset = dataset,
+        
+        train = True,
+        test = True,
+        show_loss = True,
+        show_parity = True,
+        show_predictions = True,
+    )

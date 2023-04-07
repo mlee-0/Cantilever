@@ -273,7 +273,7 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
 
     return labels
 
-def plot_loss(figure: matplotlib.figure.Figure, epochs: list, loss: List[list], labels: List[str], start_epoch: int = None) -> None:
+def plot_loss_gui(figure: matplotlib.figure.Figure, epochs: list, loss: List[list], labels: List[str], start_epoch: int = None) -> None:
     """
     Plot loss values over epochs on the given figure.
 
