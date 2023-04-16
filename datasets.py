@@ -42,7 +42,7 @@ class CantileverDataset(Dataset):
             self.labels_transformed = self.transform_logarithm(self.labels)
             self.transform, self.untransform = self.transform_logarithm, self.untransform_logarithm
         else:
-            self.labels_transformed = self.labels
+            raise Exception("For no transform, use an exponentiation transform with an exponent of 1.")
 
         # # Show the histogram of the original data and transformed data, both of which have the same range of values.
         # plt.figure()

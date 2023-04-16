@@ -11,6 +11,12 @@ import torch
 from torch import nn
 
 
+def print_model_summary(model) -> None:
+    """Print information about a model."""
+    print(f"\n{type(model).__name__}")
+    print(f"\tTotal parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"\tLearnable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+
 class StressNet(nn.Module):
     def __init__(self, input_channels: int, output_channels: int, model_size: int):
         super().__init__()
@@ -89,6 +95,8 @@ class StressNet(nn.Module):
             nn.ConvTranspose2d(c*1, output_channels, kernel_size=3, stride=1, padding=1, padding_mode="zeros"),
             nn.ReLU(inplace=True),
         )
+
+        print_model_summary(self)
 
     def forward(self, x):
         # batch_size = x.size(0)

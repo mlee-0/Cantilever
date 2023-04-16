@@ -497,7 +497,7 @@ def main(
 
     # Show the loss history.
     if show_loss:
-        checkpoint = load_model(filepath=filepath_model, device=device)
+        checkpoint = load_model(filepath=filepath_model)
         losses_training = checkpoint.get("training_loss", [])
         losses_validation = checkpoint.get("validation_loss", [])
         plot_loss(losses_training, losses_validation)
