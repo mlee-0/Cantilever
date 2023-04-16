@@ -31,7 +31,7 @@ def save_model(filepath: str, **kwargs) -> None:
     torch.save(kwargs, filepath)
     print(f"Saved model parameters to {filepath}.")
 
-def load_model(filepath: str, device: str) -> dict:
+def load_model(filepath: str, device: str='cpu') -> dict:
     """Return a dictionary of model parameters from a file."""
     try:
         checkpoint = torch.load(filepath, map_location=device)
@@ -51,7 +51,7 @@ def plot_loss(losses_training: List[float], losses_validation: List[float]) -> N
     plt.show()
 
 def train_regression(
-    device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_only: bool,
+    device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_separately: bool,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
     train_dataloader: DataLoader, validate_dataloader: DataLoader, dataset: Dataset,
     scheduler = None,
@@ -60,30 +60,20 @@ def train_regression(
     """Train and validate the given regression model. Return the model after finishing training."""
 
     # Load the previous training history.
-    if checkpoint is not None:
-        epoch = checkpoint["epoch"] + 1
-        previous_training_loss = checkpoint["training_loss"]
-        previous_validation_loss = checkpoint["validation_loss"]
-    else:
-        epoch = 1
-        previous_training_loss = []
-        previous_validation_loss = []
+    epoch = checkpoint.get('epoch', 0) + 1
     epochs = range(epoch, epoch+epoch_count)
+
+    training_loss = checkpoint.get('training_loss', [])
+    validation_loss = checkpoint.get('validation_loss', [])
 
     # Initialize values to send to the GUI, to be updated throughout training.
     if queue:
         info_gui["progress_epoch"] = (epoch, epochs[-1])
         info_gui["progress_batch"] = (0, 0)
         info_gui["epochs"] = epochs
-        info_gui["training_loss"] = []
-        info_gui["previous_training_loss"] = previous_training_loss
-        info_gui["validation_loss"] = []
-        info_gui["previous_validation_loss"] = previous_validation_loss
+        info_gui["training_loss"] = training_loss
+        info_gui["validation_loss"] = validation_loss
         queue.put(info_gui)
-
-    # Initialize the loss values for the current training session.
-    training_loss = []
-    validation_loss = []
 
     # Main training-validation loop.
     for epoch in epochs:
@@ -178,21 +168,29 @@ def train_regression(
         # labels = dataset.untransform(labels)
         # evaluate_results(outputs.numpy(), labels.numpy())
 
-        # Save the model parameters periodically and in the last iteration of the loop.
-        if (
-            (save_best_only and (validation_loss[-1] <= min(validation_loss))) or
-            (not save_best_only and (epoch % save_model_every == 0 or epoch == epochs[-1]))
-        ):
+        # Save the model periodically and in the last epoch.
+        if epoch % save_model_every == 0 or epoch == epochs[-1]:
             save_model(
                 filepath_model,
                 epoch = epoch,
                 model_state_dict = model.state_dict(),
                 optimizer_state_dict = optimizer.state_dict(),
                 learning_rate = optimizer.param_groups[0]["lr"],
-                training_loss = [*previous_training_loss, *training_loss],
-                validation_loss = [*previous_validation_loss, *validation_loss],
+                training_loss = training_loss,
+                validation_loss = validation_loss,
             )
-        
+        # Save the model if the model achieved the lowest validation loss so far.
+        if save_best_separately and validation_loss[-1] <= min(validation_loss):
+            save_model(
+                f"{filepath_model[:-4]}[best]{filepath_model[-4:]}",
+                epoch = epoch,
+                model_state_dict = model.state_dict(),
+                optimizer_state_dict = optimizer.state_dict(),
+                learning_rate = optimizer.param_groups[0]['lr'],
+                training_loss = training_loss,
+                validation_loss = validation_loss,
+            )
+
         # Show the elapsed time during the epoch.
         time_end = time.time()
         duration = time_end - time_start
@@ -388,7 +386,7 @@ def show_predictions_3d(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
 
 def main(
     epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], model: nn.Module,
-    filename_model: str, train_existing: bool, save_model_every: int, save_best_only: bool,
+    filename_model: str, train_existing: bool, save_model_every: int, save_best_separately: bool,
     dataset: Dataset,
     train: bool, test: bool,
     show_loss: bool, show_parity: bool, show_predictions: bool,
@@ -433,10 +431,9 @@ def main(
         checkpoint = load_model(filepath=filepath_model, device=device)
         # Load the last learning rate used.
         if checkpoint and decay_learning_rate:
-            learning_rate = checkpoint["learning_rate"]
-            print(f"Using last learning rate {learning_rate}.")
+            learning_rate = checkpoint.get('learning_rate', learning_rate)
     else:
-        checkpoint = None
+        checkpoint = {}
 
     # Split the dataset into training, validation, and testing.
     train_dataset, validate_dataset, test_dataset = random_split(
@@ -461,9 +458,9 @@ def main(
     loss_function = Loss()
 
     # Load previously saved model and optimizer parameters.
-    if checkpoint is not None:
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    if checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if queue:
             queue.put({
                 "epochs": range(1, checkpoint["epoch"]+1),
@@ -485,7 +482,7 @@ def main(
             checkpoint = checkpoint,
             filepath_model = filepath_model,
             save_model_every = save_model_every,
-            save_best_only = save_best_only,
+            save_best_separately = save_best_separately,
             model = model,
             optimizer = optimizer,
             loss_function = loss_function,
@@ -505,6 +502,10 @@ def main(
         losses_validation = checkpoint.get("validation_loss", [])
         plot_loss(losses_training, losses_validation)
 
+    # Load the best model.
+    checkpoint = load_model(f"{filepath_model[:-4]}[best]{filepath_model[-4:]}")
+    model.load_state_dict(checkpoint['model_state_dict'])
+
     if test:
         outputs, labels, inputs = test_regression(
             device = device,
@@ -517,9 +518,9 @@ def main(
             info_gui = info_gui,
         )
 
-        # # Transform values back to the original range.
-        # outputs = dataset.untransform_logarithm(outputs)
-        # labels = dataset.untransform_logarithm(labels)
+        # Transform values back to the original range.
+        outputs = dataset.untransform(outputs)
+        labels = dataset.untransform(labels)
 
         # Calculate evaluation metrics.
         results = evaluate_results(outputs.numpy(), labels.numpy(), queue=queue, info_gui=info_gui)
@@ -538,7 +539,7 @@ def main(
                 label, output = labels[i, 0, ...], outputs[i, 0, ...]
                 maximum = torch.max(label.max(), output.max())
 
-                plt.figure()
+                plt.figure(figsize=(6, 2))
 
                 # plt.subplot(1, 4, 1)
                 # plt.imshow(inputs[i, 0, ...], cmap='gray')
@@ -567,19 +568,19 @@ if __name__ == "__main__":
     dataset = CantileverDataset(
         is_3d=False,
         normalize_inputs=False,
-        transformation_exponent=1,
-        transformation_logarithm=None,
+        transformation_exponent=None,
+        transformation_logarithm=(0.1, 0.1+1.0),
     )
 
     # 1e-3 (1-50), 1e-4 (51-100), 1e-5 (101-150), 1e-6 (151-350)
     main(
-        filename_model = 'StressNet.pth',
+        filename_model = 'StressNetLT.pth',
         train_existing = True,
         save_model_every = 5,
-        save_best_only = not True,
+        save_best_separately = True,
 
         epoch_count = 50,
-        learning_rate = 1e-6,
+        learning_rate = 1e-3,
         decay_learning_rate = not True,
         batch_sizes = (16, 128, 128),
         dataset_split = (0.8, 0.1, 0.1),

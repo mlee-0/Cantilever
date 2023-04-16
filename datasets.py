@@ -37,8 +37,10 @@ class CantileverDataset(Dataset):
         # Apply the transformation to the label data.
         if self.transformation_exponent is not None:
             self.labels_transformed = self.transform_exponentiation(self.labels)
+            self.transform, self.untransform = self.transform_exponentiation, self.untransform_exponentiation
         elif self.transformation_logarithm is not None:
             self.labels_transformed = self.transform_logarithm(self.labels)
+            self.transform, self.untransform = self.transform_logarithm, self.untransform_logarithm
         else:
             self.labels_transformed = self.labels
 
