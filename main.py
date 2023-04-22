@@ -53,7 +53,7 @@ def plot_loss(losses_training: List[float], losses_validation: List[float]) -> N
 def train_regression(
     device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_separately: bool,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
-    train_dataloader: DataLoader, validate_dataloader: DataLoader, dataset: Dataset,
+    train_dataloader: DataLoader, validate_dataloader: DataLoader,
     scheduler = None,
     queue=None, queue_to_main=None, info_gui: dict=None,
 ) -> nn.Module:
@@ -385,38 +385,39 @@ def show_predictions_3d(outputs: np.ndarray, labels: np.ndarray, inputs: np.ndar
             plt.show()
 
 def main(
-    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], model: nn.Module,
+    epoch_count: int, learning_rate: float, decay_learning_rate: bool, batch_sizes: Tuple[int, int, int], dataset_split: Tuple[float, float, float], model: nn.Module, dataset: Dataset,
     filename_model: str, train_existing: bool, save_model_every: int, save_best_separately: bool,
-    dataset: Dataset,
-    train: bool, test: bool,
-    show_loss: bool, show_parity: bool, show_predictions: bool,
+    train: bool, test: bool, show_loss: bool, show_parity: bool, show_predictions: bool,
     Optimizer: torch.optim.Optimizer = torch.optim.SGD, Loss: nn.Module = nn.MSELoss,
     queue: Queue = None, queue_to_main: Queue = None,
 ):
     """
-    Function run directly by this file and by the GUI.
+    Train and test a model.
 
-    Parameters:
-    `train`: Train the model.
-    `test`: Test the model.
-    `train_existing`: Load a previously saved model and continue training it.
-
+    Inputs:
     `epoch_count`: Number of epochs to train.
-    `learning_rate`: Learning rate for the optimizer.
+    `learning_rate`: Learning rate.
+    `decay_learning_rate`: Use a learning rate scheduler.
     `batch_sizes`: Tuple of batch sizes for the training, validation, and testing datasets.
+    `dataset_split`: A tuple of three ratios in [0, 1] for the training, validation, and testing datasets.
     `model`: The network to train.
     `Optimizer`: An Optimizer subclass to instantiate, not an instance of the class.
     `Loss`: A Module subclass to instantiate, not an instance of the class.
-
     `dataset`: The dataset to train on.
-    `dataset_split`: A tuple of three floats in [0, 1] of the training, validation, and testing ratios.
+
     `filename_model`: Name of the .pth file to load and save to during training.
-    
-    `queue`: A Queue used to send information to the GUI.
-    `queue_to_main`: A Queue used to receive information from the GUI.
+    `train_existing`: Load a previously saved model.
+    `save_model_every`: Number of epochs between each instance of saving the model.
+    `save_best_separately`: Track the best model (as evaluated on the validation dataset) and save it as a separate file.
+
+    `train`: Train the model. Set to False to test a pretrained model.
+    `test`: Test the model.
+    `show_loss`: Plot the loss history.
+    `show_parity`: Plot model predictions vs. labels.
+    `show_predictions`: Plot model predictions and corresponding labels.
     """
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = 'cpu'  #"cuda" if torch.cuda.is_available() else "cpu"
     print(f"\nUsing {device} device.")
 
     # Initialize values to send to the GUI.
@@ -488,7 +489,6 @@ def main(
             loss_function = loss_function,
             train_dataloader = train_dataloader,
             validate_dataloader = validate_dataloader,
-            dataset = dataset,
             scheduler = scheduler,
             queue = queue,
             queue_to_main = queue_to_main,
@@ -498,8 +498,8 @@ def main(
     # Show the loss history.
     if show_loss:
         checkpoint = load_model(filepath=filepath_model)
-        losses_training = checkpoint.get("training_loss", [])
-        losses_validation = checkpoint.get("validation_loss", [])
+        losses_training = checkpoint.get('training_loss', [])
+        losses_validation = checkpoint.get('validation_loss', [])
         plot_loss(losses_training, losses_validation)
 
     # Load the best model.
@@ -564,16 +564,15 @@ def main(
     return results
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     dataset = CantileverDataset(
         normalize_inputs=False,
-        transformation_exponent=None,
-        transformation_logarithm=(0.1, 0.1+1.0),
+        transformation_exponent=1,
+        transformation_logarithm=None,
     )
 
-    # 1e-3 (1-50), 1e-4 (51-100), 1e-5 (101-150), 1e-6 (151-350)
     main(
-        filename_model = 'StressNetLT.pth',
+        filename_model = 'StressNet.pth',
         train_existing = True,
         save_model_every = 5,
         save_best_separately = True,
