@@ -3,6 +3,8 @@ Functions for generating figures.
 """
 
 
+import random
+
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -81,6 +83,7 @@ def plot_page_history():
         '2023-04-08': 117,
         '2023-04-09': 120,
         '2023-04-10': 121,
+        '2023-04-19': 122,
     }
     dates = [datetime.strptime(_, '%Y-%m-%d') for _ in pages.keys()]
 
@@ -111,6 +114,34 @@ def plot_page_distribution():
         counterclock=False,
         wedgeprops={'width': 0.25, 'edgecolor': [1.0]*3},
     )
+    plt.show()
+
+def plot_data_imbalance_classification():
+    """Visualization of data imbalance in classification."""
+
+    plt.figure(figsize=(3, 3))
+    plt.bar([1, 2], [90, 10])
+    plt.xticks(ticks=[1, 2], labels=['Not Cancer', 'Cancer'])
+    plt.yticks([])
+    plt.title('Dataset')
+    plt.show()
+
+def plot_function_approximation():
+    """Visualization of function approximation."""
+
+    f = lambda x: x ** 2
+
+    x_data = np.random.rand(15) * 3
+    y_data = f(x_data) + np.random.randn(x_data.size)
+
+    x_fit = np.linspace(0, 3, 100)
+    y_fit = f(x_fit)
+
+    plt.scatter(x_data, y_data)
+    plt.plot(x_fit, y_fit, '--')
+    plt.xticks([])
+    plt.yticks([])
+    plt.tight_layout()
     plt.show()
 
 def plot_label_histogram():
@@ -148,13 +179,13 @@ def plot_label():
 
     labels = read_pickle('Labels 2D/labels.pickle')
     label = labels[5200, 0, ...]
-    # label = labels[829, 0, ...]
 
-    plt.figure()
+    plt.figure(figsize=(6, 3))
     plt.imshow(label, cmap='Spectral_r', vmin=label.max(), vmax=0)
     plt.xticks([])
     plt.yticks([])
     plt.colorbar(fraction=0.02, ticks=np.linspace(0, label.max(), 4), label='Stress [Pa]')
+    plt.tight_layout()
     plt.show()
 
 def plot_inputs_labels():
@@ -338,7 +369,7 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 1)
     plt.grid()
-    plt.plot(me, '*-', label=['Normal', 'Sampling'])
+    plt.plot(me, '*-', label=['Baseline', 'SS'])
     plt.title('Mean Error')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -346,7 +377,7 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 2)
     plt.grid()
-    plt.semilogy(mae, '*-', label=['Normal', 'Sampling'])
+    plt.semilogy(mae, '*-', label=['Baseline', 'SS'])
     plt.title('MAE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -354,7 +385,7 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 3)
     plt.grid()
-    plt.semilogy(mse, '*-', label=['Normal', 'Sampling'])
+    plt.semilogy(mse, '*-', label=['Baseline', 'SS'])
     plt.title('MSE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -362,7 +393,7 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 4)
     plt.grid()
-    plt.semilogy(mre, '*-', label=['Normal', 'Sampling'])
+    plt.semilogy(mre, '*-', label=['Baseline', 'SS'])
     plt.title('MRE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -377,7 +408,7 @@ def plot_stratified_sampling_predictions():
     folders = glob.glob('Stratified Sampling Predictions/*')
 
     for folder in folders:
-        plt.figure()
+        plt.figure(figsize=(6,3))
 
         files = glob.glob(f"{folder}/*.png")
         for i, file in enumerate(sorted(files)):
@@ -392,9 +423,9 @@ def plot_stratified_sampling_predictions():
             plt.xticks([])
             plt.yticks([])
             if i == 0:
-                plt.ylabel("Normal")
+                plt.ylabel('Baseline')
             elif i == 4:
-                plt.ylabel("Sampling")
+                plt.ylabel('SS')
 
             # Show label.
             if 's' in file:
@@ -406,6 +437,8 @@ def plot_stratified_sampling_predictions():
                     plt.ylabel('True')
     
             plt.suptitle(f"{os.path.basename(folder)} Data", fontweight='bold')
+        plt.tight_layout()
+
     plt.show()
 
 def plot_label_transformation_average_histogram():
@@ -649,6 +682,6 @@ def plot_lt_metrics(transform: Literal['exp', 'log']):
 
 
 if __name__ == '__main__':
-    plot_page_progress(current=121, previous=113, goal_1=120, goal_2=150)
+    plot_page_progress(current=122, previous=113, goal_1=120, goal_2=150)
     plot_page_history()
     plot_page_distribution()
