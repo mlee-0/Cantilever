@@ -566,7 +566,6 @@ def main(
 
 if __name__ == "__main__":
     dataset = CantileverDataset(
-        is_3d=False,
         normalize_inputs=False,
         transformation_exponent=None,
         transformation_logarithm=(0.1, 0.1+1.0),

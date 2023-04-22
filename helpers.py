@@ -110,7 +110,7 @@ def read_samples(filepath: str) -> pd.DataFrame:
         print(f"Found {len(samples):,} samples in {filepath}.")
         return samples
 
-def generate_input_images(samples: pd.DataFrame, is_3d: bool) -> np.ndarray:
+def generate_input_images(samples: pd.DataFrame, is_3d: bool=False) -> np.ndarray:
     """Return a 4D array of images for each of the specified sample values, with dimensions: (samples, channels, height, width)."""
     
     time_start = time.time()
@@ -426,33 +426,3 @@ if __name__ == "__main__":
     folder = os.path.join(FOLDER_ROOT, "Labels 2D")
     labels = generate_label_images(samples, folder, is_3d=not True)
     write_pickle(labels, os.path.join(folder, "labels.pickle"))
-
-    # p = read_pickle("Cantilever/Labels 3D/labels.pickle")[:1000, ...]
-    # max_value = np.max(p)
-    # normalized = p / np.max(p, axis=(1, 2, 3), keepdims=True)
-
-    # p = p.flatten()
-    # normalized = normalized.flatten()
-    
-    # bins = 100
-
-    # plt.figure()
-    # plt.subplot(1, 2, 1)
-    # plt.hist(p, bins=bins, label="Original")
-    # plt.title("Original")
-    # plt.subplot(1, 2, 2)
-    # plt.hist(normalized, bins=bins)
-    # plt.title("Averaged by sample")
-    # plt.show()
-
-    # plt.figure()
-    # exponents = (1/2.2, 1/2.1, 0.5023404737562848, 1/1.9, 1/1.8, 1/1.7, 1/1.6, 1/1.5, 1)
-    # titles = ('1/2.2', '1/2.1', '1/1.99', '1/1.9', '1/1.8', '1/1.7', '1/1.6', '1/1.5', '1')
-    # for i, exponent in enumerate(exponents):
-    #     plt.subplot(2, 5, i+1)
-    #     transformed = p.flatten() ** exponent
-    #     plt.hist(normalized, bins=bins, alpha=0.5, label="Target")
-    #     plt.hist(transformed/transformed.max(), bins=bins, alpha=0.5, label="Transformed")
-    #     plt.legend()
-    #     plt.title(titles[i])
-    # plt.show()

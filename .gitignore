@@ -5,7 +5,7 @@
 *.png
 subset*.txt
 ansys_script.lgw
-Labels 2D
+Labels 2D/*.txt
 Labels 3D
 Results
 Stratified Sampling Predictions/*
