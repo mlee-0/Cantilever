@@ -1,6 +1,4 @@
-"""
-Run this script to train and test the model.
-"""
+"""Run this script to train and test the model."""
 
 
 import gc
@@ -33,13 +31,9 @@ def save_model(filepath: str, **kwargs) -> None:
 
 def load_model(filepath: str, device: str='cpu') -> dict:
     """Return a dictionary of model parameters from a file."""
-    try:
-        checkpoint = torch.load(filepath, map_location=device)
-    except FileNotFoundError:
-        print(f"{filepath} not found.")
-    else:
-        print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
-        return checkpoint
+    checkpoint = torch.load(filepath, map_location=device)
+    print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
+    return checkpoint
 
 def plot_loss(losses_training: List[float], losses_validation: List[float]) -> None:
     plt.figure()
@@ -535,11 +529,11 @@ def main(
 
         # Show corresponding inputs, outputs, labels.
         if show_predictions:
-            for i in random.sample(range(len(test_dataset)), k=10):
+            for i in random.sample(range(len(test_dataset)), k=3):
                 label, output = labels[i, 0, ...], outputs[i, 0, ...]
                 maximum = torch.max(label.max(), output.max())
 
-                plt.figure(figsize=(6, 2))
+                plt.figure(figsize=(6, 1.5))
 
                 # plt.subplot(1, 4, 1)
                 # plt.imshow(inputs[i, 0, ...], cmap='gray')
@@ -548,12 +542,16 @@ def main(
 
                 plt.subplot(1, 2, 1)
                 plt.imshow(output, cmap='Spectral_r', vmin=0, vmax=maximum)
+                plt.xticks([])
+                plt.yticks([])
                 plt.title('Predicted')
                 colorbar = plt.colorbar(ticks=[0, maximum], fraction=0.05, aspect=10)
                 colorbar.ax.tick_params(labelsize=6)
 
                 plt.subplot(1, 2, 2)
                 plt.imshow(label, cmap='Spectral_r', vmin=0, vmax=maximum)
+                plt.xticks([])
+                plt.yticks([])
                 plt.title('True')
                 colorbar = plt.colorbar(ticks=[0, maximum], fraction=0.05, aspect=10)
                 colorbar.ax.tick_params(labelsize=6)
@@ -567,8 +565,9 @@ def main(
 if __name__ == '__main__':
     dataset = CantileverDataset(
         normalize_inputs=False,
-        transformation_exponent=1,
-        transformation_logarithm=None,
+        transformation_exponentiation=None,
+        transformation_logarithmic=None,
+        label_max=100,
     )
 
     main(
@@ -588,7 +587,7 @@ if __name__ == '__main__':
         
         dataset = dataset,
         
-        train = True,
+        train = not True,
         test = True,
         show_loss = True,
         show_parity = True,
