@@ -1,6 +1,4 @@
-"""
-Information about parameters and functions for reading and writing files. Run this script to generate and save label images.
-"""
+"""Information about parameters and functions for reading and writing files. Run this script to process and cache label data."""
 
 
 import colorsys
@@ -254,15 +252,17 @@ def generate_label_images(samples: pd.DataFrame, folder: str, is_3d: bool) -> np
 
         # Insert the values into the combined array, aligned top-left.
         if is_3d:
+            # Flip along height due to inverted y-axis in FEA.
             labels[i, :image_channels, :image_height, :image_length] = np.reshape(
                 [_[0] for _ in node_values],
                 (image_channels, image_height, image_length),
-            )
+            )[:, ::-1, :]
         else:
+            # Flip along height due to inverted y-axis in FEA.
             labels[i, :, :image_height, :image_length] = np.reshape(
                 [_[0] for _ in node_values if _[3] == 0.0],
                 (1, image_height, image_length),
-            )
+            )[:, ::-1, :]
         
         if (i+1) % 100 == 0:
             print(f"Reading label {i+1} / {number_samples}...", end="\r")
