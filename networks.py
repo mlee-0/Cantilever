@@ -1,12 +1,10 @@
-"""
-Networks with different architectures.
-"""
+"""Define network architectures."""
+
 
 import inspect
 import sys
 from typing import Tuple
 
-import numpy as np
 import torch
 from torch import nn
 

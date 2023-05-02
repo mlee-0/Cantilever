@@ -1,6 +1,4 @@
-"""
-Run this script to generate dataset files.
-"""
+"""Run this script to generate dataset files."""
 
 
 import os

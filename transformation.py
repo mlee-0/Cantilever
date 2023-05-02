@@ -1,6 +1,4 @@
-"""
-Use optimization to find a power that transforms the dataset to the desired target distribution.
-"""
+"""Use optimization to find a transformation that transforms the dataset to the desired target distribution."""
 
 
 from typing import *

@@ -34,7 +34,7 @@ def transform_logarithmic(data: torch.Tensor, input_range: Tuple[float, float], 
 
 class CantileverDataset(Dataset):
     """
-    Dataset of 2-channel input images and 1-channel label images. Generates input images on initialization and loads a .pickle file of preprocessed labels. Optionally specify a transformation to apply on the labels.
+    Load a stress distribution dataset obtained in FEA. Contains 2-channel input images and 1-channel label images. Generates input images on initialization and loads a .pickle file of preprocessed labels. Optionally specify a transformation to apply on the labels.
 
     Inputs:
     `normalize_inputs`: Normalize the input data to have zero mean and unit variance. Not recommended.

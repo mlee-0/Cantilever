@@ -1,6 +1,4 @@
-"""
-Functions for generating figures.
-"""
+"""Functions for generating figures."""
 
 
 import random
@@ -84,6 +82,8 @@ def plot_page_history():
         '2023-04-09': 120,
         '2023-04-10': 121,
         '2023-04-19': 122,
+        '2023-04-26': 121,
+        '2023-04-27': 123,
     }
     dates = [datetime.strptime(_, '%Y-%m-%d') for _ in pages.keys()]
 
@@ -156,8 +156,8 @@ def plot_label_histogram():
     plt.xticks([0, 20_000, 40_000, labels.max()])
     plt.show()
 
-def plot_input():
-    """Figure of both channels of an input."""
+def plot_inputs():
+    """Both channels of an input image."""
 
     samples = read_samples('samples.csv')
     inputs = generate_input_images(samples, is_3d=False)
@@ -174,17 +174,20 @@ def plot_input():
     plt.colorbar(fraction=0.023, ticks=[0, 1, 2])
     plt.show()
 
-def plot_label():
-    """Figure of a typical stress distribution with corresponding color scale."""
+def plot_labels():
+    """Examples of stress distributions with corresponding color scale."""
 
     labels = read_pickle('Labels 2D/labels.pickle')
-    label = labels[5200, 0, ...]
+    # label = labels[5200, 0, ...]
 
     plt.figure(figsize=(6, 3))
-    plt.imshow(label, cmap='Spectral_r', vmin=label.max(), vmax=0)
-    plt.xticks([])
-    plt.yticks([])
-    plt.colorbar(fraction=0.02, ticks=np.linspace(0, label.max(), 4), label='Stress [Pa]')
+    for i, index in enumerate(random.sample(list(range(labels.shape[0])), k=6)):
+        label = labels[index, 0, ...]
+        plt.subplot(3, 2, i+1)
+        plt.imshow(label, cmap='Spectral_r', vmin=label.max(), vmax=0)
+        plt.xticks([])
+        plt.yticks([])
+        plt.colorbar(fraction=0.02, ticks=[label.min(), label.max()], label='Stress [Pa]')
     plt.tight_layout()
     plt.show()
 
@@ -358,7 +361,7 @@ def plot_stratified_sampling_histogram():
 def plot_stratified_sampling_metrics():
     """Figure comparing evaluation metrics for models trained both with and without stratified sampling."""
 
-    # First column is without, second column is with stratified sampling.
+    # First column is baseline, second column is stratified sampling.
     me = np.array([[2.03, 1.98], [-8.42, 3.36], [2.52, 11.97], [-126.76, 89.86], [-552.78, -134.31]])[::-1, :]
     mae = np.array([[56.11, 55.93], [76.03, 73.24], [188.27, 156.97], [510.20, 371.13], [1051.73, 772.29]])[::-1, :]
     mse = np.array([[13285, 10075], [34861, 17283], [208906, 81686], [1267646, 547539], [4147007, 2317887]])[::-1, :]
@@ -369,7 +372,8 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 1)
     plt.grid()
-    plt.plot(me, '*-', label=['Baseline', 'SS'])
+    plt.plot(me[:, 0], '.-', color=[0.0]*3, label='Baseline')
+    plt.plot(me[:, 1], '.-', label='SS')
     plt.title('Mean Error')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -377,7 +381,8 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 2)
     plt.grid()
-    plt.semilogy(mae, '*-', label=['Baseline', 'SS'])
+    plt.semilogy(mae[:, 0], '.-', color=[0.0]*3, label='Baseline')
+    plt.semilogy(mae[:, 1], '.-', label='SS')
     plt.title('MAE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -385,7 +390,8 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 3)
     plt.grid()
-    plt.semilogy(mse, '*-', label=['Baseline', 'SS'])
+    plt.semilogy(mse[:, 0], '.-', color=[0.0]*3, label='Baseline')
+    plt.semilogy(mse[:, 1], '.-', label='SS')
     plt.title('MSE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -393,7 +399,8 @@ def plot_stratified_sampling_metrics():
 
     plt.subplot(2, 2, 4)
     plt.grid()
-    plt.semilogy(mre, '*-', label=['Baseline', 'SS'])
+    plt.semilogy(mre[:, 0], '.-', color=[0.0]*3, label='Baseline')
+    plt.semilogy(mre[:, 1], '.-', label='SS')
     plt.title('MRE')
     plt.xlabel('Dataset Size')
     plt.xticks(range(5), labels=dataset_sizes)
@@ -592,7 +599,7 @@ def plot_lt_metrics(transform: Literal['exp', 'log']):
     elif transform == 'log':
         results = results_logarithm
         x1 = [1e-10, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 0.5, 1.0]
-        labels = [f"{_:.0e}" for _ in x1]
+        labels = [str(_) for _ in x1]
 
     else:
         raise ValueError(f"Invalid input argument: {transform}.")
@@ -614,69 +621,69 @@ def plot_lt_metrics(transform: Literal['exp', 'log']):
     maxima_nrmse = results[:, 6+8]
     maxima_mre = results[:, 7+8]
 
-    plt.figure(1)
+    plt.figure(1, figsize=(6, 6))
 
     plt.subplot(2, 2, 1)
     plt.plot(mae, '.-')
-    plt.axhline(result_baseline[1], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.axhline(result_baseline[1], linestyle='--', color=[0.0]*3, label='Baseline')
     plt.xticks(ticks=range(len(mae)), labels=labels, rotation=90)
     plt.legend()
     plt.title('MAE')
 
     plt.subplot(2, 2, 2)
     plt.semilogy(mre, '.-')
-    plt.axhline(result_baseline[7], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.axhline(result_baseline[7], linestyle='--', color=[0.0]*3, label='Baseline')
     plt.xticks(ticks=range(len(mre)), labels=labels, rotation=90)
     plt.legend()
     plt.title('MRE')
 
     plt.subplot(2, 2, 3)
-    plt.plot(mse, '.-')
-    plt.axhline(result_baseline[2], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.semilogy(mse, '.-')
+    plt.axhline(result_baseline[2], linestyle='--', color=[0.0]*3, label='Baseline')
     plt.xticks(ticks=range(len(mse)), labels=labels, rotation=90)
     plt.legend()
     plt.title('MSE')
 
     plt.subplot(2, 2, 4)
-    plt.plot(rmse, '.-')
-    plt.axhline(result_baseline[3], linestyle='--', color=[0.5]*3, label='No transformation')
+    plt.semilogy(rmse, '.-')
+    plt.axhline(result_baseline[3], linestyle='--', color=[0.0]*3, label='Baseline')
     plt.xticks(ticks=range(len(rmse)), labels=labels, rotation=90)
     plt.legend()
     plt.title('RMSE')
 
-    plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.4)
+    plt.tight_layout()
 
-    plt.figure(2)
+    # plt.figure(2, figsize=(6, 6))
 
-    plt.subplot(2, 2, 1)
-    plt.plot(maxima_mae, '.-')
-    plt.axhline(result_baseline[1+8], linestyle='--', color=[0.5]*3, label='No transformation')
-    plt.xticks(ticks=range(len(maxima_mae)), labels=labels, rotation=90)
-    plt.legend()
-    plt.title('MAE (Maxima)')
+    # plt.subplot(2, 2, 1)
+    # plt.plot(maxima_mae, '.-')
+    # plt.axhline(result_baseline[1+8], linestyle='--', color=[0.0]*3, label='Baseline')
+    # plt.xticks(ticks=range(len(maxima_mae)), labels=labels, rotation=90)
+    # plt.legend()
+    # plt.title('MAE (Maxima)')
 
-    plt.subplot(2, 2, 2)
-    plt.semilogy(maxima_mre, '.-')
-    plt.axhline(result_baseline[7+8], linestyle='--', color=[0.5]*3, label='No transformation')
-    plt.xticks(ticks=range(len(maxima_mre)), labels=labels, rotation=90)
-    plt.legend()
-    plt.title('MRE (Maxima)')
+    # plt.subplot(2, 2, 2)
+    # plt.semilogy(maxima_mre, '.-')
+    # plt.axhline(result_baseline[7+8], linestyle='--', color=[0.0]*3, label='Baseline')
+    # plt.xticks(ticks=range(len(maxima_mre)), labels=labels, rotation=90)
+    # plt.legend()
+    # plt.title('MRE (Maxima)')
 
-    plt.subplot(2, 2, 3)
-    plt.plot(maxima_mse, '.-')
-    plt.axhline(result_baseline[2+8], linestyle='--', color=[0.5]*3, label='No transformation')
-    plt.xticks(ticks=range(len(maxima_mse)), labels=labels, rotation=90)
-    plt.legend()
-    plt.title('MSE (Maxima)')
+    # plt.subplot(2, 2, 3)
+    # plt.plot(maxima_mse, '.-')
+    # plt.axhline(result_baseline[2+8], linestyle='--', color=[0.0]*3, label='Baseline')
+    # plt.xticks(ticks=range(len(maxima_mse)), labels=labels, rotation=90)
+    # plt.legend()
+    # plt.title('MSE (Maxima)')
 
-    plt.subplot(2, 2, 4)
-    plt.plot(maxima_rmse, '.-')
-    plt.axhline(result_baseline[3+8], linestyle='--', color=[0.5]*3, label='No transformation')
-    plt.xticks(ticks=range(len(maxima_rmse)), labels=labels, rotation=90)
-    plt.legend()
-    plt.title('RMSE (Maxima)')
+    # plt.subplot(2, 2, 4)
+    # plt.plot(maxima_rmse, '.-')
+    # plt.axhline(result_baseline[3+8], linestyle='--', color=[0.0]*3, label='Baseline')
+    # plt.xticks(ticks=range(len(maxima_rmse)), labels=labels, rotation=90)
+    # plt.legend()
+    # plt.title('RMSE (Maxima)')
 
-    plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.4)
+    # plt.tight_layout()
 
     plt.show()
 

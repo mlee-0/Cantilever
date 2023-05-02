@@ -408,7 +408,7 @@ def main(
     `test`: Test the model.
     `show_loss`: Plot the loss history.
     `show_parity`: Plot model predictions vs. labels.
-    `show_predictions`: Plot model predictions and corresponding labels.
+    `show_predictions`: Show randomly selected model predictions with corresponding labels.
     """
 
     device = 'cpu'  #"cuda" if torch.cuda.is_available() else "cpu"
