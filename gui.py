@@ -17,7 +17,7 @@ from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QSplitter, QFileDialog
 
-from helpers import Colors, FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap, plot_loss
+from helpers import FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap
 import main
 import networks
 
@@ -498,14 +498,14 @@ class MainWindow(QMainWindow):
         all_training_loss = [*previous_training_loss, *training_loss]
         all_validation_loss = [*previous_validation_loss, *validation_loss]
         if training_loss:
-            axis.plot(range(1, len(all_training_loss)+1), all_training_loss, ".:", color=Colors.ORANGE, label="Training")
-            axis.annotate(f"{training_loss[-1]:,.2f}", (epochs[len(training_loss)-1], training_loss[-1]), color=Colors.ORANGE, fontsize=10)
+            axis.plot(range(1, len(all_training_loss)+1), all_training_loss, ".:", label="Training")
+            axis.annotate(f"{training_loss[-1]:,.2f}", (epochs[len(training_loss)-1], training_loss[-1]), fontsize=10)
         if validation_loss:
-            axis.plot(range(1, len(all_validation_loss)+1), all_validation_loss, ".-", color=Colors.BLUE, label="Validation")
-            axis.annotate(f"{validation_loss[-1]:,.2f}", (epochs[len(validation_loss)-1], validation_loss[-1]), color=Colors.BLUE, fontsize=10)
+            axis.plot(range(1, len(all_validation_loss)+1), all_validation_loss, ".-", label="Validation")
+            axis.annotate(f"{validation_loss[-1]:,.2f}", (epochs[len(validation_loss)-1], validation_loss[-1]), fontsize=10)
 
         if previous_training_loss or previous_validation_loss:
-            axis.vlines(epochs[0] - 0.5, 0, max(previous_training_loss + previous_validation_loss), colors=(Colors.GRAY,), label="Current session starts")
+            axis.vlines(epochs[0] - 0.5, 0, max(previous_training_loss + previous_validation_loss), colors=([0]*3,), label="Current session starts")
         
         axis.legend()
         axis.set_ylim(bottom=0)
@@ -627,13 +627,32 @@ class MainWindow(QMainWindow):
                 all_training_loss = [*previous_training_loss, *training_loss]
                 all_validation_loss = [*previous_validation_loss, *validation_loss]
                 all_epochs = [*range(1, epochs[0]), *epochs[:len(training_loss)]]
-                plot_loss(
-                    figure = self.figure_loss,
-                    epochs = all_epochs,
-                    loss = [all_training_loss, all_validation_loss],
-                    labels = ("Training", "Validation"),
-                    start_epoch = epochs[0] if previous_training_loss else None,
-                    )
+
+                epochs = all_epochs
+                loss = [all_training_loss, all_validation_loss]
+                labels = ("Training", "Validation")
+                start_epoch = epochs[0] if previous_training_loss else None
+
+                self.figure_loss.clear()
+                axis = self.figure_loss.add_subplot(1, 1, 1)  # Number of rows, number of columns, index
+                
+                # markers = (".:", ".-")
+
+                # Plot each set of loss values.
+                for i, loss_i in enumerate(loss):
+                    if not len(loss_i):
+                        continue
+                    axis.semilogy(epochs[:len(loss_i)], loss_i, ".-", label=labels[i])
+                    axis.annotate(f"{loss_i[-1]:,.2f}", (epochs[-1 - (len(epochs)-len(loss_i))], loss_i[-1]), fontsize=10)
+                
+                # Plot a vertical line indicating when the current training session began.
+                if start_epoch:
+                    axis.vlines(start_epoch - 0.5, 0, max([max(_) for _ in loss]), colors=([0.5]*3,), label="Current session starts")
+                
+                axis.legend()
+                axis.set_xlabel("Epochs")
+                axis.set_ylabel("Loss")
+                axis.grid(axis="y")
                 self.canvas_loss.draw()
                 
         # Thread has stopped.

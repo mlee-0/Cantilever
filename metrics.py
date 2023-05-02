@@ -6,8 +6,6 @@ from typing import Tuple
 from matplotlib import pyplot as plt
 import numpy as np
 
-from helpers import Colors
-
 
 def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """Plot and return the CDFs of the inputs and the difference between the areas under their CDFs."""
@@ -28,8 +26,8 @@ def area_metric(predicted: np.ndarray, true: np.ndarray, max_value, plot=False) 
 
     if plot:
         plt.figure()
-        plt.plot(bin_edges[1:], cdf_predicted, "-", color=Colors.BLUE_DARK, label="Predicted")
-        plt.plot(bin_edges[1:], cdf_true, ":", color=Colors.RED, label="True")
+        plt.plot(bin_edges[1:], cdf_predicted, "-", label="Predicted")
+        plt.plot(bin_edges[1:], cdf_true, ":", label="True")
         plt.legend()
         plt.grid(visible=True, axis="y")
         # plt.title(f"{area_difference:0.2f}", fontsize=10, fontweight="bold")

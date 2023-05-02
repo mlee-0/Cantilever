@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from helpers import *
-from datasets import CantileverDataset
+from datasets import CantileverDataset, generate_simulation_parameters
 
 
 def plot_page_progress(current: int, previous: int, goal_1: int=120, goal_2: int=150):
@@ -159,18 +159,18 @@ def plot_label_histogram():
 def plot_inputs():
     """Both channels of an input image."""
 
-    samples = read_samples('samples.csv')
-    inputs = generate_input_images(samples, is_3d=False)
+    parameters = generate_simulation_parameters()
+    inputs = generate_input_images(parameters)
     i = 5200  #829
 
     plt.figure(figsize=(4, 6))
     plt.subplot(2, 1, 1)
     plt.imshow(inputs[i, 0, ...], cmap='gray', vmin=0, vmax=2)
-    plt.title(f"Length = {samples['Length'][i]} m, Height = {samples['Height'][i]} m")
+    plt.title(f"Length = {parameters[i][1]} m, Height = {parameters[i][2]} m")
     plt.colorbar(fraction=0.023, ticks=[0, 1, 2])
     plt.subplot(2, 1, 2)
     plt.imshow(inputs[i, 1, ...], cmap='gray', vmin=0, vmax=2)
-    plt.title(f"Angle = {int(samples['Angle XY'][i])}°")
+    plt.title(f"Angle = {int(parameters[i][0])}°")
     plt.colorbar(fraction=0.023, ticks=[0, 1, 2])
     plt.show()
 
@@ -194,8 +194,7 @@ def plot_labels():
 def plot_inputs_labels():
     """Many input images with corresponding labels."""
 
-    samples = read_samples('samples.csv')
-    dataset = CantileverDataset(samples, is_3d=False)
+    dataset = CantileverDataset()
 
     for i, index in enumerate([1000, 3000, 5000, 7000]):
         input_data, label_data = dataset[index]

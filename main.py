@@ -35,6 +35,19 @@ def load_model(filepath: str, device: str='cpu') -> dict:
     print(f"Loaded model from {filepath} trained for {checkpoint['epoch']} epochs.")
     return checkpoint
 
+def split_dataset(dataset_size: int, splits: List[float]) -> List[int]:
+    """Return the subset sizes according to the fractions defined in `splits`."""
+
+    assert sum(splits) == 1.0, f"The fractions {splits} must sum to 1."
+
+    # Define the last subset size as the remaining number of data to ensure that they all sum to dataset_size.
+    subset_sizes = []
+    for fraction in splits[:-1]:
+        subset_sizes.append(int(fraction * dataset_size))
+    subset_sizes.append(dataset_size - sum(subset_sizes))
+
+    return subset_sizes
+
 def plot_loss(losses_training: List[float], losses_validation: List[float]) -> None:
     plt.figure()
     plt.semilogy(range(1, len(losses_training)+1), losses_training, '-', label='Training')

@@ -46,10 +46,10 @@ class CantileverDataset(Dataset):
     def __init__(self, normalize_inputs: bool=False, transformation_exponentiation: float=None, transformation_logarithmic: Tuple[float, float]=None, label_max: float=100):
         self.label_max = label_max
 
-        samples = read_samples(os.path.join(FOLDER_ROOT, 'samples.csv'))
+        parameters = generate_simulation_parameters()
 
         # Create input images.
-        self.inputs = generate_input_images(samples)
+        self.inputs = generate_input_images(parameters)
         self.inputs = torch.tensor(self.inputs).float()
         # Normalize to zero mean and unit standard deviation.
         if normalize_inputs:
@@ -135,8 +135,9 @@ class CantileverDataset3d(Dataset):
     Dataset of inputs and labels for 3D stress predictions. Generates inputs on intialization and loads a .pickle file of preprocessed labels.
     """
 
-    def __init__(self, samples: pd.DataFrame, normalize_inputs: bool=False, transformation_exponent: float=1):
-        self.number_samples = len(samples)
+    def __init__(self, normalize_inputs: bool=False, transformation_exponent: float=1):
+        parameters = generate_simulation_parameters()
+
         self.transformation_exponent = transformation_exponent
         print(f"Using transformation exponent: {self.transformation_exponent}.")
 
@@ -153,20 +154,17 @@ class CantileverDataset3d(Dataset):
         self.labels = self.transform(self.labels, inverse=False)
         
         # Create inputs.
-        self.inputs = generate_input_images_3d(samples)
+        self.inputs = generate_input_images_3d(parameters)
         if normalize_inputs:
             raise NotImplementedError()
         print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")
-
-        # Numerical inputs, scaled to [0, 1].
-        self.loads = (samples[load.name] - load.low) / (load.high - load.low)
 
         # Number of channels in input and label images.
         self.input_channels = self.inputs.shape[1]
         self.output_channels = self.labels.shape[1]
 
     def __len__(self):
-        return self.number_samples
+        return self.inputs.size(0)
     
     def __getitem__(self, index):
         """Return input and label images."""

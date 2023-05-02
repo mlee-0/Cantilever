@@ -6,7 +6,6 @@ import math
 import os
 
 import numpy as np
-import pandas as pd
 
 from helpers import *
 
@@ -47,13 +46,13 @@ def stratify_samples(labels: np.ndarray, filename: str, subset_size: int, bins: 
     recommended_raw_size = actual_raw_size * required_frequencies[minimum_bin] / minimum_frequency
     
     plt.figure()
-    plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95, color=Colors.BLUE)
+    plt.hist(maxima, bins=bins, range=histogram_range, rwidth=0.95)
     plt.plot(
         [bin_edges[:-1], bin_edges[1:]],
         [required_frequencies, required_frequencies],
         "k--"
     )
-    plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), color=Colors.RED, fontweight="bold", horizontalalignment="center")
+    plt.annotate(f"{minimum_frequency}", (np.mean(bin_edges[minimum_bin:minimum_bin+2]), minimum_frequency), fontweight="bold", horizontalalignment="center")
     plt.xticks(bin_edges, rotation=90, fontsize=6)
     plt.xlabel("Stress")
     plt.title(f"Subset contains {actual_subset_size} out of desired {subset_size}, dataset of {actual_raw_size} should be around {recommended_raw_size:.0f}", fontsize=10)

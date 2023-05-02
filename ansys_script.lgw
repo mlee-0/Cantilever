@@ -1,40 +1,30 @@
+! When performing multiplication operations in this script using the * operator, there should not be spaces on either side of *. For example, use `1*2` instead of `1 * 2`.
+
+
+/CLEAR
 /BATCH  
-! /COM,ANSYS RELEASE 2021 R1           BUILD 21.1      UP20201109       15:50:34  
 /input,menust,tmp,''
-! /GRA,POWER  
-! /GST,ON 
-! /PLO,INFO,3 
-! /GRO,CURL,ON
-! /CPLANE,1   
-! /REPLOT,RESIZE  
 WPSTYLE,,,,,,,,0
-! /REPLOT,RESIZE  
-!*  
 
 
 ! Disable "Solution is done" popup window.
 KEYW,pr_sgui,1
 
-
-! placeholder_loop_start
-
 ! Define either 2 (2D analysis) or 3 (3D analysis).
 dimensions = 2
 
-! placeholder_define_samples
+! Define constants.
+load = 500
 
-load_x_2d = samples(2,i,1)
-load_y_2d = samples(3,i,1)
-load_x_3d = samples(4,i,1)
-load_y_3d = samples(5,i,1)
-load_z_3d = samples(6,i,1)
-node_load = samples(7,i,1)
-length = samples(8,i,1)
-height = samples(9,i,1)
-width = samples(10,i,1)
-nodes_x = samples(11,i,1)
-nodes_y = samples(12,i,1)
-nodes_z = samples(13,i,1)
+
+*DO, angle, 0, 90, 5
+*DO, length, 0.8, 3.2, 0.2
+*DO, height, 0.4, 1.6, 0.2
+*DO, position, 0.2, 1.0, 0.2
+
+! Save parameters defined in this script so far so that they can be accessed after calling /CLEAR.
+PARSAV, ALL
+
 
 /NOPR
 KEYW,PR_SET,1
@@ -96,11 +86,11 @@ MPDATA,PRXY,1,,0.3
 *IF,dimensions,EQ,2,THEN
     ! X lines have line numbers: 1, 3.
     LSEL,S,LINE,,1,3,2,0
-    LESIZE,ALL, , ,nodes_x-1, , , , ,1
+    LESIZE,ALL, , ,length/0.1-1, , , , ,1
 
     ! Y lines have line numbers: 2, 4.
     LSEL,S,LINE,,2,4,2,0
-    LESIZE,ALL, , ,nodes_y-1, , , , ,1
+    LESIZE,ALL, , ,height/0.1-1, , , , ,1
 
     ! Create the mesh.
     MSHAPE,0,2D
@@ -130,11 +120,23 @@ MPDATA,PRXY,1,,0.3
 
 ! Specify the displacement boundary conditions and the X and Y components of the load.
 *IF,dimensions,EQ,2,THEN
-    DL,4, ,ALL,0
+    DL, 4, , ALL, 0
 
-    NSEL,S,,,node_load
-    F,ALL,FX,load_x_2d
-    F,ALL,FY,load_y_2d
+    ! Define trigonometric functions to use degrees.
+    *AFUN, DEG
+    ! Calculate x- and y-components of the load.
+    load_x = COS(angle)*load
+    load_y = SIN(angle)*load
+
+    ! Select the node closest to the desired load position.
+    mesh_size_x = length/(length/0.1-1)
+    mesh_size_y = height/(height/0.1-1)
+    tolerance_x = 0.9*(mesh_size_x/2)
+    tolerance_y = 0.9*(mesh_size_y/2)
+    NSEL, S, LOC, X, (position*length)-tolerance_x, (position*length)+tolerance_x
+    NSEL, R, LOC, Y, 0-tolerance_y, 0+tolerance_y
+    F, ALL, FX, load_x
+    F, ALL, FY, load_y
 *ELSE
     DA,5,ALL,0
 
@@ -148,12 +150,11 @@ MPDATA,PRXY,1,,0.3
 
 ! Select all nodes again, which is required for solving.
 ALLSEL
+FINISH
 
 
 ! Solve.
-FINISH
 /SOL
-! /STATUS,SOLU
 SOLVE
 FINISH
 
@@ -161,51 +162,6 @@ FINISH
 ! Enter the database results postprocessor.
 /POST1
 SET,FIRST
-
-
-! Show contour plot. Skipping this may minimize runtime.
-*IF,0,EQ,1,THEN
-    /SHOW,WIN32C
-    SET,FIRST   
-    /PLOPTS,INFO,3  
-    /CONTOUR,ALL,18 
-    /PNUM,MAT,1 
-    /NUMBER,1   
-    ! /REPLOT,RESIZE  
-    PLNSOL,S,EQV
-    /UIS,ABORT,1  
-    /SHOW,WIN32 
-    ! /REPLOT,RESIZE  
-    !*  
-    ! /DSCALE,ALL,OFF 
-    ! /EFACET,1   
-    ! PLNSOL, S,EQV, 0,1.0
-    ! /EFACET,1   
-    ! PLNSOL, S,EQV, 0,1.0
-    ! /triad,off  
-    ! /REPLOT 
-    FINISH  
-
-    ! /SHOW,WIN32C
-    SET,FIRST   
-    /DSCALE,ALL,OFF
-    /PLOPTS,INFO,3  
-    /PLOPTS,LEG1,0  
-    /PLOPTS,LEG2,1  
-    /PLOPTS,LEG3,0  
-    /PLOPTS,FRAME,0 
-    /PLOPTS,TITLE,0 
-    /PLOPTS,MINM,0  
-    /PLOPTS,FILE,0  
-    /PLOPTS,SPNO,0  
-    /PLOPTS,LOGO,1  
-    /PLOPTS,WINS,1  
-    /PLOPTS,WP,0
-    /PLOPTS,DATE,0  
-    /TRIAD,OFF  
-    ! /REPLOT
-    !*
-*ENDIF
 
 
 ! Get nodal results as an array.
@@ -217,14 +173,18 @@ SET,FIRST
 
 
 ! Write the results to a file.
-! placeholder_define_suffix
-! placeholder_define_number
-! placeholder_define_filename
-*CFOPEN,filename,'txt'
-*VWRITE,stress(1),location_x(1),location_y(1),location_z(1)
+filename = 'stress_%angle%_%length%_%height%_%position%'
+*CFOPEN, filename, 'txt'
+*VWRITE, stress(1), location_x(1), location_y(1), location_z(1)
 (E10.4, ',', F6.3, ',', F6.3, ',', F6.3)
 *CFCLOS
 
 /CLEAR
+# Restore parameters previously saved after calling /CLEAR.
+PARRES
 
-! placeholder_loop_end
+
+*ENDDO
+*ENDDO
+*ENDDO
+*ENDDO

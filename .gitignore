@@ -4,7 +4,7 @@
 *.pth
 *.png
 subset*.txt
-ansys_script.lgw
+Stress 2D*/*.txt
 Labels 2D/*.txt
 Labels 3D
 Results
