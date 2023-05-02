@@ -4,7 +4,7 @@
 import torch
 from torch.utils.data import Dataset
 
-from helpers import *
+from preprocessing import *
 
 
 def transform_exponentiation(data: torch.Tensor, power: float, inverse: bool):

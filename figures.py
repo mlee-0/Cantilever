@@ -7,7 +7,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from helpers import *
+from preprocessing import *
 from datasets import CantileverDataset, generate_simulation_parameters
 
 

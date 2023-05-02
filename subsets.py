@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 
-from helpers import *
+from preprocessing import *
 
 
 def stratify_samples(labels: np.ndarray, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:

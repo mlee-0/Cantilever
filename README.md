@@ -27,7 +27,7 @@ Open Ansys and run the script `ansys_script.lgw`.
 
 Each line in a text file contains the response value at a different node (not an element) along with the X, Y, and Z coordinates of that node. The coordinates of the node are used later to insert each response value into the proper location in a matrix.
 
-Run `helpers.py` to process and cache the text files for easier loading when training models. Specifically, this code reads the response data contained in the text files and converts them into tensors and saves them as [`.pickle` files](https://docs.python.org/3/library/pickle.html). Caching the data in this way avoids having to read and convert the text files directly every time a model is trained, which takes longer.
+Run `preprocessing.py` to process and cache the text files for easier loading when training models. Specifically, this code reads the response data contained in the text files and converts them into tensors and saves them as [`.pickle` files](https://docs.python.org/3/library/pickle.html). Caching the data in this way avoids having to read and convert the text files directly every time a model is trained, which takes longer.
 
 Define the location and name of the `.pickle` file in the `CantileverDataset` class in `datasets.py`.
 

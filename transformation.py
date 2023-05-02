@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
 
-from helpers import read_pickle
+from preprocessing import read_pickle
 
 
 def transform_exponentiation(data, x: np.ndarray):

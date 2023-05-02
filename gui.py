@@ -17,7 +17,7 @@ from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QSplitter, QFileDialog
 
-from helpers import FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap
+from preprocessing import FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap
 import main
 import networks
 
