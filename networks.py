@@ -193,7 +193,7 @@ class StressNet3d(nn.Module):
         return x
 
 
-# Store all classes defined in this module in a dictionary.
+# Store all classes defined in this module in a dictionary, used by the GUI.
 networks = []
 start_lines = {}
 for name, obj in inspect.getmembers(sys.modules[__name__]):

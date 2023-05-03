@@ -6,8 +6,9 @@ import math
 import os
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-from preprocessing import *
+from preprocessing import read_pickle
 
 
 def stratify_samples(labels: np.ndarray, filename: str, subset_size: int, bins: int, nonuniformity: float = 1.0) -> None:
@@ -74,14 +75,14 @@ def stratify_samples(labels: np.ndarray, filename: str, subset_size: int, bins: 
     np.random.shuffle(sample_indices)
 
     # Write the sample indices to a text file.
-    filepath = os.path.join(FOLDER_ROOT, filename)
+    filepath = os.path.join('.', filename)
     with open(filepath, "w") as f:
         f.writelines("\n".join([str(_) for _ in sample_indices]))
         print(f"Wrote subset of {len(sample_indices)} samples to {filepath}.")
 
 
 if __name__ == "__main__":
-    labels = read_pickle("Cantilever/Labels 2D/labels.pickle")
+    labels = read_pickle("Cantilever/Stress 2D 2023-02/labels.pickle")
     stratify_samples(
         labels,
         "subset_2d_500.txt",

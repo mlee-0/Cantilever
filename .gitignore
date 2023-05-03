@@ -4,8 +4,8 @@
 *.pth
 *.png
 subset*.txt
-Stress 2D*/*.txt
-Labels 2D/*.txt
+Stress*/*.txt
+Labels*/*.txt
 Labels 3D
 Results
 Stratified Sampling Predictions/*

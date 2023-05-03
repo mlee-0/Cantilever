@@ -1,6 +1,8 @@
 """Define classes that load datasets."""
 
 
+from typing import *
+
 import torch
 from torch.utils.data import Dataset
 
@@ -49,7 +51,7 @@ class CantileverDataset(Dataset):
         parameters = generate_simulation_parameters()
 
         # Create input images.
-        self.inputs = generate_input_images(parameters)
+        self.inputs = make_inputs(parameters)
         self.inputs = torch.tensor(self.inputs).float()
         # Normalize to zero mean and unit standard deviation.
         if normalize_inputs:
@@ -57,7 +59,7 @@ class CantileverDataset(Dataset):
             self.inputs /= self.inputs.std()
 
         # Load preprocessed labels.
-        self.labels = read_pickle(os.path.join(FOLDER_ROOT, 'Labels 2D', 'labels.pickle'))
+        self.labels = read_pickle(os.path.join('Stress 2D 2023-05', 'labels.pickle'))
         self.labels = torch.tensor(self.labels)
 
         # The raw maximum value found in the entire dataset.
@@ -142,7 +144,7 @@ class CantileverDataset3d(Dataset):
         print(f"Using transformation exponent: {self.transformation_exponent}.")
 
         # Load preprocessed labels.
-        self.labels = read_pickle(os.path.join(FOLDER_ROOT, 'Labels 3D', 'labels.pickle'))
+        self.labels = read_pickle(os.path.join('Labels 3D', 'labels.pickle'))
         # Transpose dimensions for shape: (samples, 1, height (Y), length (X), width (Z)).
         self.labels = np.expand_dims(self.labels, axis=1).transpose((0, 1, 3, 4, 2))
         print(f"Label images take up {self.labels.nbytes/1e6:,.2f} MB.")
@@ -154,7 +156,7 @@ class CantileverDataset3d(Dataset):
         self.labels = self.transform(self.labels, inverse=False)
         
         # Create inputs.
-        self.inputs = generate_input_images_3d(parameters)
+        self.inputs = make_inputs_3d(parameters)
         if normalize_inputs:
             raise NotImplementedError()
         print(f"Input images take up {self.inputs.nbytes/1e6:,.2f} MB.")

@@ -17,7 +17,7 @@ from PyQt5.QtCore import Qt, QTimer, QMargins
 from PyQt5.QtGui import QFont, QImage, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QGridLayout, QFormLayout, QButtonGroup, QWidget, QScrollArea, QTabWidget, QTableWidget, QTableWidgetItem, QPushButton, QToolButton, QRadioButton, QCheckBox, QLabel, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QSplitter, QFileDialog
 
-from preprocessing import FOLDER_ROOT, FOLDER_CHECKPOINTS, array_to_colormap
+from preprocessing import array_to_colormap
 import main
 import networks
 
@@ -462,7 +462,7 @@ class MainWindow(QMainWindow):
 
     def open_dialog_model(self):
         """Show a file dialog to choose an existing model file or specify a new model file name."""
-        dialog = QFileDialog(self, directory=FOLDER_CHECKPOINTS, filter="(*.pth)")
+        dialog = QFileDialog(self, directory='Checkpoints', filter="(*.pth)")
         dialog.setFileMode(QFileDialog.AnyFile)
         if dialog.exec_():
             files = dialog.selectedFiles()
@@ -472,7 +472,7 @@ class MainWindow(QMainWindow):
 
     def open_dialog_subset(self):
         """Show a file dialog to choose an existing subset file."""
-        filename, _ = QFileDialog.getOpenFileName(self, directory=FOLDER_ROOT, filter="(*.txt)")
+        filename, _ = QFileDialog.getOpenFileName(self, directory='.', filter="(*.txt)")
 
         filename = os.path.basename(filename)
         if filename:

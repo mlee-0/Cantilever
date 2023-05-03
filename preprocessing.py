@@ -13,28 +13,12 @@ import numpy as np
 from PIL import Image
 
 
-try:
-    from google.colab import drive  # type: ignore (forces Pylance in VS Code to ignore the missing import error)
-except ModuleNotFoundError:
-    GOOGLE_COLAB = False
-else:
-    GOOGLE_COLAB = True
-    drive.mount("/content/drive")
-
-# Folders and files.
-FOLDER_ROOT = "." if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
-FOLDER_CHECKPOINTS = os.path.join(FOLDER_ROOT, "Checkpoints")
-
 # Size of input images (height, width). Must have the same aspect ratio as the largest possible cantilever geometry.
 INPUT_SIZE = (16, 32)
 INPUT_SIZE_3D = (16, 32, 16)
-# Number of nodes to create in each direction in FEA.
-NODES_X = 32
-NODES_Y = 16
-NODES_Z = 16
 # Size of output images (height, width) produced by the network. Each pixel corresponds to a single node in the FEA mesh.
-OUTPUT_SIZE = (NODES_Y, NODES_X)
-OUTPUT_SIZE_3D = (NODES_Y, NODES_X, NODES_Z)
+OUTPUT_SIZE = (16, 32)
+OUTPUT_SIZE_3D = (16, 32, 16)
 
 
 def generate_simulation_parameters() -> List[Tuple[float, float, float, float]]:
@@ -48,10 +32,11 @@ def generate_simulation_parameters() -> List[Tuple[float, float, float, float]]:
         for position in np.arange(0.2, 1.0+0.1, 0.2).round(1)
     ]
 
-def get_parameters_from_filename(filename: str) -> Tuple[float, float, float, float]:
+def get_parameters_from_filename(filename: str) -> Tuple[float, ...]:
+    """Return a tuple of the simulation parameters defined in the filename, which is assumed to have the format: `prefix_<parameter 1>_<...>_<parameter n>.txt`."""
     return tuple(float(_) for _ in filename[:-4].split('_')[1:])
 
-def generate_input_images(parameters: List[Tuple[float, float, float, float]]) -> np.ndarray:
+def make_inputs(parameters: List[Tuple[float, float, float, float]]) -> np.ndarray:
     """Create inputs for each set of parameters as a 4D array, with dimensions: (data, channels, height, width)."""
 
     time_start = time.time()
@@ -59,7 +44,7 @@ def generate_input_images(parameters: List[Tuple[float, float, float, float]]) -
     h, w = INPUT_SIZE
     array = np.zeros((len(parameters), 2, h, w), int)
 
-    for i, (length, height, position, angle) in enumerate(parameters):
+    for i, (angle, length, height, position) in enumerate(parameters):
         pixel_length = round(length / 0.1)
         pixel_height = round(height / 0.1)
 
@@ -85,7 +70,7 @@ def generate_input_images(parameters: List[Tuple[float, float, float, float]]) -
 
     return array
 
-def generate_input_images_3d(parameters: List[Tuple[float, float, float, float, float, float]]) -> np.ndarray:
+def make_inputs_3d(parameters: List[Tuple[float, float, float, float, float, float]]) -> np.ndarray:
     """Create inputs for each set of parameters as a 5D array, with dimensions: (samples, channels, height, width, depth)."""
 
     time_start = time.time()
@@ -124,9 +109,9 @@ def generate_input_images_3d(parameters: List[Tuple[float, float, float, float, 
 
     return array
 
-def generate_label_images(folder: str) -> np.ndarray:
+def make_labels(folder: str) -> np.ndarray:
     """Return a 4D array of images for the FEA text files found in the specified folder, with dimensions: (samples, channels, height, width)."""
-    
+
     time_start = time.time()
 
     parameters = generate_simulation_parameters()
@@ -149,7 +134,6 @@ def generate_label_images(folder: str) -> np.ndarray:
             [float(value) if j == 0 else round(float(value), 2) for j, value in enumerate(line.split(','))]
             for line in lines
         ]
-        print(len(values))
         # Sort the values using the coordinates.
         values.sort(key=lambda _: (_[-1], _[-2], _[-3]))
         # Remove coordinates.
@@ -161,7 +145,7 @@ def generate_label_images(folder: str) -> np.ndarray:
         # Insert the values into the combined array, aligned top-left. Flip along height due to inverted y-axis in FEA.
         array[i, 0, :pixel_height, :pixel_length] = np.reshape(values, (pixel_height, pixel_length))[::-1, :]
         
-        if (i+1) % 100 == 0:
+        if (i+1) % 10 == 0:
             print(f"Reading label {i+1} / {len(filenames)}...", end='\r')
     print()
 
@@ -243,25 +227,8 @@ def write_pickle(x: object, filepath: str) -> None:
     print(f"Saved {type(x)} to {filepath} in {time_end - time_start:.2f} seconds.")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Convert text files to an array and save them as .pickle files.
-    folder = os.path.join(FOLDER_ROOT, "Stress 2D 2023-05-02")
-    labels = generate_label_images(folder)
+    folder = "Stress 2D 2023-05"
+    labels = make_labels(folder)
     write_pickle(labels, os.path.join(folder, "labels.pickle"))
-
-    labels_new = read_pickle('Stress 2D 2023-05-02/labels.pickle')
-    labels_old = read_pickle('Labels 2D/labels.pickle')
-    mae = [np.mean(np.abs(labels_new[1] - labels_old[i])) for i in range(labels_old.shape[0])]
-    i = mae.index(min(mae))
-    # d = np.abs(labels_new - labels_old[:2])
-    # print(d[d > 0].mean())
-    # print(d[d > 0].max())
-    # import matplotlib.pyplot as plt
-    # for i in range(0, 5):
-    plt.subplot(1, 2, 1)
-    plt.imshow(labels_new[1, 0], cmap='Spectral_r')
-    plt.subplot(1, 2, 2)
-    plt.imshow(labels_old[i, 0], cmap='Spectral_r')
-    plt.show()
-    print(labels_new[1, 0])
-    print(labels_old[i, 0])

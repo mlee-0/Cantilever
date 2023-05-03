@@ -160,7 +160,7 @@ def plot_inputs():
     """Both channels of an input image."""
 
     parameters = generate_simulation_parameters()
-    inputs = generate_input_images(parameters)
+    inputs = make_inputs(parameters)
     i = 5200  #829
 
     plt.figure(figsize=(4, 6))

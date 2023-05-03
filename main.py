@@ -19,6 +19,17 @@ import metrics
 from networks import *
 
 
+try:
+    from google.colab import drive  # type: ignore (forces Pylance in VS Code to ignore the missing import error)
+except ModuleNotFoundError:
+    GOOGLE_COLAB = False
+else:
+    GOOGLE_COLAB = True
+    drive.mount("/content/drive")
+
+FOLDER_ROOT = "." if not GOOGLE_COLAB else "drive/My Drive/Colab Notebooks"
+FOLDER_CHECKPOINTS = os.path.join(FOLDER_ROOT, "Checkpoints")
+
 # Free memory between subsequent runs.
 if GOOGLE_COLAB:
     gc.collect()
@@ -57,7 +68,7 @@ def plot_loss(losses_training: List[float], losses_validation: List[float]) -> N
     plt.legend()
     plt.show()
 
-def train_regression(
+def train_model(
     device: str, epoch_count: int, checkpoint: dict, filepath_model: str, save_model_every: int, save_best_separately: bool,
     model: nn.Module, optimizer: torch.optim.Optimizer, loss_function: nn.Module,
     train_dataloader: DataLoader, validate_dataloader: DataLoader,
@@ -221,7 +232,7 @@ def train_regression(
 
     return model
 
-def test_regression(
+def test_model(
     device: str, model: nn.Module, loss_function: nn.Module, dataset: Dataset, test_dataloader: DataLoader,
     queue=None, queue_to_main=None, info_gui: dict=None,
 ) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
@@ -484,7 +495,7 @@ def main(
         queue.put(info_gui)
 
     if train:
-        model = train_regression(
+        model = train_model(
             device = device,
             epoch_count = epoch_count,
             checkpoint = checkpoint,
@@ -514,7 +525,7 @@ def main(
     model.load_state_dict(checkpoint['model_state_dict'])
 
     if test:
-        outputs, labels, inputs = test_regression(
+        outputs, labels, inputs = test_model(
             device = device,
             model = model,
             loss_function = loss_function,
